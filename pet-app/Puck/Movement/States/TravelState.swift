@@ -1,0 +1,96 @@
+//
+//  TravelState.swift
+//  Puck
+//
+//  Being carried from one world to the other -- desktop to tank, or back.
+//
+//  The move used to be a cut: fade out, set the position, fade in. It read as
+//  the pet vanishing and a copy appearing somewhere else, which is not what
+//  moving house looks like. This glides it across instead, so the eye follows
+//  one pet the whole way.
+//
+//  Walking there was never an option and still isn't: the route would cross
+//  window frames the pet cannot stand on. This is deliberately a flight --
+//  the pet is being carried, not walking -- which is why it eases in and out
+//  rather than moving at the walk speed.
+//
+
+import CoreGraphics
+import Foundation
+
+final class TravelState: StateHandler {
+    let name = "Travel"
+    /// The airborne clip. The pet is off the ground for the whole trip, and
+    /// the walk cycle against a flight reads as running on air.
+    let clipKey = "fall"
+    let loopsClip = true
+
+    /// Set together, immediately before transitioning in.
+    var origin: CGPoint?
+    var destination: CGPoint?
+    /// Short enough not to hold up whatever prompted the move, long enough to
+    /// be a movement rather than a jump.
+    var duration: TimeInterval = 0.42
+    /// Called every frame with the eased progress, so the caller can carry
+    /// anything else across on the same curve -- the pet's size shrinks into
+    /// the island this way rather than snapping when it lands.
+    var onProgress: ((Double) -> Void)?
+    /// Called on arrival, before the next state is requested -- the caller
+    /// uses it to put `roamableArea` back to the world being arrived in.
+    var onArrival: (() -> Void)?
+
+    private var elapsed: TimeInterval = 0
+    private var oneShot = OneShotTransition()
+
+    func enter() {
+        oneShot.reset()
+        elapsed = 0
+    }
+
+    func exit() {
+        // Cleared so a stale trip cannot be replayed by a later entry.
+        origin = nil
+        destination = nil
+        onProgress = nil
+        onArrival = nil
+    }
+
+    func update(dt: TimeInterval, context: StateContext) {
+        guard !oneShot.hasFired else { return }
+        guard let origin, let destination else {
+            finish(context)
+            return
+        }
+
+        elapsed += dt
+        let progress = duration > 0 ? min(1, elapsed / duration) : 1
+        let eased = Self.eased(progress)
+        context.body.position = CGPoint(
+            x: origin.x + (destination.x - origin.x) * eased,
+            y: origin.y + (destination.y - origin.y) * eased
+        )
+        if let facing = MovementSolver.facing(from: origin, toward: destination) {
+            context.body.facing = facing
+        }
+        onProgress?(eased)
+
+        if progress >= 1 { finish(context) }
+    }
+
+    private func finish(_ context: StateContext) {
+        // The end of the same curve, so a trip that arrived in one long frame
+        // still lands at the size it was heading for.
+        onProgress?(1)
+        onArrival?()
+        // Land, not idle: arriving is a landing, and the bounce is what makes
+        // the trip end rather than just stop.
+        oneShot.fire(.land, using: context.requestTransition)
+    }
+
+    /// Smoothstep. Constant speed reads as a machine sliding the pet across;
+    /// easing both ends reads as something picking it up and setting it down.
+    static func eased(_ t: Double) -> Double {
+        let clamped = max(0, min(1, t))
+        return clamped * clamped * (3 - 2 * clamped)
+    }
+}

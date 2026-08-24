@@ -1,0 +1,4 @@
+# Build-time only. The bundles vendor-acp.sh produces are what ships
+# (../../Puck/Resources/acp-*.mjs, committed); this tree is scratch.
+node_modules/
+package-lock.json

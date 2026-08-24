@@ -1,0 +1,233 @@
+name: Puck
+options:
+  bundleIdPrefix: com.speaki-e
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+# Native editor pane (Puck/ClientWindow/Editor). Pinned to exact tags, not
+# from:/branch: main -- both packages are pre-1.0 and actively developed.
+# CodeEditLanguages must match CodeEditSourceEditor's own exact pin (its
+# Package.swift pins CodeEditLanguages 0.1.20) or SwiftPM's dependency
+# resolution fails on two conflicting `exact` requirements for the same package.
+packages:
+  CodeEditSourceEditor:
+    url: https://github.com/CodeEditApp/CodeEditSourceEditor
+    exactVersion: "0.15.2"
+  CodeEditLanguages:
+    url: https://github.com/CodeEditApp/CodeEditLanguages
+    exactVersion: "0.1.20"
+  # The terminal under the editor. A terminal is a VT emulator, a PTY and a
+  # process, none of which is worth writing again -- SwiftTerm is the one
+  # maintained AppKit implementation of all three.
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    minVersion: "1.2.0"
+    maxVersion: "2.0.0"
+
+settings:
+  base:
+    # The version both apps report, and what a release is named after. One
+    # value for the pair on purpose: they speak a private protocol to each
+    # other and are only ever installed together, so a version that could
+    # differ between them would describe a pair that cannot exist.
+    MARKETING_VERSION: "0.1.1"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: true
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+
+targets:
+  Puck:
+    type: application
+    platform: macOS
+    sources:
+      - path: Puck
+        excludes:
+          - Resources/Info.plist
+          - Resources/Puck.entitlements
+          - Resources/Avatars
+          - Resources/Toys
+      # Folder reference, not a group: the avatar package must keep its
+      # Avatars/<name>/{manifest.json,*.usdz,sounds/} layout inside the app
+      # bundle. As a group, Xcode flattens every file into Resources/ and
+      # AvatarInstaller has nothing structured to copy out.
+      - path: Puck/Resources/Avatars
+        type: folder
+        buildPhase: resources
+      # Folder reference for the same reason as Avatars: each toy keeps its
+      # own directory in the bundle, so ToyCatalogue can look artwork up by
+      # toy name instead of relying on every file having a unique flat name.
+      - path: Puck/Resources/Toys
+        type: folder
+        buildPhase: resources
+      # Folder reference for the same reason as the two above: FileIconTheme
+      # looks icons up by name inside FileIcons/icons/, and a group would
+      # flatten 1,125 SVGs into Resources/ where they'd collide with anything
+      # else named the same. scripts/vendor-file-icons.sh writes it.
+      - path: Puck/Resources/FileIcons
+        type: folder
+        buildPhase: resources
+      # Folder reference for the same reason: TankBackground looks the island's
+      # artwork up by name inside TankBackgrounds/.
+      - path: Puck/Resources/TankBackgrounds
+        type: folder
+        buildPhase: resources
+    info:
+      path: Puck/Resources/Info.plist
+      properties:
+        LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        # From the build settings rather than written out here, so the pair
+        # cannot report two different versions -- see MARKETING_VERSION.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Without this the compiled asset catalog is in the bundle but macOS
+        # never looks for an icon in it -- both apps shipped iconless.
+        CFBundleIconName: AppIcon
+        NSMicrophoneUsageDescription: "Used to recognize voice commands via Push-to-Talk (PTT)."
+        NSSpeechRecognitionUsageDescription: "Used to convert spoken commands into text."
+        NSAppleEventsUsageDescription: "Needs to control other apps to run the run_applescript tool."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.Puck
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: Puck/Resources/Puck.entitlements
+    # Puck/ClientWindow/Editor is sourced by this target too (the whole
+    # `Puck` folder is), so it needs the same editor-pane package dependency
+    # as PuckClient even though the pet itself never shows an editor UI --
+    # same structural situation as it already linking WebKit for the same
+    # reason (EditorWebView.swift was compiled here pre-native-editor too).
+    dependencies:
+      - package: CodeEditSourceEditor
+      - package: CodeEditLanguages
+      - package: SwiftTerm
+    scheme:
+      testTargets:
+        - PuckTests
+      commandLineArguments:
+        "-PuckUITestMode": false
+
+  # F13 (2026-07-30): the Claude-Desktop-style client window used to live
+  # in-process inside Puck; it's now this separate, regular (Dock-
+  # resident) app instead, so it gets a real Dock icon / Cmd+Tab / Spotlight
+  # presence that an LSUIElement app can't have. It shares
+  # ClientWindow/Localization and the
+  # wire-protocol subset of Bridge/ directly from Puck's sources rather
+  # than through a separate framework target -- at this project's size a
+  # real framework would mean marking ~17 files' worth of types/members
+  # `public` for no real benefit, so both targets just compile the same
+  # source files independently.
+  PuckClient:
+    type: application
+    platform: macOS
+    sources:
+      - path: PuckClient
+        excludes:
+          - Resources/Info.plist
+          - Resources/PuckClient.entitlements
+      - path: Puck/ClientWindow
+      - path: Puck/Localization
+      # AgentSettingsView reuses SettingsSection/SettingsStackedRow rather
+      # than hand-duplicating their padding, type sizes and row heights, which
+      # had drifted out of step with the settings window.
+      # Only this one file, not all of Puck/Settings -- the rest depends on
+      # SettingsStore/AppAppearance/AvatarManagementView, which are Puck's.
+      - path: Puck/Settings/SettingsComponents.swift
+      # F15 (2026-07-31): the agent loop. Compiled into this app, not
+      # Puck -- the pet executes tools, the client decides which ones.
+      - path: Puck/Agent
+      - path: Puck/Tools/ToolRegistry.swift
+      - path: Puck/Tools/ToolTimeouts.swift
+      # protocol section 7's `src: "agent"` log lines (2026-08-12). Both apps
+      # write to the same logs directory so one `id` joins the agent's
+      # tool_call/tool_result with pet-app's tool_exec_start/end -- without
+      # the agent half a failed call is an id with no tool name and no reason.
+      - path: Puck/Tools/ToolExecutionLogger.swift
+      # AgentRunner logs a failed run's raw provider response here rather than
+      # putting it in the transcript, so this target needs it too. Only this
+      # file, not all of Puck/Diagnostics -- the rest is the pet's permission
+      # onboarding UI, which this app has no part in.
+      - path: Puck/Diagnostics/AppLogger.swift
+      # Both loggers this target compiles append through it.
+      - path: Puck/Diagnostics/JSONLinesFileAppender.swift
+      # show_code has to hand point_at a rect in the pet's normalized
+      # (top-left) space, but the editor pane reports AppKit's bottom-left
+      # one. This is the one place that flip is defined; a copy here would be
+      # a second thing to keep right.
+      - path: Puck/Movement/GlobalScreenSpace.swift
+      - path: Puck/Resources/Assets.xcassets
+      - path: Puck/Bridge/BridgeMessages.swift
+      - path: Puck/Bridge/JSONValue.swift
+      - path: Puck/Bridge/BridgeConnection.swift
+      - path: Puck/Bridge/BridgeSocketPath.swift
+      - path: Puck/Bridge/BridgeHandshakeSecret.swift
+      - path: Puck/Bridge/BridgeSocketClient.swift
+      - path: Puck/Bridge/UserInputSender.swift
+      - path: Puck/App/CompanionAppLauncher.swift
+      - path: Puck/App/AppIdentity.swift
+      # The island reads the tank's picture from the folder people drop their
+      # own into, and this app is the one that draws the island.
+      - path: Puck/Customisation/Customisation.swift
+      # This is the app that shows the editor pane, so it needs the icon set
+      # FileIconTheme reads. Folder reference for the same reason as in Puck's
+      # own list above.
+      - path: Puck/Resources/FileIcons
+        type: folder
+        buildPhase: resources
+      # This is the app that draws the island, so it needs the artwork the
+      # seabed background fills it with.
+      - path: Puck/Resources/TankBackgrounds
+        type: folder
+        buildPhase: resources
+      # And the ACP agents, because this is also the app that runs code_editor
+      # (AgentHost -> CodeEditorRunner -> AcpAgentProcess). Puck's target picks
+      # these up implicitly by sourcing the whole Puck/ folder; this target
+      # lists files one by one, so leaving them out shipped a PuckClient that
+      # failed every edit with agentScriptMissing while Puck.app carried the
+      # scripts it never uses.
+      - path: Puck/Resources/acp-claude.mjs
+        buildPhase: resources
+      - path: Puck/Resources/acp-codex.mjs
+        buildPhase: resources
+    info:
+      path: PuckClient/Resources/Info.plist
+      properties:
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Same pumpkin, stamped "client": two Dock icons from the same mark
+        # are otherwise impossible to tell apart (byeolki, 2026-07-30).
+        CFBundleIconName: AppIconClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClient
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIconClient
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: PuckClient/Resources/PuckClient.entitlements
+    dependencies:
+      - package: CodeEditSourceEditor
+      - package: CodeEditLanguages
+      - package: SwiftTerm
+
+  PuckTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PuckTests
+      # Compiled straight into the test bundle rather than reached through
+      # @testable import: it belongs to PuckClient, and adding it to the
+      # Puck target instead would change the pet's binary (and with it
+      # its ad-hoc signature, i.e. its Accessibility grant) for a file the
+      # pet never uses.
+      - path: PuckClient/ClientMainMenu.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckTests
+        # Xcode 26 refuses to code sign a test bundle with no Info.plist.
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Puck

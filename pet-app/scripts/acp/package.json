@@ -1,0 +1,14 @@
+{
+  "name": "@speaki-e/puck-acp-vendor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build-time only: pins the ACP agent packages that vendor-acp.sh bundles into Puck.app. Nothing here ships as node_modules -- see ../vendor-acp.sh.",
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  },
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.64.0",
+    "@agentclientprotocol/codex-acp": "1.2.0"
+  }
+}

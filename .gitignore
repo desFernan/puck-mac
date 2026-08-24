@@ -1,0 +1,27 @@
+# Everything that is not Xcode's build output lives here; pet-app/.gitignore
+# holds only what the project generates. One rule per thing, in one place --
+# the two files used to repeat each other, and a pattern with a slash in it is
+# anchored to the file it is written in, so the copies did not even mean the
+# same thing.
+
+# macOS
+.DS_Store
+
+# Local secrets and logs
+.env
+*.log
+
+# Local debug/scratch output, never intentional to commit
+tmp-screenshots/
+
+# AI-generated planning/analysis/design docs. Written to disk on purpose and
+# kept out of the repo on purpose: they are working notes for one task, not
+# something the next reader of this repository should have to sort through.
+docs/superpowers/
+.superpowers/
+
+# Isolated workspaces for subagent-driven development
+.worktrees/
+
+# graphify knowledge graph output
+graphify-out/
