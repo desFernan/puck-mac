@@ -27,14 +27,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         broadcast: { [weak self] message in
             self?.bridgeClient.broadcast(message) ?? false
         },
+        // Through the store's own snapshot, not its published array: this is
+        // asked from inside a run, on whatever executor the run is using,
+        // while the array itself belongs to the main thread.
         resolveProjectPath: { [weak self] workspaceId in
-            self?.clientWindowStore.workspaces.first { $0.id == workspaceId }?.projectPath
+            self?.clientWindowStore.workspaceSnapshot(workspaceId)?.projectPath
         },
         // Tells the agent which project it is looking at. Read fresh per run
         // rather than captured: the user switches workspaces between turns.
         describeWorkspace: { [weak self] workspaceId in
-            guard let workspace = self?.clientWindowStore.workspaces.first(where: { $0.id == workspaceId })
-            else { return nil }
+            guard let workspace = self?.clientWindowStore.workspaceSnapshot(workspaceId) else { return nil }
             return AgentRunner.WorkspaceContext(name: workspace.name, projectPath: workspace.projectPath)
         }
     )
@@ -333,19 +335,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             agentHost.handle(result)
         case .userInput(let input):
             // Mirrored from pet-app's quick-capture bubble: typing there has
-            // to bring this window up with the text already in the chat
-            // Only shows the window if the message
-            // actually landed in a session -- an unknown workspace/session
-            // would pop an empty window for nothing.
-            if clientWindowStore.showUserMessage(input.text, workspaceId: input.workspaceId, sessionId: input.sessionId) {
+            // to bring this window up with the text already in the chat.
+            // The run is addressed to wherever the text landed rather than to
+            // the ids that arrived -- those can name a session this window
+            // does not have, and the store then puts it in the chat on screen.
+            if let landed = clientWindowStore.showUserMessage(
+                input.text,
+                workspaceId: input.workspaceId,
+                sessionId: input.sessionId
+            ) {
                 showWindow()
                 // F15: and it is a command, not just text to display -- the
                 // pet's bubble and its push-to-talk are inputs to the same
                 // agent the chat's own input bar feeds.
                 agentHost.run(
                     command: input.text,
-                    workspaceId: input.workspaceId ?? ClientWindowStore.defaultWorkspaceId,
-                    sessionId: input.sessionId ?? ClientWindowStore.defaultSessionId
+                    workspaceId: landed.workspaceId,
+                    sessionId: landed.sessionId
                 )
             }
         default:

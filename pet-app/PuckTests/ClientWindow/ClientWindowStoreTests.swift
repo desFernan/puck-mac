@@ -495,7 +495,7 @@ final class ClientWindowStoreTests: XCTestCase {
     func test_showUserMessage_withoutIds_landsInTheDefaultCasualSession() {
         let (store, _) = makeStore()
 
-        XCTAssertTrue(store.showUserMessage("사파리 켜줘", workspaceId: nil, sessionId: nil))
+        XCTAssertNotNil(store.showUserMessage("사파리 켜줘", workspaceId: nil, sessionId: nil))
 
         XCTAssertEqual(store.session(workspaceId: "default", sessionId: "default")?.timeline.count, 1)
         XCTAssertEqual(store.activeWorkspaceId, "default")
@@ -506,20 +506,28 @@ final class ClientWindowStoreTests: XCTestCase {
         let (store, _) = makeStore()
         store.handleClientUpdate(.workspaceCreate(workspaceId: "w2", name: "cat house", projectPath: nil))
 
-        XCTAssertTrue(store.showUserMessage("hi", workspaceId: "w2", sessionId: "default"))
+        XCTAssertNotNil(store.showUserMessage("hi", workspaceId: "w2", sessionId: "default"))
 
         XCTAssertEqual(store.activeWorkspaceId, "w2")
         XCTAssertEqual(store.activeSessionId, "default")
     }
 
-    /// Same rule as handleChatEvent: an unknown session is dropped, not
-    /// fabricated -- PuckClient keys "should I bring the window up?" off
-    /// this, and an empty window popping open for a dropped message is worse
-    /// than nothing.
-    func test_showUserMessage_forAnUnknownSession_isDropped() {
+    /// Unlike handleChatEvent, which drops an event for a session it does not
+    /// have: this text is something a person just typed into the pet's bubble
+    /// and was told had been sent. It lands in the chat on screen instead,
+    /// and the caller is told where so the run goes to the same place.
+    func test_showUserMessage_forAnUnknownSession_landsInTheChatOnScreen() {
         let (store, _) = makeStore()
 
-        XCTAssertFalse(store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope"))
+        let landed = store.showUserMessage("hi", workspaceId: "nope", sessionId: "nope")
+
+        XCTAssertEqual(landed?.workspaceId, store.activeWorkspaceId)
+        XCTAssertEqual(landed?.sessionId, store.activeSessionId)
+        let session = store.session(workspaceId: store.activeWorkspaceId, sessionId: store.activeSessionId)
+        guard case .userMessage(_, let text)? = session?.timeline.last else {
+            return XCTFail("expected the text in the visible chat, got \(String(describing: session?.timeline.last))")
+        }
+        XCTAssertEqual(text, "hi")
     }
 
     // themeStyle moved to being a

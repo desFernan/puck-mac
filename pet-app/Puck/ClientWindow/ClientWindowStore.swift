@@ -113,7 +113,36 @@ final class ClientWindowStore: ObservableObject {
     var onApprovalResolved: ((_ approvalId: String, _ approved: Bool) -> Void)?
     var onRunCancelled: (() -> Void)?
 
-    @Published private(set) var workspaces: [ClientWorkspace]
+    @Published private(set) var workspaces: [ClientWorkspace] {
+        didSet { refreshWorkspaceIndex() }
+    }
+
+    /// What `workspaces` says, readable from any thread.
+    ///
+    /// The array itself is not: SwiftUI mutates it on the main thread, and
+    /// the agent asks which project a workspace points at from inside a run,
+    /// on whatever executor that run is using. Those overlapped -- a
+    /// workspace created or deleted over the socket mid-run is a mutation
+    /// racing a read of the same array, not merely a stale answer. This is
+    /// the copy the other threads read.
+    private let workspaceIndexLock = NSLock()
+    private var workspaceIndex: [String: ClientWorkspace] = [:]
+
+    /// One workspace, for a caller that is not on the main thread. Nil when
+    /// there is no such workspace -- including when it has just been deleted,
+    /// which is the honest answer to a run still asking about it.
+    nonisolated func workspaceSnapshot(_ id: String) -> ClientWorkspace? {
+        workspaceIndexLock.lock()
+        defer { workspaceIndexLock.unlock() }
+        return workspaceIndex[id]
+    }
+
+    private func refreshWorkspaceIndex() {
+        let index = Dictionary(workspaces.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        workspaceIndexLock.lock()
+        workspaceIndex = index
+        workspaceIndexLock.unlock()
+    }
     @Published var activeWorkspaceId: String
     @Published var activeSessionId: String
 
@@ -150,6 +179,10 @@ final class ClientWindowStore: ObservableObject {
         workspaces = [ClientWorkspace(id: Self.defaultWorkspaceId, name: Self.casualSessionTitle, projectPath: nil)]
         activeWorkspaceId = Self.defaultWorkspaceId
         activeSessionId = Self.defaultSessionId
+        // `didSet` does not run for an initialisation, so the first index is
+        // built by hand -- after the last stored property, which is when
+        // `self` may be used at all.
+        refreshWorkspaceIndex()
         seedDefaultSession(forWorkspace: Self.defaultWorkspaceId)
     }
 
@@ -384,8 +417,10 @@ final class ClientWindowStore: ObservableObject {
     lazy var slashCommands: SlashCommandRunner = {
         var runner = SlashCommandRunner()
         runner.projectPath = { [weak self] in
+            // The snapshot, for the same reason the agent's closures use it:
+            // a slash command runs from wherever it was submitted.
             guard let self else { return nil }
-            return self.workspaces.first { $0.id == self.activeWorkspaceId }?.projectPath
+            return self.workspaceSnapshot(self.activeWorkspaceId)?.projectPath
         }
         return runner
     }()
@@ -523,14 +558,35 @@ final class ClientWindowStore: ObservableObject {
     }
 
     @discardableResult
-    func showUserMessage(_ text: String, workspaceId: String?, sessionId: String?) -> Bool {
-        let workspaceId = workspaceId ?? Self.defaultWorkspaceId
-        let sessionId = sessionId ?? Self.defaultSessionId
-        guard let session = session(workspaceId: workspaceId, sessionId: sessionId) else { return false }
-        session.appendUserMessage(text)
-        activeWorkspaceId = workspaceId
-        activeSessionId = sessionId
-        return true
+    /// - Returns: where the text actually landed, so the caller can run the
+    ///   agent against the same chat the user is now looking at, or nil when
+    ///   there is nowhere at all to put it.
+    ///
+    /// A named session that does not exist falls back to the chat on screen
+    /// rather than being dropped. Dropping was defensible when this only
+    /// decided whether to raise the window; it is not now that the same text
+    /// is a command. pet-app has already told the user it was sent -- a gui
+    /// connection existed -- so a disagreement between its registry and this
+    /// sidebar (a session_create that raced a reconnect) meant someone typed
+    /// into the pet's bubble, watched it accept, and nothing ever happened.
+    func showUserMessage(
+        _ text: String,
+        workspaceId: String?,
+        sessionId: String?
+    ) -> (workspaceId: String, sessionId: String)? {
+        let requestedWorkspaceId = workspaceId ?? Self.defaultWorkspaceId
+        let requestedSessionId = sessionId ?? Self.defaultSessionId
+        if let session = session(workspaceId: requestedWorkspaceId, sessionId: requestedSessionId) {
+            session.appendUserMessage(text)
+            activeWorkspaceId = requestedWorkspaceId
+            activeSessionId = requestedSessionId
+            return (requestedWorkspaceId, requestedSessionId)
+        }
+        guard let fallback = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId) else {
+            return nil
+        }
+        fallback.appendUserMessage(text)
+        return (activeWorkspaceId, activeSessionId)
     }
 
     /// Answers the oldest queued approval. The answer never leaves this
