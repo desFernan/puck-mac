@@ -1,5 +1,7 @@
 # Puck for macOS
 
+> Language: **English** (here) · [한국어](README.ko.md)
+
 > This is the macOS repo — new home for what used to live at
 > [Speaki-e/puck](https://github.com/Speaki-e/puck) (now archived).
 >
