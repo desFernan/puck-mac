@@ -141,14 +141,23 @@ final class BridgeConnection: @unchecked Sendable {
         receiveNext()
     }
 
-    func send(_ message: BridgeMessage) {
+    /// - Returns: whether the message reached the socket. False means it was
+    ///   refused here and there is nothing on the wire -- the caller has to
+    ///   answer for it, because nothing else will. A `tool_dispatch` too big
+    ///   to send used to be dropped silently while the caller was told it had
+    ///   gone, and the tool then sat out its whole timeout waiting for a
+    ///   reply nobody could send. A write that fails *after* this returns is
+    ///   still reported through `onSendError` alone; by then the caller has
+    ///   moved on.
+    @discardableResult
+    func send(_ message: BridgeMessage) -> Bool {
         // A local encoder, not a shared stored property: send() is called
         // from whatever queue each ToolHandler completes on (several hop to
         // their own background queue), so two in-flight tool_results on the
         // same connection could call encode() concurrently on one instance.
         guard var data = try? JSONEncoder().encode(message) else {
             onSendError?(BridgeConnectionError.encodingFailed)
-            return
+            return false
         }
         // The same ceiling the reader enforces, applied to what we write.
         // Only one direction was capped, so a tool result big enough for the
@@ -157,7 +166,7 @@ final class BridgeConnection: @unchecked Sendable {
         // paid to encode.
         guard data.count <= Self.maximumMessageBytes else {
             onSendError?(BridgeConnectionError.messageTooLarge)
-            return
+            return false
         }
         data.append(0x0A)
         connection.send(
@@ -168,6 +177,7 @@ final class BridgeConnection: @unchecked Sendable {
                 }
             }
         )
+        return true
     }
 
     func cancel() {

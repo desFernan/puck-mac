@@ -78,8 +78,11 @@ enum ClientMainMenu {
         menu.addItem(title: "최소화", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         menu.addItem(title: "확대/축소", action: #selector(NSWindow.performZoom(_:)))
         menu.addItem(.separator())
-        // Closing the window doesn't quit: applicationShouldTerminateAfterLast-
-        // WindowClosed is false, and the Dock icon reopens it.
+        // Closing the window quits: applicationShouldTerminateAfterLast-
+        // WindowClosed is true, so ⌘W ends the app and takes any turn still
+        // running with it (applicationWillTerminate stops the ACP children).
+        // Said out loud because the comment here used to claim the opposite,
+        // and anyone wiring a second window off this menu would believe it.
         menu.addItem(title: "닫기", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         return menu
     }

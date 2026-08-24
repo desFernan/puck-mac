@@ -28,6 +28,9 @@ final class BridgeMessageRouter {
     /// calls (02_pet-app.md F3: "detail.path 변경 시 짧은 점프"). Read/written
     /// only from `handle`, which always runs on main via dispatchToMain.
     private var lastCodeEditorPath: String?
+    /// Which chat `lastCodeEditorPath` belongs to. A path from another
+    /// session is not a previous path, it is a different conversation.
+    private var lastCodeEditorSessionId: String?
 
     /// Emitted for protocol 3.2 status events, already on the main thread.
     var onEventReaction: ((EventReaction) -> Void)?
@@ -80,13 +83,24 @@ final class BridgeMessageRouter {
                 toolExecutor.cancel(id: id)
             }
 
-        case .event(let event, _, _):
+        case .event(let event, _, let sessionId):
             dispatchToMain { [weak self] in
                 guard let self else { return }
+                // A path is only worth comparing against within one run. Kept
+                // for the life of the process, the last file of the last run
+                // was still there when a brand-new chat opened its first one,
+                // and the pet jumped for a "path change" that was really the
+                // first path of a fresh session -- the very thing
+                // EventRouter.reaction's own doc says never happens.
+                if sessionId != self.lastCodeEditorSessionId {
+                    self.lastCodeEditorPath = nil
+                    self.lastCodeEditorSessionId = sessionId
+                }
                 let reaction = EventRouter.reaction(for: event, previousCodeEditorPath: self.lastCodeEditorPath)
                 if case .toolCall(_, let tool, _, let detail) = event, tool == "code_editor" {
                     self.lastCodeEditorPath = EventRouter.codeEditorPath(from: detail) ?? self.lastCodeEditorPath
                 }
+                if case .agentDone = event { self.lastCodeEditorPath = nil }
                 self.onEventReaction?(reaction)
             }
 

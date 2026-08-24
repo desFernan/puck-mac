@@ -69,6 +69,18 @@ extension AppDelegate {
         server.onMalformedLine = {
             AppLogger.shared.log(.warning, "BridgeServer: dropped a malformed line from a client")
         }
+        // The only thing that reaches this is a process that opened the
+        // socket without the handshake secret and tried to use it. It is
+        // refused either way; logging it is the difference between that being
+        // visible and being invisible, and this socket dispatches run_shell.
+        // Not the message itself: what it carries is a stranger's payload and
+        // a log is not the place for it. That something tried is the signal.
+        server.onUnauthenticatedMessage = { _ in
+            AppLogger.shared.log(
+                .warning,
+                "BridgeServer: refused a message from a connection that never authenticated"
+            )
+        }
         server.onGUIPresenceChanged = { [weak self] hasGUI in
             guard hasGUI else {
                 // The client's tank went with it -- a rect from a process

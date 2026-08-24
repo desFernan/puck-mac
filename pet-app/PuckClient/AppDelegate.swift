@@ -91,6 +91,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agentHost.onRunFinished = { [weak self] workspaceId, sessionId in
             self?.nameChatAfterItsTopic(workspaceId: workspaceId, sessionId: sessionId)
         }
+        // Nothing else would ever show it: an event that could not go out is
+        // an event pet-app will never relay back -- see AgentHost's own note.
+        agentHost.onUndeliverableEvent = { [weak self] event, workspaceId, sessionId in
+            DispatchQueue.main.async {
+                self?.clientWindowStore.handleChatEvent(event, workspaceId: workspaceId, sessionId: sessionId)
+            }
+        }
         agentHost.onRevealInEditor = { [weak self] workspaceId, _ in
             self?.clientWindowStore.revealInEditor(workspaceId: workspaceId)
             self?.showWindow()
@@ -234,18 +241,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// NSVisualEffectView stayed in whatever the system was, so the two
     /// windows of one app sat in two appearances.
     private func setUpAppearance() {
-        applyAppearance(Self.currentAppearance())
+        applyNativeAppearance()
         appearanceObserver = DistributedNotificationCenter.default().addObserver(
             forName: AppAppearance.crossProcessChangeNotification,
             object: nil,
             queue: .main
-        ) { notification in
-            // Same reasoning as the theme observer above: the value travels
-            // with the notification, and re-reading is only the fallback.
+        ) { [weak self] notification in
             MainActor.assumeIsolated {
-                let appearance = AppAppearance.resolved(fromCrossProcessUserInfo: notification.userInfo)
-                    ?? Self.currentAppearance()
-                Self.applyAppearance(appearance)
+                self?.applyNativeAppearance(
+                    AppAppearance.resolved(fromCrossProcessUserInfo: notification.userInfo)
+                )
             }
         }
     }
@@ -256,14 +261,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    /// Both settings write `NSApp.appearance`, so one of them has to win.
+    ///
+    /// They used to write it in turn: the theme set dark/light, and the
+    /// appearance setting then set nil for its "system" default, which is
+    /// what ships -- so native chrome followed macOS while the app was in a
+    /// dark theme, the exact mismatch applyClientThemeStyle exists to
+    /// prevent. And the other way round, changing the theme overrode a Light
+    /// choice the user had made explicitly.
+    ///
+    /// The rule: an explicit Light or Dark is the user saying what they want
+    /// and wins. "System" hands the decision to the theme, because a theme is
+    /// also a deliberate choice and the panels should match the window.
     @MainActor
-    private static func applyAppearance(_ appearance: AppAppearance) {
-        NSApp.appearance = appearance.nsApplicationAppearance
-    }
-
-    @MainActor
-    private func applyAppearance(_ appearance: AppAppearance) {
-        Self.applyAppearance(appearance)
+    private func applyNativeAppearance(
+        _ appearance: AppAppearance? = nil,
+        themeStyle: ClientThemeStyle? = nil
+    ) {
+        // Either observer may already hold the new value; re-reading the
+        // defaults is the fallback, not the first choice, because the write
+        // came from the other process and its own cache may not have caught
+        // up yet.
+        if let explicit = (appearance ?? Self.currentAppearance()).nsApplicationAppearance {
+            NSApp.appearance = explicit
+            return
+        }
+        let style = themeStyle ?? currentClientThemeStyle()
+        NSApp.appearance = NSAppearance(named: style.colorScheme == .dark ? .darkAqua : .aqua)
     }
 
     private func currentClientThemeStyle() -> ClientThemeStyle {
@@ -277,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // SwiftUI's .preferredColorScheme, which never touches them -- same
         // reason Puck's own AppDelegate sets NSApp.appearance alongside
         // its SwiftUI modifier.
-        NSApp.appearance = NSAppearance(named: style.colorScheme == .dark ? .darkAqua : .aqua)
+        applyNativeAppearance(themeStyle: style)
         // Clear, so WindowBackdrop's blur is what shows. Safe here in a way
         // the 2026-08-02 attempt was not: that one made the window
         // see-through with nothing behind the content, so the native

@@ -153,8 +153,10 @@ final class BridgeServer: @unchecked Sendable {
     @discardableResult
     func send(_ message: BridgeMessage, to role: ClientRole) -> Bool {
         let targets = connections(playing: role)
-        targets.forEach { $0.send(message) }
-        return !targets.isEmpty
+        // True only if it actually went somewhere: a connection can refuse a
+        // message outright (too large to frame), and a caller told "sent"
+        // then waits for an answer nobody was asked for.
+        return targets.map { $0.send(message) }.contains(true)
     }
 
     /// Connections playing `role`, chosen on `queue`.

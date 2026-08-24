@@ -71,16 +71,52 @@ final class AgentHost {
     /// Where the events of the current run are addressed. Captured when a run
     /// starts so results land in the session the command came from even if
     /// the user switches session mid-run.
-    private var activeWorkspaceId = ClientWindowStore.defaultWorkspaceId
-    private var activeSessionId = ClientWindowStore.defaultSessionId
+    ///
+    /// Guarded by `stateQueue`, like `sessionWorkspaces` and `runGeneration`
+    /// beside them, and for the same reason: `run` writes them on the main
+    /// thread while a delegated code_editor run reads them from its own task
+    /// to address the updates it streams -- and `openTaskSession` writes
+    /// `activeSessionId` from inside the run. Unguarded, submitting a turn
+    /// while one was streaming was a read racing a write, with events
+    /// addressed to the wrong session as the visible half of it.
+    private var storedActiveWorkspaceId = ClientWindowStore.defaultWorkspaceId
+    private var storedActiveSessionId = ClientWindowStore.defaultSessionId
     /// What the user typed for the current run, kept so open_task_session can
     /// carry it into the session it moves the turn to.
-    private var activeCommand = ""
+    private var storedActiveCommand = ""
+
+    private var activeWorkspaceId: String {
+        get { stateQueue.sync { storedActiveWorkspaceId } }
+        set { stateQueue.sync { storedActiveWorkspaceId = newValue } }
+    }
+
+    private var activeSessionId: String {
+        get { stateQueue.sync { storedActiveSessionId } }
+        set { stateQueue.sync { storedActiveSessionId = newValue } }
+    }
+
+    private var activeCommand: String {
+        get { stateQueue.sync { storedActiveCommand } }
+        set { stateQueue.sync { storedActiveCommand = newValue } }
+    }
 
     /// Set by AppDelegate: reveal the editor pane on this workspace's file.
     /// Called when the agent opens a file for the user to look at, and for
     /// every file a code_editor run touches: asking to be shown code should
     /// put it on screen, and watching one get written should follow along.
+    /// An event the socket could not carry, to be applied to this window's
+    /// own chat instead.
+    ///
+    /// Events are broadcast rather than applied locally (see the header):
+    /// pet-app relays them back here, and that one path both moves the
+    /// transcript and makes the pet react. When there is no socket -- pet-app
+    /// still starting, or quit mid-turn -- the broadcast goes nowhere and
+    /// nothing replays it afterwards, so the run finished with the chat still
+    /// spinning and the failure it was reporting never shown. This is the
+    /// fallback for exactly that case, and it cannot double up: the local
+    /// path only runs when the socket refused the message.
+    var onUndeliverableEvent: ((_ event: BridgeEvent, _ workspaceId: String, _ sessionId: String) -> Void)?
+
     var onRevealInEditor: ((_ workspaceId: String, _ path: String) -> Void)?
     /// Fired once a run has fully finished, with the chat it belonged to.
     /// Naming a chat needs the agent's answer as well as the question, so it
@@ -183,11 +219,7 @@ final class AgentHost {
                 // Addressed to the run's own chat, which is not necessarily
                 // the active one: a superseded turn keeps emitting until it
                 // notices, and a run can move itself into a task session.
-                _ = self.broadcast(.event(
-                    event,
-                    workspaceId: self.workspace(of: sessionId),
-                    sessionId: sessionId
-                ))
+                self.emit(event, workspaceId: self.workspace(of: sessionId), sessionId: sessionId)
             },
             delegateCodeEditor: { [weak self] task in
                 guard let self else {
@@ -234,11 +266,7 @@ final class AgentHost {
                 // when the pet has arrived, and a bubble raised at dispatch
                 // time would have expired while it was still walking.
                 if result.ok {
-                    _ = self.broadcast(.event(
-                        .petSays(text: caption),
-                        workspaceId: workspaceId,
-                        sessionId: self.activeSessionId
-                    ))
+                    self.emit(.petSays(text: caption), workspaceId: workspaceId, sessionId: self.activeSessionId)
                 }
                 return result
             },
@@ -287,17 +315,17 @@ final class AgentHost {
         }
         relayEvent = { [weak self] event, workspaceId in
             guard let self else { return }
-            _ = self.broadcast(.event(event, workspaceId: workspaceId, sessionId: self.activeSessionId))
+            self.emit(event, workspaceId: workspaceId, sessionId: self.activeSessionId)
         }
         askPermission = { [weak self] request in
             guard let self else { return false }
             let approvalId = UUID().uuidString
             let summary = request.toolName.map { "코드 편집: \($0)" } ?? "코딩 에이전트가 승인을 요청했어요."
-            _ = self.broadcast(.event(
+            self.emit(
                 .awaitApproval(summary: summary, approvalId: approvalId),
                 workspaceId: self.activeWorkspaceId,
                 sessionId: self.activeSessionId
-            ))
+            )
             return await self.awaitApproval(id: approvalId)
         }
     }
@@ -392,9 +420,13 @@ final class AgentHost {
         runner.sessionId = sessionId
         // The task session belongs to the workspace the run that opened it
         // belongs to, so its events stay routable after the user moves on.
-        stateQueue.sync { sessionWorkspaces[sessionId] = activeWorkspaceId }
+        // Read before the hop, not inside it: `activeWorkspaceId` takes
+        // `stateQueue` itself now, and a serial queue asked to run one sync
+        // inside another waits for itself forever.
+        let runWorkspaceId = activeWorkspaceId
+        stateQueue.sync { sessionWorkspaces[sessionId] = runWorkspaceId }
         if !brief.isEmpty {
-            _ = broadcast(.event(.textChunk(text: brief), workspaceId: activeWorkspaceId, sessionId: sessionId))
+            emit(.textChunk(text: brief), workspaceId: activeWorkspaceId, sessionId: sessionId)
         }
         return sessionId
     }
@@ -416,6 +448,14 @@ final class AgentHost {
     /// The workspace a chat belongs to. Falls back to the active one for a
     /// session this host has never run in -- there is nothing better to say,
     /// and it is what every event used before.
+    /// Puts one event on the socket, or -- when it will not go -- hands it
+    /// to `onUndeliverableEvent`. Every event this host produces goes through
+    /// here so there is one answer to "what if nobody is listening".
+    private func emit(_ event: BridgeEvent, workspaceId: String, sessionId: String) {
+        guard !broadcast(.event(event, workspaceId: workspaceId, sessionId: sessionId)) else { return }
+        onUndeliverableEvent?(event, workspaceId, sessionId)
+    }
+
     private func workspace(of sessionId: String) -> String {
         stateQueue.sync { sessionWorkspaces[sessionId] } ?? activeWorkspaceId
     }
@@ -447,7 +487,7 @@ final class AgentHost {
             """
             // Only the done event: DoneRow renders a failed run's summary, so
             // sending the same words as a text chunk first prints them twice.
-            _ = broadcast(.event(.agentDone(ok: false, summary: message), workspaceId: workspaceId, sessionId: sessionId))
+            emit(.agentDone(ok: false, summary: message), workspaceId: workspaceId, sessionId: sessionId)
             return
         }
 

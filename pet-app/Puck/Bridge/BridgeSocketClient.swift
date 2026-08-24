@@ -119,8 +119,12 @@ extension BridgeSocketClient: UserInputTransport {
     func broadcast(_ message: BridgeMessage) -> Bool {
         queue.sync {
             guard let connection, isReady else { return false }
-            connection.send(message)
-            return true
+            // The connection's own answer, not an assumption: a message it
+            // refuses (too large to frame, or one that will not encode) never
+            // reaches the socket, and reporting that as sent is what left a
+            // tool dispatch waiting out its whole timeout for a reply that
+            // was never asked for.
+            return connection.send(message)
         }
     }
 }
