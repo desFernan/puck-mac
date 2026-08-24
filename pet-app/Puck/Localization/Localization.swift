@@ -54,7 +54,10 @@ final class Localization: ObservableObject, @unchecked Sendable {
         if Thread.isMainThread {
             objectWillChange.send()
         } else {
-            DispatchQueue.main.async { [objectWillChange] in objectWillChange.send() }
+            // `self`, not the publisher: this type is Sendable (its state is
+            // behind `queue`) and Combine's publisher is not, so capturing
+            // the object is the one of the two that can honestly cross.
+            DispatchQueue.main.async { [weak self] in self?.objectWillChange.send() }
         }
     }
 }

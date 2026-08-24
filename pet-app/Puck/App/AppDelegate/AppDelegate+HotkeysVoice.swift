@@ -66,16 +66,20 @@ extension AppDelegate {
     private func waitForAccessibilityThenStartHotkeys() {
         // Scheduled on the main run loop, which is where it fires; the
         // closure's own signature is not isolated, so it has to be said.
-        let timer = Timer.scheduledTimer(withTimeInterval: Self.accessibilityRetrySeconds, repeats: true) { [weak self] timer in
+        // The timer is reached through the property rather than through the
+        // block's own parameter: that parameter is a value handed in from
+        // outside the main actor, and passing it into the hop below is the
+        // one thing here that actually crosses.
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.accessibilityRetrySeconds, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, let manager = self.hotkeyManager else {
-                    timer.invalidate()
+                    self?.accessibilityRetryTimer?.invalidate()
                     return
                 }
                 guard AccessibilityPermission.isTrusted() else { return }
                 if manager.start() {
                     AppLogger.shared.log(.info, "GlobalHotkeyManager started after Accessibility was granted")
-                    timer.invalidate()
+                    self.accessibilityRetryTimer?.invalidate()
                 }
             }
         }
