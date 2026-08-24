@@ -31,6 +31,20 @@ final class TextInputBubbleView: NSView {
     private lazy var textFieldLeadingWithThumbnail = textField.leadingAnchor.constraint(
         equalTo: thumbnailView.trailingAnchor, constant: Self.horizontalInset / 2
     )
+    /// The same pair on the other side, for the attach button.
+    ///
+    /// Hiding a view does not release the space its constraints reserve, so
+    /// while the pet was speaking the field was still 22pt plus a gap
+    /// narrower than `speechSize` measured against -- the text wrapped into
+    /// more lines than the window had been sized for and the last one was
+    /// cut off. The two have to agree, so the button's share is given back
+    /// when the button is not there.
+    private lazy var textFieldTrailingWithButton = textField.trailingAnchor.constraint(
+        equalTo: attachButton.leadingAnchor, constant: -Self.horizontalInset / 2
+    )
+    private lazy var textFieldTrailingWithoutButton = textField.trailingAnchor.constraint(
+        equalTo: trailingAnchor, constant: -Self.horizontalInset
+    )
 
     var onSubmit: ((String) -> Void)?
     var onCancel: (() -> Void)?
@@ -124,6 +138,8 @@ final class TextInputBubbleView: NSView {
         textField.alignment = .center
         textField.stringValue = text
         attachButton.isHidden = true
+        textFieldTrailingWithButton.isActive = false
+        textFieldTrailingWithoutButton.isActive = true
         window?.makeFirstResponder(nil)
     }
 
@@ -139,6 +155,8 @@ final class TextInputBubbleView: NSView {
         textField.maximumNumberOfLines = 1
         textField.alignment = .natural
         attachButton.isHidden = false
+        textFieldTrailingWithoutButton.isActive = false
+        textFieldTrailingWithButton.isActive = true
         setAttachmentThumbnail(nil)
         textField.stringValue = ""
         window?.makeFirstResponder(textField)
@@ -212,7 +230,7 @@ final class TextInputBubbleView: NSView {
             attachButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             attachButton.widthAnchor.constraint(equalToConstant: 22),
             attachButton.heightAnchor.constraint(equalToConstant: 22),
-            textField.trailingAnchor.constraint(equalTo: attachButton.leadingAnchor, constant: -Self.horizontalInset / 2),
+            textFieldTrailingWithButton,
 
             thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
             thumbnailView.centerYAnchor.constraint(equalTo: centerYAnchor),

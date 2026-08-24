@@ -34,9 +34,10 @@ final class PuckMCPServer {
     private let requests: MCPRequestHandler
     private var endpoint: LoopbackHTTPServer.Endpoint?
 
-    init(toolSpecs: [GPTToolSpec], invoke: @escaping AgentToolInvocation) {
+    init(toolSpecs: [GPTToolSpec], sessionId: String? = nil, invoke: @escaping AgentToolInvocation) {
         let requests = MCPRequestHandler(
             toolDefinitions: MCPToolCatalog.definitions(for: toolSpecs),
+            sessionId: sessionId,
             invoke: invoke
         )
         self.requests = requests

@@ -18,7 +18,7 @@ final class AgentRunnerTests: XCTestCase {
         var turns: [GPTTurn] = []
         private(set) var sendCount = 0
 
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
             sendCount += 1
             return turns.isEmpty ? GPTTurn(text: "done", toolCalls: []) : turns.removeFirst()
         }
@@ -31,7 +31,7 @@ final class AgentRunnerTests: XCTestCase {
         var toolCalls: [GPTToolCall] = []
         private(set) var messagesPerTurn: [[GPTMessage]] = []
 
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
             messagesPerTurn.append(messages)
             guard messagesPerTurn.count == 1 else { return GPTTurn(text: "done", toolCalls: []) }
             return GPTTurn(text: nil, toolCalls: toolCalls)
@@ -46,7 +46,7 @@ final class AgentRunnerTests: XCTestCase {
         /// where a real run spends nearly all its time.
         var stallNanoseconds: UInt64 = 0
 
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
             lastMessages = messages
             if stallNanoseconds > 0 { try? await Task.sleep(nanoseconds: stallNanoseconds) }
             return GPTTurn(text: "ok", toolCalls: [])
@@ -235,7 +235,7 @@ final class AgentRunnerTests: XCTestCase {
 
         init(started: XCTestExpectation) { self.started = started }
 
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
             started.fulfill()
             try await Task.sleep(nanoseconds: 5_000_000_000)
             return GPTTurn(text: "answered after the stop", toolCalls: [])
@@ -402,6 +402,38 @@ final class AgentRunnerTests: XCTestCase {
         }
     }
 
+    /// The chat a turn belongs to travels with the turn. The CLI provider
+    /// calls Puck's tools out of band over MCP, and those calls used to be
+    /// addressed to whatever the runner's "current" chat happened to be by
+    /// the time they arrived -- so a tool call from a still-running turn in
+    /// chat A, including its approval prompt, appeared in chat B.
+    func test_aTurnTellsTheClientWhichChatItBelongsTo() async {
+        final class SessionRecordingClient: AgentLLMClient {
+            private(set) var sessions: [String?] = []
+            func send(
+                messages: [GPTMessage],
+                tools: [GPTToolSpec],
+                sessionId: String? = nil
+            ) async throws -> GPTTurn {
+                sessions.append(sessionId)
+                return GPTTurn(text: "ok", toolCalls: [])
+            }
+        }
+
+        let client = SessionRecordingClient()
+        let runner = AgentRunner(
+            client: client,
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in true },
+            emit: { _, _ in }
+        )
+
+        await runner.run(command: "첫 채팅", session: "chat-a")
+        await runner.run(command: "두 번째 채팅", session: "chat-b")
+
+        XCTAssertEqual(client.sessions, ["chat-a", "chat-b"])
+    }
+
     /// A run that is superseded by a command in *another* chat used to emit
     /// nothing at all: events were addressed to whichever chat was active when
     /// they were emitted, so announcing "중지했어요" would have said it in a
@@ -452,7 +484,7 @@ final class AgentRunnerTests: XCTestCase {
 
         init(error: Error) { self.error = error }
 
-        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
             throw error
         }
     }

@@ -28,7 +28,7 @@ final class PuckMCPServerTests: XCTestCase {
     ]
 
     private func start(
-        invoke: @escaping AgentToolInvocation = { _, _ in
+        invoke: @escaping AgentToolInvocation = { _, _, _ in
             DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         }
     ) async throws -> JSONValue {
@@ -81,7 +81,7 @@ final class PuckMCPServerTests: XCTestCase {
 
     func test_theWholeHandshake_endsInAToolThatRan() async throws {
         let ran = UncheckedBox<[(String, JSONValue)]>([])
-        let descriptor = try await start(invoke: { name, arguments in
+        let descriptor = try await start(invoke: { name, arguments, _ in
             ran.value.append((name, arguments))
             return DispatchedToolResult(
                 ok: true,
@@ -124,7 +124,7 @@ final class PuckMCPServerTests: XCTestCase {
 
     func test_aRequestWithoutTheToken_isRefusedBeforeAnyToolRuns() async throws {
         let ran = UncheckedBox(false)
-        let descriptor = try await start(invoke: { _, _ in
+        let descriptor = try await start(invoke: { _, _, _ in
             ran.value = true
             return DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         })
@@ -159,7 +159,7 @@ final class PuckMCPServerTests: XCTestCase {
     /// A body that isn't JSON is answered, not dropped: an unanswered request
     /// leaves the CLI waiting out its own timeout.
     func test_aMalformedBody_answersAParseError() async throws {
-        let handler = MCPRequestHandler(toolDefinitions: [], invoke: { _, _ in
+        let handler = MCPRequestHandler(toolDefinitions: [], invoke: { _, _, _ in
             DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         })
 

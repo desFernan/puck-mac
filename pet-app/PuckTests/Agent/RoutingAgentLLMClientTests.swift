@@ -82,7 +82,7 @@ private final class SpyAgentLLMClient: AgentLLMClient {
         self.name = name
     }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
         receivedMessageCounts.append(messages.count)
         return GPTTurn(text: name, toolCalls: [])
     }

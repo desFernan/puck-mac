@@ -181,6 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// see showNoticeBubble(). Bumped per notice so an earlier one's expiry
     /// timer cannot close the notice that replaced it.
     var noticeBubbleGeneration = 0
+    /// Which generation the live-caption bubble took, or nil when the hold is
+    /// not showing one. Releasing the key closes the bubble only while this
+    /// still matches -- by then a notice may have replaced the captions, and
+    /// that notice's own timer owns the window.
+    var captionBubbleGeneration: Int?
     /// Set once a capture completes, cleared on submit/cancel/dismiss --
     /// see AppDelegate+HotkeysVoice.swift's showTextInputBubble(). At most
     /// one: the panel has room for a single thumbnail, and multi-image

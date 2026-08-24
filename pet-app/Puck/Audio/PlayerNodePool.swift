@@ -31,12 +31,23 @@ final class PlayerNodePool<Node: PooledAudioNode> {
         self.nodes = nodes
     }
 
-    func nextAvailableNode() -> Node {
-        if let idle = nodes.first(where: { !$0.isPlaying }) {
+    /// - Parameter reserved: a node the caller is using for something that
+    ///   must not be cut off -- the looping sound. Without it, a pool with
+    ///   every node busy could round-robin onto the loop's own node, stop it
+    ///   to play a one-shot, and leave the player still believing that loop
+    ///   was running: `currentLoopKey` unchanged, so the same key would never
+    ///   start it again.
+    func nextAvailableNode(avoiding reserved: Node? = nil) -> Node {
+        let candidates = nodes.filter { $0 !== reserved }
+        // Only when the reserved node is the whole pool. Cutting it off is
+        // still better than playing nothing.
+        guard !candidates.isEmpty else { return nodes[0] }
+
+        if let idle = candidates.first(where: { !$0.isPlaying }) {
             return idle
         }
-        let node = nodes[nextRoundRobinIndex]
-        nextRoundRobinIndex = (nextRoundRobinIndex + 1) % nodes.count
+        let node = candidates[nextRoundRobinIndex % candidates.count]
+        nextRoundRobinIndex = (nextRoundRobinIndex + 1) % candidates.count
         return node
     }
 }

@@ -30,6 +30,13 @@ extension AppDelegate {
             guard let self, let characterController = self.characterController else { return }
             characterController.transition(to: self.stateBeforeListen ?? self.idleState)
             self.stateBeforeListen = nil
+            self.closeCaptionBubble()
+        }
+        // What is being heard, over the pet's head, while the key is held.
+        // The service has always asked for partial results and this was the
+        // one end of it nobody connected, so they were computed and dropped.
+        voiceController.onPartialText = { [weak self] text in
+            self?.showCaptionBubble(text)
         }
         voiceController.onFinalText = { [weak self] text in
             self?.sendUserInput(text: text, source: .voice)
@@ -133,6 +140,12 @@ extension AppDelegate {
     private func showTextInputBubble() {
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
+        // The bubble window is shared with the pet's notices, and each notice
+        // leaves a timer behind that closes whatever is in it when it fires.
+        // Taking the generation claims the window: a notice shown a second
+        // before this panel opened would otherwise close the panel the user
+        // is typing into, and leave the pet pinned with nothing on screen.
+        noticeBubbleGeneration += 1
         pinCharacter()
         // Fresh session, fresh state -- bubbleView itself is a brand-new
         // instance per makeBubble() call, but this property lives on the
@@ -238,6 +251,36 @@ extension AppDelegate {
     /// `wasMovedByUser` is deliberately ignored: a bubble the user once
     /// dragged is still the pet's speech, and leaving it parked where the pet
     /// no longer is defeats the whole point.
+    /// Live captions while push-to-talk is held.
+    ///
+    /// No timer, unlike a notice: this bubble lasts exactly as long as the
+    /// hold, and `closeCaptionBubble` ends it. It still takes the notice
+    /// generation, because the window is shared -- a notice shown a moment
+    /// earlier would otherwise close the captions mid-sentence.
+    private func showCaptionBubble(_ text: String) {
+        guard !isCharacterHidden, !text.isEmpty else { return }
+        guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
+
+        noticeBubbleGeneration += 1
+        captionBubbleGeneration = noticeBubbleGeneration
+        bubbleView.onCancel = { bubbleWindow.closeAndYieldFocus() }
+        bubbleWindow.onDismiss = nil
+        bubbleView.showMessage(text)
+        anchorBubbleToPet(bubbleWindow, size: TextInputBubbleView.speechSize(for: text))
+        bubbleWindow.showSpeech()
+    }
+
+    /// Ends the caption bubble, if the hold put one up.
+    ///
+    /// Generation-guarded so releasing the key cannot close something else:
+    /// by the time a hold ends, the window may already be showing a notice
+    /// that replaced the captions.
+    private func closeCaptionBubble() {
+        guard captionBubbleGeneration == noticeBubbleGeneration else { return }
+        captionBubbleGeneration = nil
+        textInputBubbleWindow?.closeAndYieldFocus()
+    }
+
     func anchorBubbleToPet(_ bubbleWindow: TextInputBubbleWindow, size: CGSize) {
         bubbleWindow.setContentSize(size)
 

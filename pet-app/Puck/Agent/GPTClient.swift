@@ -103,7 +103,19 @@ enum GPTError: LocalizedError {
 /// behavioral gain, and the shapes really are the same three request fields
 /// and two response fields regardless of who serves them.
 protocol AgentLLMClient {
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn
+    /// - Parameter sessionId: the chat this turn belongs to, so anything the
+    ///   turn does out of band -- the CLI provider calling Puck's tools over
+    ///   MCP -- is addressed to it rather than to whichever chat happens to be
+    ///   running when the call arrives. Runs overlap: cancelling is a request,
+    ///   and a superseded CLI turn goes on working until it notices.
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String?) async throws -> GPTTurn
+}
+
+extension AgentLLMClient {
+    /// For callers with no chat of their own -- the chat titler, and tests.
+    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+        try await send(messages: messages, tools: tools, sessionId: nil)
+    }
 }
 
 /// Routes each `send` to the underlying client matching `configuration()`'s
@@ -137,14 +149,14 @@ final class RoutingAgentLLMClient: AgentLLMClient {
         self.cliClient = cliClient
     }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String?) async throws -> GPTTurn {
         switch configuration().provider {
         case .openai:
-            return try await openAIClient.send(messages: messages, tools: tools)
+            return try await openAIClient.send(messages: messages, tools: tools, sessionId: sessionId)
         case .anthropic:
-            return try await anthropicClient.send(messages: messages, tools: tools)
+            return try await anthropicClient.send(messages: messages, tools: tools, sessionId: sessionId)
         case .cli:
-            return try await cliClient.send(messages: messages, tools: tools)
+            return try await cliClient.send(messages: messages, tools: tools, sessionId: sessionId)
         }
     }
 }
@@ -191,7 +203,7 @@ final class GPTClient: AgentLLMClient {
         self.session = session
     }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String?) async throws -> GPTTurn {
         let configuration = configuration()
         guard let apiKey = configuration.apiKey, !apiKey.isEmpty else { throw GPTError.notConfigured }
 

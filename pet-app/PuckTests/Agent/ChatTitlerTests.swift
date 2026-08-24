@@ -18,7 +18,7 @@ private final class StubTitleClient: AgentLLMClient {
     init(reply: String?) { self.reply = reply }
     init(error: Error) { self.error = error }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String? = nil) async throws -> GPTTurn {
         sends += 1
         lastTools = tools
         if let error { throw error }

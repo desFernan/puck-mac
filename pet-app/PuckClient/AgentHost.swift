@@ -203,11 +203,11 @@ final class AgentHost {
                 // the same execution routes and emits the same events as one
                 // the model asked for directly. `runner` is assigned by the
                 // time any turn can run.
-                invokeTool: { [weak self] name, arguments in
+                invokeTool: { [weak self] name, arguments, sessionId in
                     guard let self else {
                         return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
                     }
-                    return await self.runner.invokeTool(name: name, arguments: arguments)
+                    return await self.runner.invokeTool(name: name, arguments: arguments, sessionId: sessionId)
                 }
             ),
             dispatcher: dispatcher,

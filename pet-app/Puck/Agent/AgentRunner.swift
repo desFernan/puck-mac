@@ -353,7 +353,10 @@ final class AgentRunner {
             }
             let turn: GPTTurn
             do {
-                turn = try await client.send(messages: conversation(key), tools: toolSpecs)
+                // `key`, not the runner's current session: this turn belongs
+                // to the chat it started in even after a newer one has moved
+                // that property on.
+                turn = try await client.send(messages: conversation(key), tools: toolSpecs, sessionId: key)
             } catch {
                 // Checked before the error is described: a cancelled
                 // `URLSession.data(for:)` surfaces as URLError(.cancelled)

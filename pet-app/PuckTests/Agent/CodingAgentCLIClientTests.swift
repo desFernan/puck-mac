@@ -416,7 +416,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         }
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
-            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            invokeTool: { _, _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
             startAgent: { _, _ in FakeTransport(connection: agent.connection) }
         )
 
@@ -448,7 +448,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         }
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
-            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            invokeTool: { _, _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
             startAgent: { _, _ in FakeTransport(connection: agent.connection) }
         )
 
@@ -505,7 +505,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         }
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
-            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            invokeTool: { _, _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
             startAgent: { _, _ in FakeTransport(connection: agent.connection) }
         )
 
@@ -533,7 +533,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
         agent.errorReplies["session/prompt"] = (code: -32000, message: "Authentication required")
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
-            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            invokeTool: { _, _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
             startAgent: { _, _ in FakeTransport(connection: agent.connection) }
         )
 
@@ -563,7 +563,7 @@ final class CodingAgentCLIClientTests: XCTestCase {
     func test_send_stillFailsFastForAMissingCLI_andLeavesNoPortOpen() async {
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
-            invokeTool: { _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
+            invokeTool: { _, _, _ in DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil) },
             startAgent: { _, _ in throw AcpAgentCommandError.vendorCLINotFound(.codex) }
         )
 

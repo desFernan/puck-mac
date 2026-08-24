@@ -131,7 +131,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
         return process
     }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String?) async throws -> GPTTurn {
         let kind = configuration().codingAgent
         let cwd = workingDirectory()
 
@@ -143,7 +143,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
         defer { mcpServer?.stop() }
         var mcpServers: [JSONValue] = []
         if let invokeTool {
-            let server = PuckMCPServer(toolSpecs: tools, invoke: invokeTool)
+            let server = PuckMCPServer(toolSpecs: tools, sessionId: sessionId, invoke: invokeTool)
             do {
                 mcpServers = [try await server.start()]
                 mcpServer = server

@@ -36,9 +36,16 @@ enum HotkeyDecisionMaker {
     ) -> HotkeyAction {
         switch eventType {
         case .keyDown:
-            // OS key-repeat re-sends keyDown for a physically held key --
-            // without this guard, each repeat re-fires pushToTalkDown.
-            if !isPushToTalkActive, bindings.pushToTalk.matches(keyCode: keyCode, modifierFlags: flags) {
+            // Nothing else happens while push-to-talk holds that key. The OS
+            // re-sends keyDown for a physically held key, with whatever
+            // modifiers are down *now* -- so a hold on Space with Shift added
+            // halfway through fell past this and matched the text-input
+            // binding, opening the capture panel on top of a live recording.
+            // Matched on the key alone, like the release below.
+            if isPushToTalkActive, bindings.pushToTalk.keyCode == keyCode {
+                return .none
+            }
+            if bindings.pushToTalk.matches(keyCode: keyCode, modifierFlags: flags) {
                 return .pushToTalkDown
             }
             if bindings.textInput.matches(keyCode: keyCode, modifierFlags: flags) {

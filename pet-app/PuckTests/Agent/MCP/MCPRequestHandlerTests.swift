@@ -32,7 +32,7 @@ final class MCPRequestHandlerTests: XCTestCase {
     ]
 
     private func makeHandler(
-        invoke: @escaping AgentToolInvocation = { _, _ in
+        invoke: @escaping AgentToolInvocation = { _, _, _ in
             DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         }
     ) -> MCPRequestHandler {
@@ -134,7 +134,7 @@ final class MCPRequestHandlerTests: XCTestCase {
 
     func test_toolsCall_runsTheToolThroughTheHostAndReturnsItsResult() async throws {
         let seen = UncheckedBox<[(String, JSONValue)]>([])
-        let handler = makeHandler(invoke: { name, arguments in
+        let handler = makeHandler(invoke: { name, arguments, _ in
             seen.value.append((name, arguments))
             return DispatchedToolResult(ok: true, data: .object(["pid": .number(42)]), error: nil, detail: nil)
         })
@@ -157,7 +157,7 @@ final class MCPRequestHandlerTests: XCTestCase {
     /// model has to read "denied_by_user" and say something about it, and a
     /// JSON-RPC error would look to the CLI like the server being broken.
     func test_toolsCall_reportsARefusalAsAToolErrorTheModelCanRead() async throws {
-        let handler = makeHandler(invoke: { _, _ in
+        let handler = makeHandler(invoke: { _, _, _ in
             DispatchedToolResult(ok: false, data: nil, error: "denied_by_user", detail: nil)
         })
 
@@ -176,7 +176,7 @@ final class MCPRequestHandlerTests: XCTestCase {
 
     func test_toolsCall_refusesANameThatIsNotInTheRegistry() async throws {
         let ran = UncheckedBox(false)
-        let handler = makeHandler(invoke: { _, _ in
+        let handler = makeHandler(invoke: { _, _, _ in
             ran.value = true
             return DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         })
@@ -193,7 +193,7 @@ final class MCPRequestHandlerTests: XCTestCase {
     /// for it would be a list the server does not enforce.
     func test_toolsCall_refusesCodeEditorEvenThoughItIsInTheRegistry() async throws {
         let ran = UncheckedBox(false)
-        let handler = makeHandler(invoke: { _, _ in
+        let handler = makeHandler(invoke: { _, _, _ in
             ran.value = true
             return DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         })
@@ -218,7 +218,7 @@ final class MCPRequestHandlerTests: XCTestCase {
     /// The turn's deadline is paused while this holds, so a tool sitting on an
     /// approval prompt does not spend the CLI's budget.
     func test_isServingToolCall_holdsForTheLengthOfACall() async {
-        let handler = makeHandler(invoke: { _, _ in
+        let handler = makeHandler(invoke: { _, _, _ in
             try? await Task.sleep(nanoseconds: 300_000_000)
             return DispatchedToolResult(ok: true, data: nil, error: nil, detail: nil)
         })

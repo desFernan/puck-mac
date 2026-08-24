@@ -57,7 +57,7 @@ final class ClaudeClient: AgentLLMClient {
         self.session = session
     }
 
-    func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+    func send(messages: [GPTMessage], tools: [GPTToolSpec], sessionId: String?) async throws -> GPTTurn {
         let configuration = configuration()
         guard let apiKey = configuration.apiKey, !apiKey.isEmpty else { throw GPTError.notConfigured }
 

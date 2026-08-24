@@ -93,6 +93,38 @@ final class HotkeyDecisionMakerTests: XCTestCase {
         XCTAssertEqual(action, .none)
     }
 
+    /// Push-to-talk and the text-input panel are the same key with one extra
+    /// modifier, so pressing Shift halfway through a hold used to open the
+    /// capture panel on top of a live recording. While that key is held, it
+    /// belongs to push-to-talk whatever else is pressed with it.
+    func test_keyDown_addingAModifierMidHold_doesNotOpenTheTextPanel() {
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: 49, flags: [.maskAlternate, .maskShift],
+            bindings: bindings, isPushToTalkActive: true
+        )
+        XCTAssertEqual(action, .none)
+    }
+
+    /// The guard it grew out of: auto-repeat must not re-fire the hold.
+    func test_keyDown_repeatOfTheHeldKey_isIgnored() {
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: 49, flags: [.maskAlternate],
+            bindings: bindings, isPushToTalkActive: true
+        )
+        XCTAssertEqual(action, .none)
+    }
+
+    /// Only that key is claimed. A binding on a different one -- the toys,
+    /// which are not on Space -- still fires during a hold.
+    func test_keyDown_aBindingOnAnotherKeyDuringAHold_stillFires() {
+        let toy = bindings.toySummon1
+        let action = HotkeyDecisionMaker.decide(
+            eventType: .keyDown, keyCode: toy.keyCode, flags: toy.modifierFlags,
+            bindings: bindings, isPushToTalkActive: true
+        )
+        XCTAssertEqual(action, .toySummon1Requested)
+    }
+
     func test_flagsChanged_releasingModifierBeforeKey_endsHold() {
         // User released Option while still holding Space -> no keyUp for Space
         // yet, but PTT must still end (this is exactly why the plan lists

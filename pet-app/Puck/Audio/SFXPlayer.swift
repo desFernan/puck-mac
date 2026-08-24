@@ -90,7 +90,10 @@ final class SFXPlayer: SFXTriggering {
         case .silent, .alreadyLooping:
             return
         case .playOneShot(let url):
-            play(url: url, loop: false, node: pool.nextAvailableNode())
+            // Never onto the looping node: stopping that one to play a click
+            // would silence the loop while the player still thought it was
+            // running.
+            play(url: url, loop: false, node: pool.nextAvailableNode(avoiding: currentLoopNode))
         case .startLoop(let url):
             fadeOutCurrentLoop()
             let node = pool.nextAvailableNode()

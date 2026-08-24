@@ -24,7 +24,12 @@ import Foundation
 /// Runs one host tool end to end -- approval included -- and reports what
 /// happened. `AgentRunner.invokeTool` is the implementation; the closure keeps
 /// the MCP server from depending on the runner it is ultimately driven by.
-typealias AgentToolInvocation = (_ name: String, _ arguments: JSONValue) async -> DispatchedToolResult
+/// - Parameter sessionId: the chat whose turn asked for this tool. Passed
+///   rather than looked up, because by the time an MCP call arrives the
+///   runner's own "current" chat may be a newer one -- and then the call's
+///   events, its approval prompt included, appear in a conversation the user
+///   did not ask anything in.
+typealias AgentToolInvocation = (_ name: String, _ arguments: JSONValue, _ sessionId: String?) async -> DispatchedToolResult
 
 final class MCPRequestHandler {
     /// What we answer `initialize` with when the client asks for a version we
@@ -56,7 +61,13 @@ final class MCPRequestHandler {
     /// the array per call would be the same answer computed again each time.
     private let offeredToolNames: Set<String>
 
-    init(toolDefinitions: [JSONValue], invoke: @escaping AgentToolInvocation) {
+    /// The chat this server was started for -- one turn, one server, one
+    /// chat. Held rather than asked for per call, because the whole point is
+    /// that the answer must not change while the turn is running.
+    private let sessionId: String?
+
+    init(toolDefinitions: [JSONValue], sessionId: String? = nil, invoke: @escaping AgentToolInvocation) {
+        self.sessionId = sessionId
         self.toolDefinitions = toolDefinitions
         offeredToolNames = Set(toolDefinitions.compactMap { $0["name"]?.stringValue })
         self.invoke = invoke
@@ -140,7 +151,7 @@ final class MCPRequestHandler {
         let arguments = params["arguments"] ?? .object([:])
 
         stateQueue.sync { callsInFlight += 1 }
-        let outcome = await invoke(name, arguments)
+        let outcome = await invoke(name, arguments, sessionId)
         stateQueue.sync { callsInFlight -= 1 }
 
         let text = AgentRunner.toolResultText(
