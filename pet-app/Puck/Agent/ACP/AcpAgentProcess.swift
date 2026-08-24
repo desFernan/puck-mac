@@ -311,15 +311,26 @@ final class AcpAgentProcess: AcpAgentTransport {
 
     var isRunning: Bool { process.isRunning }
 
+    /// SIGTERM to the whole group, not just the child.
+    ///
+    /// The child is `sandbox-exec`, which runs node, which spawns the vendor
+    /// CLI -- a ~256MB binary that is the grandchild here. Signalling the one
+    /// pid orphans it, which is the opposite of what every caller of this
+    /// wants: CodeEditorRunner.shutDown and LiveAgentProcesses.endAll exist
+    /// precisely so quitting does not leave one of those running. Foundation
+    /// puts a child in its own process group, so `-pid` reaches the whole
+    /// tree and nothing else (the same reasoning RunShellHandler.terminate
+    /// spells out, and its tests demonstrate).
     func terminate() {
         guard process.isRunning else { return }
-        process.terminate()
+        Foundation.kill(-process.processIdentifier, SIGTERM)
     }
 
-    /// SIGKILL. Only for the case where `session/cancel` plus SIGTERM did not
-    /// end it -- see AcpCodeEditorSession's cancel path.
+    /// SIGKILL, to the group for the same reason as `terminate`. Only for the
+    /// case where `session/cancel` plus SIGTERM did not end it -- see
+    /// AcpCodeEditorSession's cancel path.
     func kill() {
         guard process.isRunning else { return }
-        Foundation.kill(process.processIdentifier, SIGKILL)
+        Foundation.kill(-process.processIdentifier, SIGKILL)
     }
 }

@@ -61,14 +61,21 @@ final class LaunchAppHandler: ToolHandler {
             return
         }
 
-        let appURL: URL?
-        if case .string(let bundleID) = fields["bundle_id"] {
-            appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        } else if case .string(let appName) = fields["app_name"] {
-            appURL = Self.applicationURL(named: appName)
-        } else {
-            appURL = nil
-        }
+        // Either field may resolve it, and a model that sends both is the
+        // normal case rather than a mistake -- the registry documents them as
+        // one-of. So a bundle id that resolves to nothing falls through to
+        // the name instead of failing the call: an invented bundle id
+        // alongside a perfectly good app name used to report that neither
+        // could be resolved, for an app that was right there.
+        let byBundleID: URL? = {
+            guard case .string(let bundleID) = fields["bundle_id"] else { return nil }
+            return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        }()
+        let byName: URL? = {
+            guard case .string(let appName) = fields["app_name"] else { return nil }
+            return Self.applicationURL(named: appName)
+        }()
+        let appURL = byBundleID ?? byName
 
         guard let appURL else {
             completion(.failure(.executionFailed("could not resolve app_name/bundle_id")))

@@ -27,6 +27,33 @@ final class RunShellHandlerTests: XCTestCase {
         wait(for: [expectation], timeout: 1)
     }
 
+    /// The reported hang. A command that backgrounds anything leaves the
+    /// grandchild holding the write end of both pipes, so EOF never comes --
+    /// and the handler used to wait for EOF, not for the command. `npm run
+    /// dev &` finished in milliseconds and was reported as a timeout a minute
+    /// later, with a parked thread and a live call entry to show for it.
+    func test_aCommandThatBackgroundsSomething_stillAnswersAtOnce() {
+        let handler = RunShellHandler()
+
+        let expectation = expectation(description: "completion called")
+        // The backgrounded sleep outlives the shell by far more than the
+        // three seconds this test is willing to wait.
+        handler.execute(
+            id: "test",
+            args: .object(["command": .string("echo done; sleep 30 &")])
+        ) { result in
+            guard case .success(.object(let fields)?) = result else {
+                XCTFail("expected success, got \(result)")
+                return
+            }
+            XCTAssertEqual(fields["stdout"], .string("done\n"))
+            XCTAssertEqual(fields["exit_code"], .number(0))
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 3)
+    }
+
     func test_validCommand_returnsStdoutAndExitCode() {
         let handler = RunShellHandler()
 

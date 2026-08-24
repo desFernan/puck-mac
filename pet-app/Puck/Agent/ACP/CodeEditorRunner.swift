@@ -73,6 +73,12 @@ func withDeadline<Value>(
     await withDeadline(seconds: seconds, suspendedWhile: { false }, work: work)
 }
 
+/// How long the deadline may be held off by one uninterrupted stretch of
+/// `suspendedWhile` before it starts counting again. Generous, because the
+/// thing on the other end is a person reading an approval prompt; finite,
+/// because a person who never answers is the case this bound exists for.
+let maximumSuspension: TimeInterval = 15 * 60
+
 /// The same deadline, but one that does not run while `suspendedWhile` holds.
 ///
 /// A CLI chat turn calls Puck's tools through an MCP server, and a tool can
@@ -96,10 +102,26 @@ func withDeadline<Value>(
             // leave a task alive for 180s after every turn.
             let tick: TimeInterval = 0.05
             var spent: TimeInterval = 0
+            var suspended: TimeInterval = 0
             while spent < seconds {
                 try? await Task.sleep(nanoseconds: UInt64(tick * 1_000_000_000))
                 if outcome.isResolved { return }
-                if !isSuspended() { spent += tick }
+                if isSuspended() {
+                    suspended += tick
+                    // Bounded, because "serving a tool call" is not the same
+                    // as "serving one forever". The tool that suspends this is
+                    // usually waiting on an approval prompt, and nothing times
+                    // that out -- a person who walks away from it, or a bubble
+                    // dismissed without answering, would otherwise hold the
+                    // deadline open for the life of the app, with a live node
+                    // and vendor process behind it. Past this, the clock runs
+                    // again and the turn ends the way any other wedged one
+                    // does.
+                    if suspended >= maximumSuspension { spent += tick }
+                } else {
+                    suspended = 0
+                    spent += tick
+                }
             }
             outcome.resolve(nil)
         }

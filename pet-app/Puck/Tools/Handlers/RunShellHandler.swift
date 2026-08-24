@@ -29,6 +29,15 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
     /// on. Nothing in the app writes it.
     nonisolated(unsafe) static var killGracePeriod: TimeInterval = 0.5
 
+    /// How long the output collectors get after the command has exited.
+    ///
+    /// The exit and the last write race each other, so this is what stops the
+    /// tail of the output being dropped. It is short because the usual answer
+    /// is "already here": the only case that spends the whole of it is a
+    /// command that left something running with the pipe still open, and
+    /// there the wait is capped rather than endless.
+    static let drainGraceAfterExit: TimeInterval = 0.2
+
     /// How much of one stream is kept, per call. Nothing capped this: the
     /// handler read both pipes to EOF, so `cat` on a large file or a `find /`
     /// grew a String as large as the output and then handed it on. Two things
@@ -143,14 +152,26 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
                 let stdoutHandle = stdoutPipe.fileHandleForReading
                 let stderrHandle = stderrPipe.fileHandleForReading
 
-                let stderrQueue = DispatchQueue(label: "Puck.RunShellHandler.stderr")
-                var stderrCapture = Capture()
-                stderrQueue.async { stderrCapture = Self.drain(stderrHandle) }
+                let stdoutCollector = StreamCollector(handle: stdoutHandle)
+                let stderrCollector = StreamCollector(handle: stderrHandle)
 
-                let stdoutCapture = Self.drain(stdoutHandle)
-                stderrQueue.sync {} // barrier: stderrCapture is fully written past this point
-
+                // The command is finished when the *command* exits, not when
+                // its pipes reach EOF. Those are the same thing right up
+                // until the command backgrounds something -- `npm run dev &`,
+                // anything that daemonizes -- and then the grandchild holds
+                // the write end open for as long as it lives. Waiting for EOF
+                // there meant a command that succeeded in milliseconds was
+                // reported as a timeout a minute later, with a thread and a
+                // process entry parked until the background job happened to
+                // end.
                 process.waitUntilExit()
+                // Whatever is still in flight has a moment to arrive: the
+                // last write and the exit race each other, and the loser is
+                // usually the tail of the output.
+                stdoutCollector.waitForEnd(within: Self.drainGraceAfterExit)
+                stderrCollector.waitForEnd(within: Self.drainGraceAfterExit)
+                let stdoutCapture = stdoutCollector.finish()
+                let stderrCapture = stderrCollector.finish()
                 self.stateQueue.sync { self.calls[id] = nil }
                 completion(
                     .success(
@@ -178,27 +199,82 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
         var isTruncated = false
     }
 
-    /// Reads `handle` to EOF and keeps at most `maximumCapturedBytes` of it:
-    /// the first half from the front, the last half from the end.
+    /// Collects one stream while the command runs, keeping at most
+    /// `maximumCapturedBytes` of it: the first half from the front, the last
+    /// half from the end.
     ///
-    /// Reading to EOF regardless of the cap is not optional. The child blocks
-    /// in `write()` once the OS pipe buffer fills, so a reader that stopped at
-    /// its limit would hang the command it is running rather than truncate it.
-    private static func drain(_ handle: FileHandle) -> Capture {
-        let half = maximumCapturedBytes / 2
-        // Kept up to the whole cap, not to half of it. Half was enough for
-        // the truncated case, which only ever shows the first half -- and it
-        // silently threw away the middle of every output between half the cap
-        // and the cap, where nothing is truncated and everything is supposed
-        // to be there.
-        var head = Data()
-        var tail = Data()
-        var total = 0
+    /// Reading *while* it runs is not optional. The child blocks in `write()`
+    /// once the OS pipe buffer fills (64KB on macOS), so a reader that waited
+    /// for the exit first would hang the command it is running -- and both
+    /// streams fill independently, so reading only one hangs a stderr-noisy
+    /// command just the same.
+    ///
+    /// Event-driven rather than a thread blocked in `availableData`: that
+    /// thread only comes back at EOF, and EOF is exactly what a backgrounded
+    /// grandchild withholds. A readability handler can simply be dropped.
+    ///
+    /// `@unchecked Sendable`: everything mutable is behind `lock`, which the
+    /// handler's queue and the caller's both take.
+    private final class StreamCollector: @unchecked Sendable {
+        private let handle: FileHandle
+        private let lock = NSLock()
+        private var head = Data()
+        private var tail = Data()
+        private var total = 0
+        private let ended = DispatchSemaphore(value: 0)
+        private var didSignalEnd = false
 
-        while true {
-            let chunk = handle.availableData
-            if chunk.isEmpty { break }
+        init(handle: FileHandle) {
+            self.handle = handle
+            handle.readabilityHandler = { [weak self] handle in
+                let chunk = handle.availableData
+                guard let self else { return }
+                if chunk.isEmpty {
+                    self.signalEnd()
+                } else {
+                    self.append(chunk)
+                }
+            }
+        }
+
+        /// Waits for the stream's own end, but not indefinitely -- see the
+        /// class comment for who holds a pipe open past the command's exit.
+        func waitForEnd(within seconds: TimeInterval) {
+            _ = ended.wait(timeout: .now() + seconds)
+        }
+
+        /// Stops collecting and returns what was collected. Ordered so the
+        /// handler is gone before the descriptor is: closing a FileHandle
+        /// with a live readability handler is a crash, not a tidy-up.
+        func finish() -> Capture {
+            handle.readabilityHandler = nil
+            try? handle.close()
+            lock.lock()
+            defer { lock.unlock() }
+            guard total > maximumCapturedBytes else {
+                return Capture(text: String(decoding: head, as: UTF8.self), isTruncated: false)
+            }
+            let half = maximumCapturedBytes / 2
+            let dropped = total - half - half
+            // Decoded separately: the cut can land inside a multi-byte
+            // character, and String(decoding:) turns that half into a
+            // replacement character rather than losing the rest of the line.
+            let text = String(decoding: head.prefix(half), as: UTF8.self)
+                + "\n[... \(dropped) bytes of output dropped ...]\n"
+                + String(decoding: tail, as: UTF8.self)
+            return Capture(text: text, isTruncated: true)
+        }
+
+        private func append(_ chunk: Data) {
+            let half = maximumCapturedBytes / 2
+            lock.lock()
+            defer { lock.unlock() }
             total += chunk.count
+            // Kept up to the whole cap, not to half of it. Half was enough
+            // for the truncated case, which only ever shows the first half --
+            // and it silently threw away the middle of every output between
+            // half the cap and the cap, where nothing is truncated and
+            // everything is supposed to be there.
             if head.count < maximumCapturedBytes {
                 head.append(chunk.prefix(maximumCapturedBytes - head.count))
             }
@@ -206,16 +282,12 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
             if tail.count > half { tail.removeFirst(tail.count - half) }
         }
 
-        guard total > maximumCapturedBytes else {
-            return Capture(text: String(decoding: head, as: UTF8.self), isTruncated: false)
+        private func signalEnd() {
+            lock.lock()
+            let shouldSignal = !didSignalEnd
+            didSignalEnd = true
+            lock.unlock()
+            if shouldSignal { ended.signal() }
         }
-        let dropped = total - half - half
-        // Decoded separately: the cut can land inside a multi-byte character,
-        // and String(decoding:) turns that half into a replacement character
-        // rather than losing the rest of the line.
-        let text = String(decoding: head.prefix(half), as: UTF8.self)
-            + "\n[... \(dropped) bytes of output dropped ...]\n"
-            + String(decoding: tail, as: UTF8.self)
-        return Capture(text: text, isTruncated: true)
     }
 }

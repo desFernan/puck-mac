@@ -28,6 +28,11 @@ final class AcpConnection {
     private let lock = NSLock()
     private var nextRequestID = 1
     private var pending: [Int: CheckedContinuation<Result<JSONValue, Error>, Never>] = [:]
+    /// Guards `buffer` and the delivery of the lines split out of it. Its own
+    /// lock, not the one above: `handle(line:)` calls out to `onNotification`
+    /// and `onRequest`, whose handlers reach back in through `respond` -- and
+    /// that takes `lock`. Two locks means neither path waits on itself.
+    private let receiveLock = NSLock()
     private var buffer = Data()
     /// Set once the agent is gone. Guarded by the same lock as `pending`, so a
     /// request cannot be filed into a dictionary nobody will ever drain again.
@@ -48,7 +53,17 @@ final class AcpConnection {
 
     /// Feeds raw bytes in. Splits on newlines and tolerates a chunk that ends
     /// mid-line, which is the normal case on a pipe.
+    /// Locked, because two threads genuinely arrive here: the FileHandle's
+    /// readability handler on its own queue, and the drain that runs when the
+    /// process exits -- clearing a readability handler does not wait for a
+    /// block already running in it. Unguarded, the append and the re-slice
+    /// interleave, and the window is exactly process exit, which is when the
+    /// final response to `session/prompt` arrives. A run that had completed
+    /// would be reported as the agent having died, or the index arithmetic
+    /// would trap.
     func receive(_ data: Data) {
+        receiveLock.lock()
+        defer { receiveLock.unlock() }
         buffer.append(data)
         while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
             let line = buffer[buffer.startIndex..<newline]

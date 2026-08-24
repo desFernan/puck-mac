@@ -51,8 +51,14 @@ final class MCPRequestHandler {
     private let stateQueue = DispatchQueue(label: "Puck.MCPRequestHandler.state")
     private var callsInFlight = 0
 
+    /// The names in `toolDefinitions`, worked out once: `tools/call` has to
+    /// answer "is this one of the tools I listed?" and doing it by scanning
+    /// the array per call would be the same answer computed again each time.
+    private let offeredToolNames: Set<String>
+
     init(toolDefinitions: [JSONValue], invoke: @escaping AgentToolInvocation) {
         self.toolDefinitions = toolDefinitions
+        offeredToolNames = Set(toolDefinitions.compactMap { $0["name"]?.stringValue })
         self.invoke = invoke
     }
 
@@ -119,7 +125,13 @@ final class MCPRequestHandler {
         guard let name = params["name"]?.stringValue, !name.isEmpty else {
             return failure(id: id, code: -32602, message: "tools/call requires a tool name")
         }
-        guard !MCPToolCatalog.excludedToolNames.contains(name), ToolRegistry.tool(named: name) != nil else {
+        // Checked against what this server actually advertised, not against
+        // the whole registry. They are not the same list: a delegated tool
+        // whose delegate was never supplied (show_code, read_file,
+        // list_files, open_in_editor) is in the registry, is not excluded,
+        // and is not offered -- so the registry check let it through to a
+        // dispatch nothing could execute.
+        guard offeredToolNames.contains(name) else {
             // Named, but not one of ours (or one we deliberately withhold).
             // A protocol error rather than a tool error: the model asked for
             // something that does not exist, which is not a failed action.
