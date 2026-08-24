@@ -35,6 +35,48 @@ final class WorkspaceRegistryTests: XCTestCase {
         return url
     }
 
+    // MARK: - All or nothing
+
+    /// A write that fails must leave the registry as it was. It used to
+    /// change memory first, so a create the coordinator reported as failed
+    /// was still there -- announced to the next client that connected and
+    /// folded into the next successful write.
+    func testACreateThatCannotBeSavedIsNotKept() throws {
+        let registry = try WorkspaceRegistry(storageURL: storageURL())
+        let project = try makeProject(named: "p")
+        // A file where the store's directory has to be: every later write
+        // fails at createDirectory.
+        try FileManager.default.removeItem(at: storageURL().deletingLastPathComponent())
+        try Data("blocked".utf8).write(to: storageURL().deletingLastPathComponent())
+
+        XCTAssertThrowsError(try registry.create(name: "doomed", projectPath: project.path))
+
+        XCTAssertEqual(registry.list().map(\.id), [WorkspaceRegistry.defaultWorkspaceID])
+    }
+
+    /// The mirror: a remove that could not be written keeps the workspace,
+    /// because the sidebar keeps its row when the call throws.
+    func testARemoveThatCannotBeSavedKeepsTheWorkspace() throws {
+        let registry = try WorkspaceRegistry(storageURL: storageURL())
+        let project = try makeProject(named: "p")
+        let created = try registry.create(name: "keep me", projectPath: project.path)
+        try FileManager.default.removeItem(at: storageURL().deletingLastPathComponent())
+        try Data("blocked".utf8).write(to: storageURL().deletingLastPathComponent())
+
+        XCTAssertThrowsError(try registry.remove(id: created.id))
+
+        XCTAssertTrue(registry.list().contains { $0.id == created.id })
+    }
+
+    /// The seed write is what proves the store is usable. Swallowed, `init`
+    /// could never fail and the caller's "unavailable" branch was dead.
+    func testAStoreThatCannotBeWrittenFailsToOpen() throws {
+        let blocked = root.appendingPathComponent("blocked", isDirectory: false)
+        try Data("not a directory".utf8).write(to: blocked)
+
+        XCTAssertThrowsError(try WorkspaceRegistry(storageURL: blocked.appendingPathComponent("workspaces.json")))
+    }
+
     // MARK: - Default workspace
 
     func testStartsWithADefaultWorkspace() throws {

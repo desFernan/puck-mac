@@ -61,7 +61,12 @@ final class WorkspaceRegistry {
         // be rewritten just because it was read.
         if records.count == 1 && records[Self.defaultWorkspaceID] != nil
             && !FileManager.default.fileExists(atPath: self.storageURL.path) {
-            try? persist()
+            // Thrown, not swallowed: this is the write that proves the store
+            // is usable at all. Swallowed, `init` could never fail, and the
+            // caller's "WorkspaceRegistry unavailable" branch was dead code
+            // -- so a directory nobody can write to produced a registry that
+            // silently discarded every workspace for the rest of the session.
+            try persist()
         }
     }
 
@@ -95,9 +100,10 @@ final class WorkspaceRegistry {
             createdAt: now,
             updatedAt: now
         )
-        records[id] = record
-        order.append(id)
-        try persist()
+        try commit {
+            records[id] = record
+            order.append(id)
+        }
         return record
     }
 
@@ -108,8 +114,7 @@ final class WorkspaceRegistry {
         record.projectPath = resolved
         record.realProjectPath = resolved
         record.updatedAt = Self.nowMilliseconds()
-        records[id] = record
-        try persist()
+        try commit { records[id] = record }
         return record
     }
 
@@ -117,10 +122,34 @@ final class WorkspaceRegistry {
     ///   it is the one every session can always fall back to.
     @discardableResult
     func remove(id: String) throws -> Bool {
-        guard id != Self.defaultWorkspaceID, records.removeValue(forKey: id) != nil else { return false }
-        order.removeAll { $0 == id }
-        try persist()
+        guard id != Self.defaultWorkspaceID, records[id] != nil else { return false }
+        try commit {
+            records[id] = nil
+            order.removeAll { $0 == id }
+        }
         return true
+    }
+
+    /// Applies a change and keeps it only if it reached the disk.
+    ///
+    /// The three mutations used to write to memory and then try to persist,
+    /// so a failed write left the two disagreeing in whichever direction the
+    /// caller could not see. A create the coordinator reported as failed was
+    /// still in memory -- announced to the next client that connected, and
+    /// folded into the next successful write. A remove was the mirror: gone
+    /// from memory and from the next write, while the sidebar kept its row
+    /// because the coordinator reads a thrown remove as "did not happen".
+    private func commit(_ change: () -> Void) throws {
+        let previousRecords = records
+        let previousOrder = order
+        change()
+        do {
+            try persist()
+        } catch {
+            records = previousRecords
+            order = previousOrder
+            throw error
+        }
     }
 
     // MARK: - Persistence

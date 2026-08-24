@@ -443,16 +443,18 @@ enum AgentProvider: String, CaseIterable {
         }
     }
 
-    /// Same resolve-with-fallback shape as
-    /// `ClientThemeStyle.resolved(fromDefaultsValue:)` -- a raw value this
-    /// build doesn't recognize (a stale `.env`, a future provider) falls back
-    /// to `.openai` instead of crashing.
-    /// What an absent or unreadable setting resolves to. See
+    /// What an absent or unreadable setting resolves to -- a stale `.env`, a
+    /// provider a future build knows about and this one does not. See
     /// `AgentConfiguration.provider(environment:searchPaths:)`.
     static let fallback: AgentProvider = .cli
 
+    /// Case-folded, like every sibling setting (`AgentEffort.resolved`,
+    /// `AgentPermissionMode.resolved`, `AgentConfiguration.codingAgent`).
+    /// Without it `AGENT_PROVIDER=OpenAI` in a hand-written `.env` fell
+    /// through to the fallback, and the only sign was the app talking to a
+    /// coding CLI while the person who wrote that line believed otherwise.
     static func resolved(fromRawValue raw: String?) -> AgentProvider {
-        raw.flatMap(AgentProvider.init(rawValue:)) ?? AgentProvider.fallback
+        raw.flatMap { AgentProvider(rawValue: $0.lowercased()) } ?? AgentProvider.fallback
     }
 
     /// What the composer's model menu offers: this provider's default, and

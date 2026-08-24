@@ -82,6 +82,20 @@ final class AgentConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.model, "gpt-4.1")
     }
 
+    /// A hand-written `.env` is typed by a person, and every other setting
+    /// here folds case. `AGENT_PROVIDER=OpenAI` used to fall through to the
+    /// fallback, so the app talked to a coding CLI while the person who wrote
+    /// that line believed they had chosen OpenAI.
+    func test_theProviderIsReadWhateverCaseItIsWrittenIn() throws {
+        for spelling in ["openai", "OpenAI", "OPENAI"] {
+            let directory = try directory(withEnv: "AGENT_PROVIDER=\(spelling)\nOPENAI_API_KEY=sk-x")
+
+            let configuration = AgentConfiguration.load(environment: [:], searchPaths: [directory])
+
+            XCTAssertEqual(configuration.provider, .openai, "\(spelling) should name the same provider")
+        }
+    }
+
     func test_environmentBeatsTheFile_soAOneOffOverrideNeedsNoEdit() throws {
         let directory = try directory(withEnv: "AGENT_PROVIDER=openai\nOPENAI_API_KEY=sk-from-file")
 

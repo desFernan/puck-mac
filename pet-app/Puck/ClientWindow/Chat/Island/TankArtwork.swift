@@ -26,9 +26,11 @@ enum TankArtwork {
     /// picture dropped in while the app is running is picked up at its next
     /// launch, which is what the README says.
     static func image() -> NSImage? {
-        if let cached = cache.object(forKey: name as NSString) { return cached }
+        lock.lock()
+        defer { lock.unlock() }
+        if let loaded { return loaded }
         guard let url = resolvedURL(), let image = NSImage(contentsOf: url) else { return nil }
-        cache.setObject(image, forKey: name as NSString)
+        loaded = image
         return image
     }
 
@@ -48,8 +50,14 @@ enum TankArtwork {
         return image.size.width / image.size.height
     }
 
-    /// `nonisolated(unsafe)` because NSCache is documented as thread-safe --
-    /// the compiler cannot see that, and the island draws from whichever
-    /// context SwiftUI evaluates it in.
-    private nonisolated(unsafe) static let cache = NSCache<NSString, NSImage>()
+    /// Held, not cached. This was an NSCache, which is allowed to throw its
+    /// contents away whenever it likes -- and the one thing this must not do
+    /// is decode a 3596-pixel-wide PNG again while the island is being drawn.
+    /// One image for the life of the process is what "loaded once and kept"
+    /// meant all along.
+    ///
+    /// `nonisolated(unsafe)` with a lock around every access: the island is
+    /// drawn from whichever context SwiftUI evaluates it in.
+    private nonisolated(unsafe) static var loaded: NSImage?
+    private static let lock = NSLock()
 }
