@@ -1,23 +1,10 @@
 # Puck 디자인 시스템 (현재 구현 기준)
 
-> **디자인 시스템 v2 — 2026-08-14.** 아래 문서는 이전 팔레트/테마 체계(호박 주황 accent +
-> 다크/화이트/글래스 3무드)를 전면 교체한 결과를 기록한다. 근거/배경은 `docs/decisions.md`의
-> 2026-08-14 항목 참고 — 교체 사유는 기술적 결함이 아니라 아트디렉션 전면 재조정이었다.
-> `.glass` 테마는 폐기됐다(macOS 26+ 전용 기능 유지보수 비용 대비 실익이 낮다는 판단,
-> `docs/decisions.md`).
+> 값의 정본은 언제나 `ClientPalette` / `ClientTheme`이고, 이 문서는 그걸 읽기 쉽게
+> 옮겨 적은 것이다. 값이 바뀌면 코드가 먼저 바뀌고 여기가 따라온다.
 >
-> **v4 — 2026-08-15 채팅 UI가 네이티브 SwiftUI로 복귀.** 이 문서의 이전 판(v2/v3)은 F13
-> 클라이언트 창의 사이드바/탑바/메시지 목록이 `chat-web/`(React/Tailwind/shadcn)에 있다고
-> 적고 있었다. 그 웹 레이어는 **삭제됐다** — 지금 채팅 UI는 전부 Swift이고
-> `Puck/ClientWindow/Chat/`에 산다(`docs/decisions.md`의 "the chat UI goes back to native
-> SwiftUI; chat-web is deleted", 2026-08-15). 같은 날 `workspace/`도 삭제됐다.
->
-> 그래서 아래 §6은 **네이티브 기준으로 다시 썼다**. 팔레트/타이포/간격(§1-§5)과 설정창(§9),
-> 에디터 표면(§9.5)은 그 교체에 영향받지 않았고 값도 그대로다 — 웹은 같은 값을 CSS 변수로
-> 한 벌 더 갖고 있었을 뿐, 정본은 언제나 `ClientPalette`/`ClientTheme`였다.
->
-> `ClientWindowView.swift`가 실제로 그리는 것: `ChatPaneView`(단독 또는 `HSplitView`로
-> `EditorPaneView`와 나란히, §9.5) + 상시 `ClientStatusBarView`(§4.5).
+> 어떻게 여기까지 왔는지(호박 주황 3무드 → light/dark 2테마, 웹 채팅 UI → 네이티브
+> SwiftUI)는 `docs/decisions.md`에 남아 있다.
 
 F13 클라이언트 창의 디자인이 확정된 상태를 **코드에 실제로 존재하는 값 그대로** 기록한 문서다.
 새 디자인 제안이 아니라 현황 스냅샷이며, 값이 바뀌면 이 문서가 아니라 아래 소스가 먼저 바뀐다.

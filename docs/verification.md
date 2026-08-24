@@ -52,21 +52,11 @@ one pass of every item below on the supported macOS version:
 - Remove or hide an optional vendor CLI and confirm the UI reports that only
   `code_editor` is unavailable rather than breaking the rest of the app.
 
-## Evidence record
+## Recording a release
 
-| Gate | Latest evidence | Status |
-|---|---|---|
-| Full automated suite | Local run on 2026-08-24 via `pet-app/scripts/test.sh` (1819 tests) | Pass |
-| 2D frame policy regression | Part of the suite above | Pass |
-| ACP filesystem containment | Part of the suite above | Pass |
-| Clean-checkout CI | Workflow added; first remote run not yet available | Pending |
-| Signed-app manual smoke test | No current recording attached | Pending |
-
-A release is ready only when every row is `Pass`. For remote or manual runs,
-replace the pending text with a durable link to the workflow run or recording;
-do not infer a pass from an older architecture's badge.
-
-`v0.1.0` was tagged with the two rows above still pending, which is a fact
-about that release rather than a change to the rule: it ships unnotarised, to
-people who were told exactly that, and the smoke test is the thing standing
-between it and anyone else.
+Two releases have shipped with this section as a table of "Pending" rows that
+nobody filled in, which is worse than not having it: it reads as a gate and
+enforces nothing. So there is no table. The automated half is enforced by CI
+on every push, visible on the commit; the manual half above is a checklist to
+walk before tagging, and what it produced belongs in the release notes where
+the people downloading it can read it.
