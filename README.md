@@ -1,10 +1,15 @@
-# Puck
+# Puck for macOS
 
 > This is the macOS repo — new home for what used to live at
-> [Speaki-e/puck](https://github.com/Speaki-e/puck) (now archived). Windows
-> and Linux ports live at [desFernan/puck-windows](https://github.com/desFernan/puck-windows)
-> and [desFernan/puck-linux](https://github.com/desFernan/puck-linux)
-> (nothing there yet).
+> [Speaki-e/puck](https://github.com/Speaki-e/puck) (now archived).
+>
+> Platforms: **macOS** (here) · [Windows](https://github.com/desFernan/puck-windows) · [Linux](https://github.com/desFernan/puck-linux)
+
+### 💬 [Join the Discord](https://discord.gg/ePBZVnwSYE)
+
+Bugs, feature requests, build help, or just want to hang out — the
+[support server](https://discord.gg/ePBZVnwSYE) is the fastest way to reach
+us. Come say hi!
 
 A macOS desktop pet that is also an AI agent. Two Swift apps:
 
@@ -157,3 +162,8 @@ import button takes a folder like the above and copies it in for you.
 - [`docs/decisions.md`](docs/decisions.md) — why the cross-cutting changes happened
 - [`docs/verification.md`](docs/verification.md) — release criteria + manual desktop checks
 - [`pet-app/design.md`](pet-app/design.md) — app design notes
+
+## Community
+
+Questions, bug reports, feature ideas, or just want to show off your custom
+avatar — join us on **[Discord](https://discord.gg/ePBZVnwSYE)**.
