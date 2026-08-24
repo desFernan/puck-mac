@@ -17,9 +17,24 @@
 import Foundation
 
 final class ProjectChangeTracker {
-    /// Same exclusions the TS version used. `.git` above all: a single commit
-    /// rewrites hundreds of paths under it and none of them are the agent's edit.
-    static let ignoredDirectories: Set<String> = [".git", "node_modules"]
+    /// `.git` above all: a single commit rewrites hundreds of paths under it
+    /// and none of them are the agent's edit. The rest are the same shape --
+    /// directories a build tool owns, where a change is a by-product of the
+    /// work rather than the work.
+    ///
+    /// This list is what keeps the walk cheap now that hidden files are *not*
+    /// skipped wholesale. They used to be, which meant an agent asked to fix
+    /// a CI workflow, a .env or a .gitignore reported changing nothing at
+    /// all: the snapshot could not see the file, so the watcher was the only
+    /// witness, and a coalesced burst there is unrecoverable.
+    static let ignoredDirectories: Set<String> = [
+        ".git", "node_modules", ".build", ".swiftpm", "DerivedData",
+        ".next", ".venv", "__pycache__",
+    ]
+
+    /// Finder writes this into whichever folder someone looked at, which has
+    /// nothing to do with the agent.
+    static let ignoredFileNames: Set<String> = [".DS_Store"]
 
     private let root: URL
     private let lock = NSLock()
@@ -85,8 +100,12 @@ final class ProjectChangeTracker {
         guard let relative = PathContainment.relativePath(root: rootPath, candidate: absolutePath) else { return nil }
         // The root itself is inside itself but is not a changed *file*.
         guard !relative.isEmpty else { return nil }
-        let first = relative.split(separator: "/").first.map(String.init)
-        if let first, ignoredDirectories.contains(first) { return nil }
+        let components = relative.split(separator: "/").map(String.init)
+        // Any level, not only the first: a `.git` or a `node_modules` nested
+        // inside a package is the same noise as one at the root.
+        if components.dropLast().contains(where: ignoredDirectories.contains) { return nil }
+        if let first = components.first, ignoredDirectories.contains(first) { return nil }
+        if let name = components.last, ignoredFileNames.contains(name) { return nil }
         return relative
     }
 
@@ -98,7 +117,11 @@ final class ProjectChangeTracker {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
+            // Hidden files included: `.github/workflows`, `.env`, `.gitignore`
+            // and `.vscode` are edited as often as anything else, and skipping
+            // them meant the snapshot half of this tracker never saw them.
+            // `ignoredDirectories` is what keeps the walk cheap instead.
+            options: []
         ) else { return result }
 
         for case let url as URL in enumerator {

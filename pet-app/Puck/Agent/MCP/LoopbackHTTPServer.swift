@@ -283,9 +283,13 @@ private final class ResumeOnce<Value: Sendable>: @unchecked Sendable {
 /// One accepted connection: reads requests, authenticates them, and writes
 /// answers. Persistent by default -- an MCP client sends initialize,
 /// tools/list and every tool call down the same socket.
-/// `@unchecked Sendable` for the same reason as the server above: one
-/// connection's state is only touched from the queue its NWConnection
-/// callbacks arrive on.
+/// `@unchecked Sendable`, with two different guarantees behind it rather
+/// than one. `buffer` and the parsing around it are touched only from the
+/// queue this connection's NWConnection callbacks arrive on. `isClosed` is
+/// not: the server's `stop()` closes every connection from whichever thread
+/// ended the turn, and a send completion can be closing the same one at that
+/// moment, so it has a lock of its own. Without it both paths saw `false`,
+/// and the connection was cancelled twice and reported closed twice.
 private final class HTTPConnection: @unchecked Sendable {
     private let connection: NWConnection
     private let token: String
@@ -293,7 +297,16 @@ private final class HTTPConnection: @unchecked Sendable {
     private let onClose: () -> Void
 
     private var buffer = Data()
+    private let closeLock = NSLock()
     private var isClosed = false
+
+    /// Whether this connection has already been closed. Read under the lock,
+    /// because it is the one piece of state here that two threads reach.
+    private var hasClosed: Bool {
+        closeLock.lock()
+        defer { closeLock.unlock() }
+        return isClosed
+    }
 
     init(
         connection: NWConnection,
@@ -322,7 +335,7 @@ private final class HTTPConnection: @unchecked Sendable {
 
     private func receive() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
-            guard let self, !self.isClosed else { return }
+            guard let self, !self.hasClosed else { return }
             if let data, !data.isEmpty {
                 self.buffer.append(data)
                 if self.buffer.count > LoopbackHTTPServer.maximumBodyBytes {
@@ -436,7 +449,7 @@ private final class HTTPConnection: @unchecked Sendable {
         var payload = Data(head.utf8)
         payload.append(body)
         connection.send(content: payload, completion: .contentProcessed { [weak self] _ in
-            guard let self, !self.isClosed else { return }
+            guard let self, !self.hasClosed else { return }
             if thenClose {
                 self.close()
             } else {
@@ -446,9 +459,16 @@ private final class HTTPConnection: @unchecked Sendable {
         })
     }
 
+    /// Idempotent, and it has to be: the server closes every connection when
+    /// a turn ends, a send completion closes the one it just answered, and a
+    /// state update closes one that failed. Whoever gets there first does the
+    /// work; the rest return.
     func close() {
-        guard !isClosed else { return }
+        closeLock.lock()
+        let alreadyClosed = isClosed
         isClosed = true
+        closeLock.unlock()
+        guard !alreadyClosed else { return }
         connection.stateUpdateHandler = nil
         connection.cancel()
         onClose()

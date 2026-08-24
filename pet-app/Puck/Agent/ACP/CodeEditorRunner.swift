@@ -260,7 +260,9 @@ actor CodeEditorRunner {
         // both firing is normal rather than a bug: a cancel arrives while the
         // run is still awaiting, and whichever gets there first is the one
         // that ends the process. `shutDown` is idempotent for that reason.
-        if let process = run.process { shutDown(process, cancelGrace: 2) }
+        // Not awaited: cancel() answers the caller straight away, and the
+        // grace period this spends is time nobody is waiting on.
+        if let process = run.process { Task { await shutDown(process, cancelGrace: 2) } }
         return true
     }
 
@@ -274,16 +276,21 @@ actor CodeEditorRunner {
     /// own, then SIGKILL. `terminate()` alone is a request, not a guarantee,
     /// and the transport is released as soon as the run finishes, so nothing
     /// would be left to escalate afterwards.
-    private func shutDown(_ process: AcpAgentTransport, cancelGrace: TimeInterval) {
-        Task {
-            if cancelGrace > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(cancelGrace * 1_000_000_000))
-            }
-            if process.isRunning { process.terminate() }
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            if process.isRunning { process.kill() }
-            liveProcesses.remove(process)
+    /// Ends the agent, and does not return until it is actually gone.
+    ///
+    /// Awaited rather than fired and forgotten wherever the file list is
+    /// taken afterwards: the snapshot is what tells the user which files the
+    /// run touched, and taking it while the agent is still alive and possibly
+    /// mid-write misses exactly the writes of the run that needed the list
+    /// most. Callers with nothing to read afterwards wrap it in a Task.
+    private func shutDown(_ process: AcpAgentTransport, cancelGrace: TimeInterval) async {
+        if cancelGrace > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(cancelGrace * 1_000_000_000))
         }
+        if process.isRunning { process.terminate() }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        if process.isRunning { process.kill() }
+        liveProcesses.remove(process)
     }
 
     // MARK: - Internals
@@ -332,7 +339,9 @@ actor CodeEditorRunner {
 
         guard var result = await withDeadline(seconds: timeoutSeconds, work: { await session.run(task: task) }) else {
             session.cancel()
-            shutDown(process, cancelGrace: 0)
+            // Awaited: the file list below is taken from the disk this agent
+            // was writing to a moment ago.
+            await shutDown(process, cancelGrace: 0)
             return CodeEditorResult(
                 ok: false,
                 summary: String(format: Strings.text(.toolCodeEditTimedOutFormat), "\(Int(timeoutSeconds))"),
@@ -341,7 +350,7 @@ actor CodeEditorRunner {
                 detail: "code_editor exceeded \(Int(timeoutSeconds))s"
             )
         }
-        shutDown(process, cancelGrace: 0)
+        await shutDown(process, cancelGrace: 0)
         result.changedFiles = tracker.finish()
         return result
     }
