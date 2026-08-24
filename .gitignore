@@ -14,10 +14,16 @@
 # Local debug/scratch output, never intentional to commit
 tmp-screenshots/
 
-# AI-generated planning/analysis/design docs. Written to disk on purpose and
-# kept out of the repo on purpose: they are working notes for one task, not
-# something the next reader of this repository should have to sort through.
-docs/superpowers/
+# Working notes, kept on disk and out of the repository. None of them tell
+# somebody who cloned this anything they can use: a task list with commit
+# hashes in it, a release checklist, why decisions that predate this
+# repository were taken, and a design-token table whose source of truth is
+# ClientPalette/ClientTheme anyway. The README is what an outside reader
+# gets.
+docs/
+pet-app/design.md
+
+# AI-generated planning/analysis/design docs, same reasoning as above.
 .superpowers/
 
 # Isolated workspaces for subagent-driven development

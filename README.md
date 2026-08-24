@@ -159,12 +159,6 @@ so it is the louder way to find out what is missing.
 `pet-app/Puck/Resources/Avatars/dummy` is a complete example, and Settings'
 import button takes a folder like the above and copies it in for you.
 
-## Docs
-
-- [`docs/decisions.md`](docs/decisions.md) — why the cross-cutting changes happened
-- [`docs/verification.md`](docs/verification.md) — release criteria + manual desktop checks
-- [`pet-app/design.md`](pet-app/design.md) — app design notes
-
 ## Community
 
 Questions, bug reports, feature ideas, or just want to show off your custom

@@ -9,8 +9,7 @@
 //  ClientChatWebView (React/Tailwind/shadcn). Undone 2026-08-15: they are
 //  ChatPaneView now, native, and the web bundle is gone. The reason web was
 //  chosen -- iterating fast toward a bespoke shadcn look -- stopped applying
-//  when the target became stock Apple components. See
-//  docs/superpowers/specs/2026-08-15-native-chat-design.md.
+//  when the target became stock Apple components.
 //
 //  The editor toggle is this view's own state again rather than something the
 //  web view drove through a bridge handler, which is also what let it grow a

@@ -3,7 +3,7 @@
 //  Puck
 //
 //  Design system v2 (2026-08-14): switched internal spacing/padding to
-//  ClientTheme.Metrics -- see docs/decisions.md (tab strip pattern).
+//  ClientTheme.Metrics (tab strip pattern).
 //  stripHeight/tabHeight stay plain literals rather than derived from a
 //  spacing token -- they're this view's own dimensions, not a spacing
 //  concern, and coupling them to a generic token would let retuning that

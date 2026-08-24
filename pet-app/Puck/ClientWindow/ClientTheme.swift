@@ -2,10 +2,10 @@
 //  ClientTheme.swift
 //  Puck
 //
-//  Design system v2 (2026-08-14) -- see docs/decisions.md. Colors
+//  Design system v2 (2026-08-14). Colors
 //  live in ClientPalette; this file is type/spacing/shape. Pruned to only
 //  the tokens still actually consumed -- the 2026-08-13 chat-web migration
-//  (docs/decisions.md) deleted ChatView.swift/ClientSidebarView.swift but
+//  deleted ChatView.swift/ClientSidebarView.swift but
 //  left their token definitions here; this rewrite removes them rather
 //  than redesigning values nothing reads anymore.
 //

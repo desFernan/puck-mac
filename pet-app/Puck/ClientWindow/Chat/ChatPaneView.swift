@@ -3,8 +3,7 @@
 //  Puck
 //
 //  The chat window's whole UI, native again (2026-08-15) -- replaces
-//  ClientChatWebView and the chat-web bundle behind it. See
-//  docs/superpowers/specs/2026-08-15-native-chat-design.md.
+//  ClientChatWebView and the chat-web bundle behind it.
 //
 //  Reads ClientWindowStore/ChatSession directly. Those were always the source
 //  of truth; chat-web was a second consumer of them over a hand-mirrored JSON

@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  Which of the ClientWindow themes is active. Design system v2
-//  (2026-08-14) dropped the `.glass` theme -- see docs/decisions.md for
+//  (2026-08-14) dropped the `.glass` theme --
 //  the rationale. A distinct setting from Puck's system-wide AppAppearance
 //  (Settings' light/dark/system toggle, used by the pet overlay/Settings),
 //  but not a separate ClientWindow-local one either -- theme should stay in

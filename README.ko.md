@@ -157,12 +157,6 @@ Avatars/my-pet/
 `pet-app/Puck/Resources/Avatars/dummy`가 완전한 예시이고, 설정의 가져오기
 버튼은 위와 같은 폴더를 받아 복사해 줍니다.
 
-## 문서
-
-- [`docs/decisions.md`](docs/decisions.md) — 크로스커팅 변경이 왜 일어났는지
-- [`docs/verification.md`](docs/verification.md) — 릴리스 기준 + 수동 데스크톱 체크
-- [`pet-app/design.md`](pet-app/design.md) — 앱 설계 노트
-
 ## 커뮤니티
 
 질문, 버그 제보, 기능 아이디어, 아니면 만든 커스텀 아바타 자랑하고 싶을 때 —

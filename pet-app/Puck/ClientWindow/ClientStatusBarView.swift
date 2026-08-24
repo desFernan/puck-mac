@@ -3,7 +3,7 @@
 //  Puck
 //
 //  Design system v2 (2026-08-14) -- a persistent thin status bar, new UI
-//  (docs/decisions.md). Reports the active workspace's *editor/project*
+//  Reports the active workspace's *editor/project*
 //  status -- deliberately not called "connection", since that term means
 //  the pet-app<->workspace bridge socket elsewhere in this codebase and
 //  this bar doesn't observe that.

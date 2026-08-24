@@ -6,8 +6,9 @@
 //  client reports, and moving the pet in and out.
 //
 //  Everything the pet can do follows roamableArea, so going home is one
-//  assignment plus a scale -- see docs/superpowers/specs/2026-08-22-pet-tank-design.md
-//  for why the rendering stays here rather than moving into PuckClient.
+//  assignment plus a scale. The rendering stays here rather than moving
+//  into PuckClient because there is one pet and pet-app owns it: the
+//  client reports where the island is, and nothing else.
 //
 
 import AppKit
