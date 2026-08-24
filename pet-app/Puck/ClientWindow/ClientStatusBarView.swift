@@ -57,10 +57,9 @@ struct ClientStatusBarView: View {
         return configuration.codingAgent.displayName
     }
 
-    // Matches ClientWindowStore.casualSessionTitle -- the
-    // default workspace's own name, not an English placeholder (every
-    // sibling string here is Korean, e.g. ConflictBannerView's "디스크에서
-    // 파일이 변경됐습니다").
+    // Matches ClientWindowStore.casualSessionTitle -- the default
+    // workspace's own name, not an English placeholder. Every string beside
+    // it on screen is Korean, so an English one would read as a gap.
     private var projectLabel: String {
         guard let projectPath = workspace?.projectPath else { return workspace?.displayName ?? Strings.text(.chatCasualSession) }
         return abbreviatedPath(projectPath, home: NSHomeDirectory())

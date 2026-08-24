@@ -125,7 +125,7 @@ final class NearestClimbTargetTests: XCTestCase {
         XCTAssertEqual(target(from: 550, windows: [standingIn, reachable])?.x, 900 + 4)
     }
 
-    // MARK: - "포커스된 창 위로는 올라가지 않기" (Settings)
+    // MARK: - Settings' "don't climb the focused window"
 
     /// The toggle's whole promise. Before it had a reader, an excluded window
     /// was climbed exactly like any other.

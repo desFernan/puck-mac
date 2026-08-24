@@ -3,8 +3,9 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The pure motion arithmetic behind MoveTo/Walk. plan/02_pet-app.md F3:
-//  "물리엔진 없음. MoveTo 등속(px/sec) + 도착 반경, Fall만 낙하 가속도".
+//  The pure motion arithmetic behind MoveTo/Walk. plan/02_pet-app.md F3: no
+//  physics engine -- MoveTo travels at a constant px/sec with an arrival
+//  radius, and only Fall accelerates.
 //  Positions are GlobalScreenSpace pixels (top-left origin, Y down).
 //
 

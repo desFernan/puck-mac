@@ -126,9 +126,10 @@ extension AppDelegate {
         sendUserInput(text: text, source: .text, attachments: attachments)
     }
 
-    /// F6 (2026-07-30 재정정): F13 클라이언트 창이 PuckClient라는 별도
-    /// 앱으로 분리되면서, 이 핫키는 다시 원래의 가벼운 퀵 캡처 말풍선만
-    /// 담당한다 -- 무거운 전체 창을 열 이유가 없어졌음.
+    /// Revised 2026-07-30: once the client window became an app of its own
+    /// (PuckClient), this hotkey went back to being only the light
+    /// quick-capture bubble -- there is no longer a reason for it to open the
+    /// whole window.
     private func showTextInputBubble() {
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
@@ -219,7 +220,7 @@ extension AppDelegate {
         stateBeforePin = nil
     }
 
-    /// F6: "소켓 미연결 시 '워크스페이스 꺼져있음' 말풍선". What is missing is
+    /// The bubble shown when the socket has nobody on it. What is missing is
     /// PuckClient now, not workspace -- it hosts the agent as of 2026-08-15 --
     /// so the wording names the chat window the user would actually open.
     private func showClientOfflineBubble() {

@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Pure hit test: plan/02_pet-app.md F10 ("클릭 감지: 전역 클릭 모니터로 클릭
-//  좌표의 대상 frame 포함 여부 확인").
+//  Pure hit test: plan/02_pet-app.md F10 -- a global click monitor asks
+//  whether the click landed inside the target's frame.
 //
 
 import XCTest

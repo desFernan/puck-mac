@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  JSON Lines log formatting, per protocol/01_protocol.md section 7
-//  ("로그 포맷 (분산 디버깅 표준)").
+//  JSON Lines log formatting, per protocol/01_protocol.md section 7 -- the
+//  shared log format the processes debug through.
 //
 
 import XCTest
