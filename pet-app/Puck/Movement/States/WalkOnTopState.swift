@@ -61,7 +61,15 @@ final class WalkOnTopState: StateHandler {
         // the walk clip -- looking like it was trying to leave the screen
         // (2026-08-22).
         let limits = Self.walkableX(in: context.roamableArea, visualBounds: context.visualBounds)
-        if nextX < limits.lowerBound || nextX > limits.upperBound {
+        // The same guard CeilingState has: an oversized avatar (Settings'
+        // size slider on a narrow area) has no x where it fits, so the range
+        // collapses to a point and every frame is "outside" it -- the pet
+        // stands pinned while its facing flips at the frame rate.
+        let fits = !ScreenBounds.isOversizedHorizontally(
+            visualBounds: context.visualBounds,
+            in: context.roamableArea
+        )
+        if fits, nextX < limits.lowerBound || nextX > limits.upperBound {
             resolvedDirection = -resolvedDirection
             nextX = context.body.position.x + resolvedDirection * context.walkSpeed * CGFloat(dt)
         }

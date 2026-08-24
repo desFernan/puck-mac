@@ -102,11 +102,17 @@ final class PetHomeDecider {
     /// - Returns: the move to make, once and only once, when a reported state
     ///   has held long enough and differs from where the pet already is.
     func tick(dt: TimeInterval) -> Move? {
+        // After the two guards, not before. A code tour calls forceDesktop()
+        // at whatever moment the agent reaches one, and a forced move that
+        // jumped the queue took the pet out of the hand holding it -- the one
+        // thing `isBeingHeld` exists to prevent -- or relocated a pet the
+        // user had hidden.
+        guard !isPetHidden, !isBeingHeld else { return nil }
         if let forced {
             self.forced = nil
             return forced
         }
-        guard !isPetHidden, !isBeingHeld, let pending else { return nil }
+        guard let pending else { return nil }
         elapsed += dt
         guard elapsed >= Self.holdSeconds else { return nil }
         self.pending = nil

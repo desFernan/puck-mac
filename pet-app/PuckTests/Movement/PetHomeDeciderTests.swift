@@ -17,6 +17,16 @@ final class PetHomeDeciderTests: XCTestCase {
         return move
     }
 
+    /// The first move a run of frames produces, where `settled` gives the
+    /// last -- for the cases where two decisions land in the same second and
+    /// the order between them is the point.
+    private func firstMove(_ decider: PetHomeDecider) -> PetHomeDecider.Move? {
+        for _ in 0..<60 {
+            if let move = decider.tick(dt: 1.0 / 60) { return move }
+        }
+        return nil
+    }
+
     func test_aVisibleTankOnAFrontmostWindow_bringsThePetHome() {
         let decider = PetHomeDecider()
         decider.report(hasTank: true, visible: true)
@@ -36,6 +46,37 @@ final class PetHomeDeciderTests: XCTestCase {
         decider.report(hasTank: true, visible: false)
 
         XCTAssertNil(settled(decider), "the pet stays where the hand put it")
+    }
+
+    /// A code tour forces the pet out of its tank at whatever moment the
+    /// agent reaches one -- including while somebody is holding the pet, or
+    /// while it is hidden. Neither is a moment to move it.
+    func test_aForcedMoveStillWaitsForTheHandHoldingThePet() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true)
+        XCTAssertEqual(settled(decider), .home)
+
+        decider.isBeingHeld = true
+        decider.forceDesktop()
+
+        XCTAssertNil(settled(decider), "not while it is being held")
+
+        // The first thing that happens after letting go, not the last: the
+        // standing report ("home", still true) takes the pet back afterwards,
+        // which is the tour and the tank disagreeing rather than this rule.
+        decider.isBeingHeld = false
+        XCTAssertEqual(firstMove(decider), .desktop, "and then it happens")
+    }
+
+    func test_aForcedMoveDoesNotRelocateAHiddenPet() {
+        let decider = PetHomeDecider()
+        decider.report(hasTank: true, visible: true)
+        XCTAssertEqual(settled(decider), .home)
+
+        decider.isPetHidden = true
+        decider.forceDesktop()
+
+        XCTAssertNil(settled(decider))
     }
 
     /// Letting go decides again from what was reported meanwhile, rather than

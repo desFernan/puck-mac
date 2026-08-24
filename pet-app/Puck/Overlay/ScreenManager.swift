@@ -51,6 +51,12 @@ final class ScreenManager {
 
     private func refresh() {
         guard let space = GlobalScreenSpace.current() else { return }
+        // Only for a real change. didChangeScreenParameters also fires for a
+        // Dock resize, the menu bar auto-hiding, a colour-profile switch --
+        // and every one of those tore down and rebuilt every overlay window,
+        // which now means the pet is put back on the desktop. Resizing the
+        // Dock ejected it from the island it was sitting in.
+        guard space != current else { return }
         current = space
         onChange?(space)
     }

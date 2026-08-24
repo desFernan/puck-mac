@@ -402,11 +402,20 @@ final class EditorPaneStore: ObservableObject {
     }
 
     /// Conflict resolution: discard the draft, load whatever's on disk now.
+    ///
+    /// Through `adopt`, not by replacing the tab with a fresh one. A fresh
+    /// tab starts its adoption count at zero, and the editor view is keyed on
+    /// `path#adoptions` precisely so it rebuilds when the text changes under
+    /// it -- so replacing a never-adopted tab (which is exactly the tab that
+    /// can be in conflict: the watcher only auto-adopts clean ones) left the
+    /// key identical, the view unrebuilt, and the user's draft still on
+    /// screen. The next keystroke then pushed that draft back out through
+    /// `updateDraft` and overwrote the disk contents they had just asked to
+    /// keep.
     func useDisk(path: String) {
         guard let index = openTabs.firstIndex(where: { $0.path == path }) else { return }
         do {
-            let fresh = try service.readFile(at: path)
-            openTabs[index] = EditorTab(fresh)
+            openTabs[index].adopt(try service.readFile(at: path))
         } catch let error as WorkspaceFileServiceError {
             lastError = error
         } catch {

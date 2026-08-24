@@ -136,8 +136,41 @@ final class WorkspaceFileWatcher {
         return nil
     }
 
-    private static func isInsideIgnoredDirectory(_ path: String, root: String) -> Bool {
-        guard let relative = PathContainment.relativePath(root: root, candidate: path) else { return false }
+    /// Whether an event path lies inside a directory nobody wants to hear
+    /// about.
+    ///
+    /// Both sides are put through `realpath` first. FSEvents reports the
+    /// filesystem's own spelling -- `/private/tmp/...` -- while the root this
+    /// watcher was given has been standardized back to `/tmp/...`, so the two
+    /// never lined up: `relativePath` answered nil, the guard passed, and
+    /// every write under `node_modules` or `.git` was delivered as a change.
+    /// Each one costs a full tree reload and a `git status`.
+    ///
+    /// `realpath`, not `resolvingSymlinksInPath`: the latter standardizes
+    /// `/private/tmp` *to* `/tmp`, which is the direction that hid this.
+    static func isInsideIgnoredDirectory(_ path: String, root: String) -> Bool {
+        guard let relative = PathContainment.relativePath(
+            root: canonicalPath(root),
+            candidate: canonicalPath(path)
+        ) else {
+            return false
+        }
         return relative.split(separator: "/").contains { workspaceFileServiceDefaultIgnores.contains(String($0)) }
+    }
+
+    /// The kernel's spelling of a path, or the path itself when it does not
+    /// exist -- a file the event says was deleted has no realpath any more,
+    /// and its directory prefix is what matters here.
+    private static func canonicalPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else {
+            // Fall back to resolving as much of the parent as exists, so a
+            // deleted node_modules/x is still recognised by its directory.
+            let parent = (path as NSString).deletingLastPathComponent
+            guard !parent.isEmpty, let resolvedParent = realpath(parent, nil) else { return path }
+            defer { free(resolvedParent) }
+            return String(cString: resolvedParent) + "/" + (path as NSString).lastPathComponent
+        }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 }

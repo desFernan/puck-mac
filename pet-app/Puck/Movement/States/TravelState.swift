@@ -39,6 +39,18 @@ final class TravelState: StateHandler {
     /// uses it to put `roamableArea` back to the world being arrived in.
     var onArrival: (() -> Void)?
 
+    /// Re-entering restarts the trip.
+    ///
+    /// The default is not to, which is right for a state whose entry is
+    /// expensive or whose timers should survive -- and wrong here: a second
+    /// trip is ordered by installing a new origin, destination and callbacks
+    /// and then transitioning again. Without a restart the new endpoints were
+    /// driven by the *old* elapsed time, so a trip ordered a third of the way
+    /// through the last one rendered its first frame two thirds of the way
+    /// across the screen. The pet teleported instead of gliding, and its
+    /// size lerp jumped with it.
+    var restartsOnReentry: Bool { true }
+
     private var elapsed: TimeInterval = 0
     private var oneShot = OneShotTransition()
 

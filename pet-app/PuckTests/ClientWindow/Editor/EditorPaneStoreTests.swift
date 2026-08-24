@@ -161,6 +161,11 @@ final class EditorPaneStoreTests: XCTestCase {
         XCTAssertEqual(store.activeTab?.content, "changed elsewhere")
         XCTAssertFalse(store.activeTab?.isDirty ?? true)
         XCTAssertFalse(store.activeTab?.diskChanged ?? true)
+        // The count the editor view is keyed on. Without it the view is not
+        // rebuilt, the discarded draft stays on screen, and the next
+        // keystroke writes it back over the file the user chose to keep --
+        // so "the tab holds the right text" is only half the assertion.
+        XCTAssertEqual(store.activeTab?.adoptions, 1)
     }
 
     func test_keepMine_reanchorsAndSavesTheDraft() throws {
