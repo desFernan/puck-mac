@@ -54,7 +54,9 @@ enum PermissionOnboarding {
         }
     }
 
-    static func requestUndecidedPermissions(completion: @escaping (PermissionStatus) -> Void) {
+    /// `@Sendable`: the answer arrives on whichever queue AVFoundation and
+    /// Speech happen to call back on -- see MicrophonePermission.
+    static func requestUndecidedPermissions(completion: @escaping @Sendable (PermissionStatus) -> Void) {
         MicrophonePermission.requestMicrophoneAccess { _ in
             MicrophonePermission.requestSpeechRecognitionAccess { _ in
                 completion(currentStatus())

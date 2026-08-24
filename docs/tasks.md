@@ -10,7 +10,7 @@
 ## 대기
 
 1. **Swift 6 언어 모드로 올리기** — 진행 중. `SWIFT_STRICT_CONCURRENCY: complete`
- 기준 경고가 292개(Puck 220 + PuckClient 72)에서 **46개**(두 타깃 합쳐 고유 기준)로 줄었다.
+ 기준 경고가 292개(Puck 220 + PuckClient 72)에서 **37개**(두 타깃 합쳐 고유 기준)로 줄었다.
  지금까지 한 것: AppDelegate와 상태 기계(StateHandler·CharacterController)와
  NSViewRepresentable 코디네이터들을 `@MainActor`로, 큐로 지키는 타입들을
  `@unchecked Sendable`로, 순수 헬퍼는 `nonisolated`로. 그 과정에서 point_at이

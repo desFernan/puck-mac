@@ -176,14 +176,19 @@ extension AppDelegate {
     /// elsewhere in this file.
     private func startAttachmentCapture(bubbleView: TextInputBubbleView?) {
         ScreenRegionCapture.capture { [weak self, weak bubbleView] url in
-            // The interactive capture takes focus system-wide; hand it back
-            // regardless of whether anything was actually captured.
-            NSApp.activate(ignoringOtherApps: true)
-            self?.textInputBubbleWindow?.makeKeyAndOrderFront(nil)
+            // Delivered on the main queue by `capture` itself, which its
+            // signature cannot say -- the callback is armed on whichever
+            // thread the child process ended on.
+            MainActor.assumeIsolated {
+                // The interactive capture takes focus system-wide; hand it
+                // back regardless of whether anything was actually captured.
+                NSApp.activate(ignoringOtherApps: true)
+                self?.textInputBubbleWindow?.makeKeyAndOrderFront(nil)
 
-            guard let url else { return } // Escape, or capture failed
-            self?.pendingBubbleAttachment = Attachment(path: url.path)
-            bubbleView?.setAttachmentThumbnail(NSImage(contentsOf: url))
+                guard let url else { return } // Escape, or capture failed
+                self?.pendingBubbleAttachment = Attachment(path: url.path)
+                bubbleView?.setAttachmentThumbnail(NSImage(contentsOf: url))
+            }
         }
     }
 

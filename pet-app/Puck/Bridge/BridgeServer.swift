@@ -19,7 +19,10 @@ enum BridgeServerError: Error, Equatable {
 /// (protocol repo section 2: "서버: pet-app (NWListener)"). workspace connects
 /// as a client and reconnects with exponential backoff on its own; pet-app's
 /// job is just to accept connections and stay a pure pet when none are open.
-final class BridgeServer {
+/// `@unchecked Sendable` for the same reason BridgeSocketClient is: the
+/// connection list and the handshake secret are touched on `queue` alone,
+/// which is what makes the listener's callbacks safe to hand `self`.
+final class BridgeServer: @unchecked Sendable {
     static let defaultSocketURL: URL = BridgeSocketPath.default
 
     /// All access to `connections` (reads and writes) must go through `queue` —

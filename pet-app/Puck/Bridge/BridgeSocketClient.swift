@@ -13,7 +13,12 @@
 import Foundation
 import Network
 
-final class BridgeSocketClient {
+/// `@unchecked Sendable`: every mutable field is read and written on
+/// `queue` and nowhere else, which is also what the reconnect timer and the
+/// connection callbacks below rely on. The compiler cannot see a serial
+/// queue as an isolation boundary; the code has treated it as one since it
+/// was written.
+final class BridgeSocketClient: @unchecked Sendable {
     /// Fires for every message the server relays to this connection
     /// (protocol 3.7 -- events, workspace_create, session_create,
     /// editor_view_ready, editor_view_unavailable).

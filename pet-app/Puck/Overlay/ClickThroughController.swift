@@ -15,10 +15,20 @@ import CoreGraphics
 /// over the character's hitbox: click-through everywhere else, clickable
 /// over the character so clicks/drags reach the app instead of passing
 /// through to whatever's behind it.
+/// `@MainActor`: it turns an NSWindow's click-through on and off, and the
+/// event monitors that make it do so are delivered on the main thread. The
+/// window property alone would force this -- AppKit is main-actor -- and
+/// everything that builds one of these is there already.
+@MainActor
 final class ClickThroughController {
     private weak var window: NSWindow?
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
+    /// `nonisolated(unsafe)` so `stopMonitoring()` can be called from
+    /// `deinit`, which has no isolation whatever the type it belongs to.
+    /// Written and read on the main thread everywhere else; a monitor left
+    /// installed past its owner is the failure the deinit exists to prevent,
+    /// and it is worse than the one the annotation gives up.
+    nonisolated(unsafe) private var globalMonitor: Any?
+    nonisolated(unsafe) private var localMonitor: Any?
     private var characterScreenPosition: CGPoint = .zero
     private var hitboxSize: CGSize = .zero
     private var isUpsideDown = false
@@ -94,7 +104,8 @@ final class ClickThroughController {
         stopMonitoring()
     }
 
-    func stopMonitoring() {
+    /// `nonisolated` so `deinit` may call it -- see the monitors above.
+    nonisolated func stopMonitoring() {
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
         }
@@ -173,7 +184,7 @@ final class ClickThroughController {
     /// The character's full body rect: the ground point plus hitboxSize,
     /// flipped by isUpsideDown. `headRect` slices a fraction off its "head"
     /// edge.
-    private static func bodyRect(characterScreenPosition: CGPoint, hitboxSize: CGSize, isUpsideDown: Bool) -> CGRect {
+    nonisolated private static func bodyRect(characterScreenPosition: CGPoint, hitboxSize: CGSize, isUpsideDown: Bool) -> CGRect {
         let originY = isUpsideDown
             ? characterScreenPosition.y - hitboxSize.height
             : characterScreenPosition.y
@@ -190,7 +201,7 @@ final class ClickThroughController {
     /// counts as its head for petting. The art is a chibi with a very large
     /// head, so this is generous — but it stops short of the body, because
     /// "쓰담쓰담" on the pet's feet isn't petting.
-    static let headFraction: CGFloat = 0.45
+    nonisolated static let headFraction: CGFloat = 0.45
 
     /// The head's rectangle, in the same AppKit global space as the cursor
     /// positions this type is given.
@@ -199,7 +210,7 @@ final class ClickThroughController {
     /// against the artwork's silhouette: petting asks "is the cursor over the
     /// pet's head?", which is a region of the body, not a set of drawn
     /// pixels. Stroking the air just above the hair should still count.
-    static func headRect(
+    nonisolated static func headRect(
         characterScreenPosition: CGPoint,
         hitboxSize: CGSize,
         isUpsideDown: Bool = false

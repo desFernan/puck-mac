@@ -13,7 +13,9 @@ import AVFoundation
 import Speech
 
 enum MicrophonePermission {
-    static func requestMicrophoneAccess(completion: @escaping (Bool) -> Void) {
+    /// `@Sendable`: AVFoundation calls back on an arbitrary queue, which is
+    /// exactly why the callers hop to the main thread themselves.
+    static func requestMicrophoneAccess(completion: @escaping @Sendable (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             completion(true)
@@ -26,7 +28,8 @@ enum MicrophonePermission {
         }
     }
 
-    static func requestSpeechRecognitionAccess(completion: @escaping (Bool) -> Void) {
+    /// `@Sendable` for the same reason as the microphone above.
+    static func requestSpeechRecognitionAccess(completion: @escaping @Sendable (Bool) -> Void) {
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized:
             completion(true)

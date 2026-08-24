@@ -22,7 +22,11 @@ enum ScreenRegionCapture {
     ///   pressed Escape (screencapture still exits 0, it just never writes
     ///   the file) or the process itself couldn't be launched. Always
     ///   called on the main thread.
-    static func capture(completion: @escaping (URL?) -> Void) {
+    ///
+    /// `@Sendable`, because it genuinely crosses: the callback is armed from
+    /// the process's termination handler, which runs on whichever thread
+    /// waitpid returned on, and hops to the main queue from there.
+    static func capture(completion: @escaping @Sendable (URL?) -> Void) {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("Puck-capture-\(UUID().uuidString).png")
 

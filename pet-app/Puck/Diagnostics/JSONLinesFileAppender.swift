@@ -28,11 +28,17 @@ final class JSONLinesFileAppender {
     /// Fire-and-forget. A log line is never worth propagating a failure to
     /// the caller -- a diagnostics write that throws would turn a logged
     /// problem into a second one.
+    ///
+    /// Encoded here and written on the queue. The other way round meant
+    /// handing an arbitrary Encodable to another thread, which is both
+    /// something the compiler cannot check and something the caller may still
+    /// be mutating. Bytes are safe to send anywhere.
     func append(_ line: some Encodable) {
-        queue.async { [directory] in
-            guard var data = try? JSONEncoder().encode(line) else { return }
-            data.append(0x0A)
-
+        guard let encoded = try? JSONEncoder().encode(line) else { return }
+        // A `let`, so what crosses to the queue is a value rather than a
+        // variable this thread could still be writing.
+        let data = encoded + Data([0x0A])
+        queue.async { [directory, data] in
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let fileURL = directory.appendingPathComponent(Self.fileName(for: Date()))
 
