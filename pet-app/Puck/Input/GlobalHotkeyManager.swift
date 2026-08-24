@@ -109,11 +109,25 @@ final class GlobalHotkeyManager {
                 place: .headInsertEventTap,
                 options: .listenOnly,
                 eventsOfInterest: mask,
-                callback: { _, type, event, refcon in
-                    guard let refcon else { return Unmanaged.passRetained(event) }
+                callback: { proxy, type, event, refcon in
+                    // Unretained: this tap only listens, so the event is
+                    // handed straight back and its ownership never changes.
+                    // Retaining it leaked one CGEvent per key the user
+                    // pressed, for the life of the app.
+                    guard let refcon else { return Unmanaged.passUnretained(event) }
                     let manager = Unmanaged<GlobalHotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
+                    // macOS switches a tap off if it is slow to answer, or
+                    // when the user's own input storms it. Nothing turned it
+                    // back on, so every global hotkey stayed dead for the
+                    // rest of the session -- and the pet's push-to-talk with
+                    // them.
+                    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                        manager.reEnableTap()
+                        return Unmanaged.passUnretained(event)
+                    }
+                    _ = proxy
                     manager.handle(type: type, event: event)
-                    return Unmanaged.passRetained(event)
+                    return Unmanaged.passUnretained(event)
                 },
                 userInfo: Unmanaged.passUnretained(self).toOpaque()
             )
@@ -152,6 +166,14 @@ final class GlobalHotkeyManager {
         eventTap = nil
         runLoopSource = nil
         runLoop = nil
+    }
+
+    /// Turns the tap back on after macOS switched it off. Called from the tap
+    /// callback, which is the only place that hears about it.
+    fileprivate func reEnableTap() {
+        guard let eventTap else { return }
+        AppLogger.shared.log(.warning, "GlobalHotkeyManager: the event tap was disabled; re-enabling it")
+        CGEvent.tapEnable(tap: eventTap, enable: true)
     }
 
     private func handle(type: CGEventType, event: CGEvent) {

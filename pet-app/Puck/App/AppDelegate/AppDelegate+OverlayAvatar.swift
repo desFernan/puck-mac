@@ -64,7 +64,10 @@ extension AppDelegate {
         let focusObserver = FocusModeObserver()
         focusObserver.onChange = { [weak self] isFocusActive in
             guard let self, self.settingsStore.autoMuteOnFocus else { return }
-            self.sfxPlayer?.isMuted = isFocusActive
+            // Focus can add muting, never take it away: assigning the flag
+            // outright meant Focus switching off unmuted a pet the user had
+            // muted in Settings, and nothing put that back.
+            self.sfxPlayer?.isMuted = isFocusActive || self.settingsStore.isMuted
         }
         focusObserver.startObserving()
         focusModeObserver = focusObserver

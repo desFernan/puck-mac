@@ -24,6 +24,20 @@ final class AgentRunnerTests: XCTestCase {
         }
     }
 
+    /// Answers the first turn with tool calls and records what it is shown
+    /// on every turn after that -- which is where an unanswered tool call
+    /// shows up.
+    private final class ToolThenRecordingClient: AgentLLMClient {
+        var toolCalls: [GPTToolCall] = []
+        private(set) var messagesPerTurn: [[GPTMessage]] = []
+
+        func send(messages: [GPTMessage], tools: [GPTToolSpec]) async throws -> GPTTurn {
+            messagesPerTurn.append(messages)
+            guard messagesPerTurn.count == 1 else { return GPTTurn(text: "done", toolCalls: []) }
+            return GPTTurn(text: nil, toolCalls: toolCalls)
+        }
+    }
+
     /// Records what the model was actually shown, which is the only way to
     /// see one chat's context leaking into another.
     private final class RecordingLLMClient: AgentLLMClient {
@@ -339,6 +353,53 @@ final class AgentRunnerTests: XCTestCase {
         XCTAssertEqual(approvals.value, ["call-1"], "the second tool must never be asked about")
         XCTAssertEqual(events.value.last, .agentDone(ok: false, summary: AgentRunner.cancelledSummary))
         XCTAssertEqual(fake.sendCount, 1, "no further turn may be requested after a stop")
+    }
+
+    /// The stack a provider is handed has to answer every tool call in it.
+    /// Stopping between two of them left the last assistant message asking
+    /// for tools nothing replied to, and both providers reject that -- so
+    /// every later message in that chat failed, permanently, with nothing in
+    /// the app to repair it.
+    func test_aStopBetweenToolCalls_leavesAConversationTheProviderWillAccept() async {
+        let client = ToolThenRecordingClient()
+        client.toolCalls = [
+            GPTToolCall(id: "call-1", name: "run_shell", argumentsJSON: "{\"command\":\"ls\"}"),
+            GPTToolCall(id: "call-2", name: "run_shell", argumentsJSON: "{\"command\":\"pwd\"}"),
+        ]
+        let runTask = UncheckedBox(Task<Void, Never>?.none)
+        let runner = AgentRunner(
+            client: client,
+            dispatcher: PetToolDispatcher(send: { _ in false }),
+            approve: { _, _ in
+                runTask.value?.cancel()
+                return false
+            },
+            emit: { _, _ in }
+        )
+
+        let release = UncheckedBox(false)
+        let stopped = Task {
+            while !release.value { await Task.yield() }
+            await runner.run(command: "두 개 해줘")
+        }
+        runTask.value = stopped
+        release.value = true
+        await stopped.value
+
+        // The same chat, used again afterwards -- which is what used to fail.
+        await runner.run(command: "그래서, 뭐였지?")
+
+        let shown = client.messagesPerTurn.last ?? []
+        var answered: Set<String> = []
+        var requested: [String] = []
+        for message in shown {
+            if case .assistant(_, let calls, _) = message { requested += calls.map(\.id) }
+            if case .tool(let callId, _) = message { answered.insert(callId) }
+        }
+        XCTAssertEqual(requested.sorted(), ["call-1", "call-2"])
+        for id in requested {
+            XCTAssertTrue(answered.contains(id), "\(id) was asked for and never answered")
+        }
     }
 
     /// A run that is superseded by a command in *another* chat used to emit

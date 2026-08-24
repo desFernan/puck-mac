@@ -75,6 +75,12 @@ final class VoiceInputController {
             guard let self else { return }
             self.onError?(error)
             if self.isListening {
+                // The engine and its input tap do not stop themselves when a
+                // recognition fails. Clearing the flag alone left the
+                // microphone held for the rest of the session -- and the
+                // release that follows takes the `guard isListening` exit, so
+                // nothing else was ever going to stop it either.
+                self.speechService.stopStreaming()
                 self.isListening = false
                 self.pressStartUptime = nil
                 self.onListenEnd?()

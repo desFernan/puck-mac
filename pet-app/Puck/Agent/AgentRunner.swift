@@ -397,11 +397,20 @@ final class AgentRunner {
             }
 
             append(.assistant(text: turn.text, toolCalls: turn.toolCalls, reasoning: turn.reasoning), to: key)
-            for call in turn.toolCalls {
+            for (index, call) in turn.toolCalls.enumerated() {
                 // Between calls, not only between turns: a turn can ask for
                 // several tools, and a stop pressed during the first one
                 // should not still run the rest.
                 if Task.isCancelled {
+                    // Every call that will not run still needs an answer in
+                    // the conversation. Both providers reject a stack whose
+                    // last assistant message asks for tools nothing replied
+                    // to -- OpenAI with "must be followed by tool messages",
+                    // Anthropic with "tool_use ids found without tool_result"
+                    // -- and nothing repairs it afterwards, so a chat stopped
+                    // mid-tool used to reject every message sent in it from
+                    // then on, forever.
+                    answerUnrunCalls(turn.toolCalls[index...], in: key)
                     emitCancelled(from: key)
                     return
                 }
@@ -414,6 +423,20 @@ final class AgentRunner {
         // so sending the same words as a text chunk first prints them twice --
         // the same mistake the reply echo was.
         emit(.agentDone(ok: false, summary: hitCeiling), to: key)
+    }
+
+    /// Answers tool calls that will never run, so the conversation stays
+    /// something a provider will accept.
+    ///
+    /// A stack whose last assistant message asks for tools is only valid once
+    /// every one of those calls has a reply. Cancelling in the middle leaves
+    /// the rest unanswered, and neither provider tolerates that -- nor does
+    /// anything here repair it later, since `trimConversation` only drops
+    /// leading tool messages and `forgetSession` runs when a chat is deleted.
+    private func answerUnrunCalls(_ calls: ArraySlice<GPTToolCall>, in key: String) {
+        for call in calls {
+            append(.tool(callId: call.id, content: "error: cancelled"), to: key)
+        }
     }
 
     /// The one exit a cancelled run takes. Emits `agent_done` like every other
@@ -536,7 +559,14 @@ final class AgentRunner {
             // The branch carries the conversation with it, so the agent lands
             // in the session it just opened still knowing the task.
             carryConversation(from: key, to: opened)
-            append(.tool(callId: call.id, content: "ok -- 새 작업 세션 \"\(title)\"으로 옮겼습니다."), to: opened)
+            let answer = "ok -- 새 작업 세션 \"\(title)\"으로 옮겼습니다."
+            append(.tool(callId: call.id, content: answer), to: opened)
+            // And to the chat it branched from, which is not always thrown
+            // away: the casual session -- the one this tool is documented to
+            // branch out of -- is deliberately kept by the window. Left with
+            // the request and no answer, it would reject everything the user
+            // typed in it afterwards.
+            if key != opened { append(.tool(callId: call.id, content: answer), to: key) }
             return opened
         }
 

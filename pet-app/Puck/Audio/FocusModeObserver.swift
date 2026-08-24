@@ -77,6 +77,14 @@ final class FocusModeObserver {
     /// shape -- and a Notification is not Sendable, so not needing it is also
     /// what keeps the hop to the main actor clean.
     private func handleNotification() {
+        // A toggle, and it is a guess: the notification's payload does not
+        // reliably carry the new status across macOS versions, and there is
+        // no public API to read Focus back, so this counts changes from an
+        // assumed-off baseline. Launching while Focus is already on therefore
+        // starts inverted for that session. Its blast radius is bounded on
+        // purpose -- the only consumer may add muting and never remove it
+        // (see the auto-mute wiring in AppDelegate+OverlayAvatar) -- so the
+        // worst case is a quiet pet rather than a noisy one during Focus.
         isFocusActive.toggle()
         onChange?(isFocusActive)
     }
