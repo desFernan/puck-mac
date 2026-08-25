@@ -119,6 +119,18 @@ enum L10nKey: String, CaseIterable, Hashable {
 
     /// Shared by more than one surface, so they cannot drift apart.
     case commonCancel, commonDelete, commonCreate, commonChoose, commonClose
+
+    /// Labels only a screen reader ever reads. Two kinds: a control that is
+    /// an icon and nothing else (a mouse gets a tooltip, VoiceOver got the
+    /// SF Symbol's name or silence), and state a sighted user takes from a
+    /// colour -- an unsaved dot, a project that failed to open. The two
+    /// `Format` ones are spoken out loud when something happens off-screen:
+    /// the pet saying something, and a run stopping to ask.
+    case a11yRemoveAttachment, a11yAgentSettings, a11yClearSearch, a11yCloseTab
+    case a11yUnsavedChanges, a11yFileModified, a11ySelectTab
+    case a11yProjectReady, a11yProjectNone, a11yProjectUnavailable
+    case a11yOpenFile, a11ySelected
+    case a11yPetSaysFormat, a11yApprovalNeededFormat
     case codeBlockCopy, codeBlockCopied
 
     case chatSelectAConversation, chatNewSession, chatCasualSession, chatThisWorkspace
@@ -394,6 +406,20 @@ enum Strings {
         .codeBlockCopy: "복사",
         .codeBlockCopied: "복사했어요",
         .commonClose: "닫기",
+        .a11yRemoveAttachment: "첨부 제거",
+        .a11yAgentSettings: "에이전트 설정",
+        .a11yClearSearch: "검색어 지우기",
+        .a11yCloseTab: "탭 닫기",
+        .a11yUnsavedChanges: "저장하지 않음",
+        .a11yFileModified: "수정됨",
+        .a11ySelectTab: "이 탭 열기",
+        .a11yProjectReady: "프로젝트 열림",
+        .a11yProjectNone: "프로젝트 없음",
+        .a11yProjectUnavailable: "프로젝트를 열 수 없음",
+        .a11yOpenFile: "파일 열기",
+        .a11ySelected: "사용 중",
+        .a11yPetSaysFormat: "펫: %1$@",
+        .a11yApprovalNeededFormat: "승인이 필요해요: %1$@",
         .commonCancel: "취소",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
@@ -726,6 +752,20 @@ enum Strings {
         .codeBlockCopy: "Copy",
         .codeBlockCopied: "Copied",
         .commonClose: "Close",
+        .a11yRemoveAttachment: "Remove attachment",
+        .a11yAgentSettings: "Agent settings",
+        .a11yClearSearch: "Clear search",
+        .a11yCloseTab: "Close tab",
+        .a11yUnsavedChanges: "Unsaved changes",
+        .a11yFileModified: "Modified",
+        .a11ySelectTab: "Open this tab",
+        .a11yProjectReady: "Project ready",
+        .a11yProjectNone: "No project",
+        .a11yProjectUnavailable: "Project unavailable",
+        .a11yOpenFile: "Open file",
+        .a11ySelected: "In use",
+        .a11yPetSaysFormat: "Puck says: %1$@",
+        .a11yApprovalNeededFormat: "Approval needed: %1$@",
         .commonCancel: "Cancel",
         .commonDelete: "Delete",
         .commonCreate: "Create",

@@ -20,8 +20,12 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
-        let atHome = desktopRoamableArea != nil
-        let outcome = Self.wanderOutcome(outcome, atHome: atHome)
+        let atHome = desktopRoamableAreas != nil
+        let outcome = Self.wanderOutcome(
+            outcome,
+            atHome: atHome,
+            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        )
         // Whatever was half-walked is abandoned: the pet has been given
         // something else to do, and finishing the old route afterwards would
         // read as it changing its mind twice.
@@ -220,10 +224,18 @@ extension AppDelegate {
     /// however small the pet's world is right now, so a pet in its tank would
     /// set off at a window outside its own glass. A 90pt strip has no ceiling
     /// worth crawling along either.
+    ///
+    /// `reduceMotion` is the system setting, and it settles the question
+    /// before the rest: a wander is the one thing here nobody asked for. The
+    /// pet still walks when it is dragged, thrown, sent somewhere by a tool
+    /// or called home to its island -- what stops is it setting off across
+    /// the screen on a timer while somebody is trying to read.
     nonisolated static func wanderOutcome(
         _ outcome: WanderScheduler.Outcome,
-        atHome: Bool
+        atHome: Bool,
+        reduceMotion: Bool = false
     ) -> WanderScheduler.Outcome {
+        if reduceMotion { return .stay }
         guard atHome else { return outcome }
         switch outcome {
         case .climbNearestWindow, .climbToCeiling: return .walkToRandomPoint

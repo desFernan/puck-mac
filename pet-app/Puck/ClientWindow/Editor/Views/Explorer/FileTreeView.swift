@@ -153,6 +153,7 @@ struct FileTreeView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.textSecondary)
+                .accessibilityHidden(true)
             TextField(Strings.text(.editorSearchFiles), text: $query)
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.sessionTitle)
@@ -168,6 +169,9 @@ struct FileTreeView: View {
             .disabled(changedPaths.isEmpty)
             .opacity(changedPaths.isEmpty ? 0.35 : 1)
             .accessibilityLabel(Strings.text(.editorChangedOnly))
+            // Same as the mic: on is a tint, and a tint is not a state
+            // anything can read out.
+            .accessibilityAddTraits(changedOnly ? .isSelected : [])
             .help(Strings.text(.editorChangedOnly))
         }
         .padding(.horizontal, 8)

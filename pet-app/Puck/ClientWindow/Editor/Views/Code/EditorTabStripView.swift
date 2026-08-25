@@ -175,6 +175,7 @@ struct EditorTabStripView: View {
         .foregroundStyle(canSave ? palette.textPrimary : palette.textSecondary)
         .opacity(canSave ? 1 : 0.35)
         .keyboardShortcut("s", modifiers: .command)
+        .accessibilityLabel(Strings.text(.editorSaveHint))
         .help(Strings.text(.editorSaveHint))
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .accessibilityIdentifier("editor.save")
@@ -187,7 +188,15 @@ struct EditorTabStripView: View {
                 .font(ClientTheme.Typography.sessionTitle)
                 .lineLimit(1)
             if tab.isDirty {
-                StatusDotView(status: .active, palette: palette, diameter: 5, pulses: false)
+                StatusDotView(
+                    status: .active,
+                    palette: palette,
+                    diameter: 5,
+                    pulses: false,
+                    // The one thing standing between this tab and a closed
+                    // file with lost edits.
+                    label: Strings.text(.a11yUnsavedChanges)
+                )
             }
             Button(action: { onClose(tab.path) }) {
                 Image(systemName: "xmark")
@@ -195,6 +204,8 @@ struct EditorTabStripView: View {
             }
             .buttonStyle(.plain)
             .opacity(0.6)
+            .accessibilityLabel(Strings.text(.a11yCloseTab))
+            .help(Strings.text(.a11yCloseTab))
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingMedium)
         .frame(height: Self.tabHeight)
@@ -202,5 +213,11 @@ struct EditorTabStripView: View {
         .foregroundStyle(isActive ? palette.textPrimary : palette.textSecondary)
         .contentShape(Rectangle())
         .onTapGesture { onSelect(tab.path) }
+        // A tap gesture is invisible to VoiceOver and unreachable from the
+        // keyboard: without this the tab strip could be read but no tab in it
+        // could be opened. The close button stays its own element inside.
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(named: Text(Strings.text(.a11ySelectTab))) { onSelect(tab.path) }
     }
 }

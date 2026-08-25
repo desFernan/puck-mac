@@ -207,6 +207,12 @@ extension AppDelegate {
         }
         guard let (bubbleWindow, bubbleView) = makeBubble() else { return }
 
+        // The bubble is drawn in a window that never takes focus, so this is
+        // the whole of what a screen reader gets to hear the pet say. After
+        // the hidden-pet guard above, deliberately: a pet that isn't speaking
+        // shouldn't be speaking here either.
+        VoiceOverAnnouncer.announce(String(format: Strings.text(.a11yPetSaysFormat), message))
+
         bubbleView.onCancel = { bubbleWindow.closeAndYieldFocus() }
         // Cleared, not reassigned: onDismiss fires from resignKey, and speech
         // never takes key in the first place. Left pointing at an input

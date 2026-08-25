@@ -21,6 +21,17 @@ func dotStatus(for availability: EditorAvailability) -> DotStatus {
     }
 }
 
+/// The same three states in words. The dot is a colour and nothing else, so
+/// this is the whole of what a screen reader can be told about it -- and
+/// `.unavailable` in particular is a failure that otherwise has no voice.
+func dotDescription(for availability: EditorAvailability) -> String {
+    switch availability {
+    case .noProject: return Strings.text(.a11yProjectNone)
+    case .ready: return Strings.text(.a11yProjectReady)
+    case .unavailable: return Strings.text(.a11yProjectUnavailable)
+    }
+}
+
 /// `/Users/x/dev/p` -> `~/dev/p`. Only at a path boundary, so `/Users/xyz`
 /// isn't mangled by a home of `/Users/x`.
 func abbreviatedPath(_ path: String, home: String) -> String {
@@ -68,7 +79,11 @@ struct ClientStatusBarView: View {
     var body: some View {
         HStack(spacing: ClientTheme.Metrics.spacingMedium) {
             HStack(spacing: ClientTheme.Metrics.spacingSmall) {
-                StatusDotView(status: dotStatus(for: availability), palette: palette)
+                StatusDotView(
+                    status: dotStatus(for: availability),
+                    palette: palette,
+                    label: dotDescription(for: availability)
+                )
                 Text(projectLabel)
             }
             if let branch = git?.branch {
@@ -76,6 +91,7 @@ struct ClientStatusBarView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.branch")
                         .font(.system(size: 9))
+                        .accessibilityHidden(true)
                     Text(branch)
                     // Only when there is something to say. A footer that
                     // reads "0 changed, 0 ahead" on every clean repository is
@@ -90,6 +106,7 @@ struct ClientStatusBarView: View {
             HStack(spacing: 4) {
                 Image(systemName: "cpu")
                     .font(.system(size: 9))
+                    .accessibilityHidden(true)
                 Text(model)
             }
             Spacer(minLength: ClientTheme.Metrics.spacingMedium)
@@ -99,6 +116,7 @@ struct ClientStatusBarView: View {
             HStack(spacing: 4) {
                 Image(systemName: "globe")
                     .font(.system(size: 9))
+                    .accessibilityHidden(true)
                 Text(Localization.shared.language.rawValue.uppercased())
             }
         }

@@ -317,6 +317,16 @@ final class ChatSession: ObservableObject, Identifiable {
             guard !pendingApprovals.contains(where: { $0.approvalId == approvalId }) else { break }
             pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary))
             timeline.append(.approvalRequested(id: UUID(), approvalId: approvalId, summary: summary))
+            // The run is stopped until this is answered, and the banner it is
+            // waiting behind arrives without taking focus -- so behind a
+            // screen reader the turn simply goes quiet. High priority because
+            // nothing else the chat says is more urgent than the thing it has
+            // stopped for. Announced once per request, which the guard above
+            // is also what guarantees.
+            VoiceOverAnnouncer.announce(
+                String(format: Strings.text(.a11yApprovalNeededFormat), summary),
+                priority: .high
+            )
 
         case .agentDone(let ok, let summary):
             isRunning = false

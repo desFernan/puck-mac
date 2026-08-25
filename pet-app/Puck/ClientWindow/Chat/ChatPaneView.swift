@@ -218,6 +218,10 @@ struct ChatPaneView: View {
                 Picker("", selection: explorerTab) {
                     ForEach(ExplorerTab.allCases) { tab in
                         Image(systemName: tab.symbolName)
+                            // `.help` is a tooltip; a segment with no label
+                            // is read out as its SF Symbol's name or as
+                            // nothing at all.
+                            .accessibilityLabel(tab.displayName)
                             .help(tab.displayName)
                             .tag(tab)
                     }

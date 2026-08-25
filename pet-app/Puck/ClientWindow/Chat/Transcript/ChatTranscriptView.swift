@@ -252,6 +252,9 @@ private struct ToolCallRow: View {
                 HStack(spacing: 6) {
                     Image(systemName: icon)
                         .foregroundStyle(iconStyle)
+                        // Decoration: the tool's name is next to it, and the
+                        // outcome is spelled out in the row below.
+                        .accessibilityHidden(true)
                     Text(tool)
                         .font(.system(.body, design: .monospaced))
                     if isPending {

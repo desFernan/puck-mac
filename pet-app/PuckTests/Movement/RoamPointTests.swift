@@ -104,6 +104,33 @@ final class RoamPointTests: XCTestCase {
         XCTAssertEqual(AppDelegate.wanderOutcome(.climbToCeiling, atHome: false), .climbToCeiling)
     }
 
+    // MARK: - Reduce Motion
+
+    /// A wander is the one movement in the app nobody asked for: it starts on
+    /// a timer, next to whatever the person is actually reading. With the
+    /// system setting on, the draw comes out as "stay" wherever the pet is
+    /// and whatever it rolled.
+    func test_reduceMotion_turnsEveryWanderIntoStayingPut() {
+        for outcome in [
+            WanderScheduler.Outcome.walkToRandomPoint,
+            .climbNearestWindow,
+            .climbToCeiling,
+            .playWithToy,
+            .stay,
+        ] {
+            XCTAssertEqual(AppDelegate.wanderOutcome(outcome, atHome: false, reduceMotion: true), .stay)
+            XCTAssertEqual(AppDelegate.wanderOutcome(outcome, atHome: true, reduceMotion: true), .stay)
+        }
+    }
+
+    /// And off, nothing changes -- the setting is the only thing that decides
+    /// this, so a pet that stopped wandering for anybody else would be a bug
+    /// with no way to tell it from the feature.
+    func test_withoutReduceMotion_theDrawIsUntouched() {
+        XCTAssertEqual(AppDelegate.wanderOutcome(.climbToCeiling, atHome: false, reduceMotion: false), .climbToCeiling)
+        XCTAssertEqual(AppDelegate.wanderOutcome(.walkToRandomPoint, atHome: false, reduceMotion: false), .walkToRandomPoint)
+    }
+
     /// The island is small enough that one leg of it is barely a step, so a
     /// wander there is made of more of them, with less standing about between.
     func test_aWanderOnTheIslandHasMoreLegsAndShorterPauses() {

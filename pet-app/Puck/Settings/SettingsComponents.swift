@@ -53,6 +53,15 @@ struct SettingsRow<Control: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             control
+                // The row's own Text is what names this control on screen,
+                // and every control in this window is built with an empty
+                // label and `.labelsHidden()` so it isn't printed twice.
+                // Nothing carried that name to VoiceOver, though: the whole
+                // settings window read out as an unnamed switch, an unnamed
+                // slider, an unnamed pop-up. Applied here rather than at
+                // thirty call sites, which is also the only way the next row
+                // added gets it for free.
+                .accessibilityLabel(label)
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
@@ -79,6 +88,8 @@ struct SettingsStackedRow<Control: View>: View {
                 }
             }
             control
+                // Same as SettingsRow's -- see the note there.
+                .accessibilityLabel(label)
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
     }
@@ -108,6 +119,8 @@ struct ToyTile: View {
                         // the grid doesn't silently lose an entry.
                         Image(systemName: "questionmark")
                             .foregroundStyle(.secondary)
+                            // The toy's name is under it either way.
+                            .accessibilityHidden(true)
                     }
                 }
                 .frame(height: 34)
@@ -146,6 +159,7 @@ struct SettingsActionRow: View {
                     Image(systemName: systemImage)
                         .frame(width: 16)
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
                 Text(label)
                     .font(ClientTheme.Typography.sessionTitle)
@@ -153,6 +167,8 @@ struct SettingsActionRow: View {
                 Image(systemName: "chevron.right")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    // Both decoration on a row that already says what it does.
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
             .padding(.vertical, ClientTheme.Metrics.spacingSmall)

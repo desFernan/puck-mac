@@ -191,6 +191,7 @@ private struct ExplorerErrorBanner: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 10))
                 .foregroundStyle(palette.statusError)
+                .accessibilityHidden(true)
             Text(message)
                 .font(ClientTheme.Typography.caption)
                 .foregroundStyle(palette.textPrimary)

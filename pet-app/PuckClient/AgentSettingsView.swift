@@ -261,6 +261,10 @@ struct AgentSettingsView: View {
                         .controlSize(.small)
                 }
             }
+            // A row with more than one control in it: as a container the
+            // row's label names the group, and 저장/지우기 keep their own
+            // names instead of all three answering to "API 키".
+            .accessibilityElement(children: .contain)
         }
 
         Text(apiKeyStatus)
@@ -355,6 +359,8 @@ struct AgentSettingsView: View {
                 Button(text(.modelReset)) { saveModel(nil) }
                     .controlSize(.small)
             }
+            // Three controls under one label -- see the API key row above.
+            .accessibilityElement(children: .contain)
         }
 
         Text(String(

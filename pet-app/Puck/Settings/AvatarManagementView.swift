@@ -70,6 +70,9 @@ struct AvatarManagementView: View {
                         if name == selectedAvatarName {
                             Image(systemName: "checkmark")
                                 .foregroundStyle(.secondary)
+                                // The tick is the only thing saying which
+                                // preset is the one in use.
+                                .accessibilityValue(text(.a11ySelected))
                         } else {
                             Button(text(.avatarSelectButton)) { selectAvatar(name) }
                                 .controlSize(.small)

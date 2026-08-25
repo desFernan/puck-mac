@@ -84,6 +84,7 @@ struct AgentSessionListView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isLoading)
+            .accessibilityLabel(Strings.text(.sessionsRefresh))
             .help(Strings.text(.sessionsRefresh))
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
@@ -119,6 +120,11 @@ struct AgentSessionListView: View {
         // Finder rather than the editor: a transcript lives under ~/.claude,
         // outside any project the editor can open.
         .onTapGesture {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.transcriptPath)])
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text(Strings.text(.skillReveal))) {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.transcriptPath)])
         }
         .help(session.workingDirectory)

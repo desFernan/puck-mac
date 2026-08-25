@@ -113,6 +113,7 @@ struct ChatSidebarView: View {
                             .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(Strings.text(.chatNewWorkspace))
                     .help(Strings.text(.chatNewWorkspace))
                 }
             }
@@ -294,6 +295,8 @@ struct ChatSidebarView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.textSecondary)
+                // The field beside it announces itself; this is decoration.
+                .accessibilityHidden(true)
             TextField(Strings.text(.chatFilterPlaceholder), text: $filter)
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.workspaceName)
@@ -306,6 +309,8 @@ struct ChatSidebarView: View {
                         .foregroundStyle(palette.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Strings.text(.a11yClearSearch))
+                .help(Strings.text(.a11yClearSearch))
             }
         }
         .padding(.horizontal, 10)

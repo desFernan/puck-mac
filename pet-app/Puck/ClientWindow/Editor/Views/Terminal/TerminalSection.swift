@@ -96,6 +96,7 @@ struct TerminalSection: View {
             Image(systemName: "terminal")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(Strings.text(.terminalTitle))
                 .font(ClientTheme.Typography.caption)
                 .foregroundStyle(.secondary)

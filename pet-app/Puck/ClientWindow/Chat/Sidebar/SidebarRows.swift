@@ -28,6 +28,7 @@ struct SidebarActionRow: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 13))
                     .frame(width: 16)
+                    .accessibilityHidden(true)
                 Text(title)
                     .font(ClientTheme.Typography.workspaceName)
                 Spacer(minLength: 0)
@@ -126,10 +127,15 @@ struct WorkspaceGroup: View {
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .foregroundStyle(palette.textSecondary)
                     .frame(width: 12)
+                    // Both decoration: the row is one button that says the
+                    // workspace's name, and an arrow and a folder read out
+                    // before every one of them is noise.
+                    .accessibilityHidden(true)
                 Image(systemName: workspace.projectPath == nil ? "bubble.left" : "folder")
                     .font(.system(size: 13))
                     .frame(width: 16)
                     .foregroundStyle(isActive ? palette.accent : palette.textSecondary)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(workspace.displayName)
                         .font(ClientTheme.Typography.workspaceName)
@@ -216,7 +222,14 @@ struct ChatSessionRow: View {
                         .accessibilityLabel(Strings.text(.chatRunning))
                         .help(Strings.text(.chatRunning))
                 } else {
-                    StatusDotView(status: dotStatus, palette: palette, pulses: false)
+                    StatusDotView(
+                        status: dotStatus,
+                        palette: palette,
+                        pulses: false,
+                        // Green or red is the only record of how the last run
+                        // ended once the row is collapsed.
+                        label: dotStatus == .error ? Strings.text(.chatFailed) : nil
+                    )
                 }
             }
             .frame(width: 12, height: 12)

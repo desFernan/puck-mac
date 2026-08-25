@@ -139,6 +139,9 @@ struct ChatInputBar: View {
                 HStack(spacing: 4) {
                     Image(systemName: "photo")
                         .font(.system(size: 9))
+                        // The word "photo" spoken before every file name adds
+                        // nothing: the name is right there and says more.
+                        .accessibilityHidden(true)
                     Text((attachment.path as NSString).lastPathComponent)
                         .font(ClientTheme.Typography.caption)
                         .lineLimit(1)
@@ -150,6 +153,8 @@ struct ChatInputBar: View {
                             .font(.system(size: 8, weight: .semibold))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(Strings.text(.a11yRemoveAttachment))
+                    .help(Strings.text(.a11yRemoveAttachment))
                 }
                 .foregroundStyle(palette.textSecondary)
                 .padding(.horizontal, 6)
@@ -208,11 +213,17 @@ struct ChatInputBar: View {
                 Text(effort.displayName)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 8)
             .frame(height: Self.controlHeight)
             .contentShape(.rect)
         }
+        // Two words and an arrow, which read as two unrelated labels. Named
+        // for what the menu *is*, with what it currently says as its value --
+        // which is also the one place the mode is stated out loud.
+        .accessibilityLabel(Strings.text(.a11yAgentSettings))
+        .accessibilityValue("\(modeLabel), \(effort.displayName)")
         // `.borderlessButton` throws the label away: it renders as an
         // NSPopUpButton, which takes a title and nothing else, so the two
         // words and the chevron here came out as one word with the system's
@@ -243,6 +254,10 @@ struct ChatInputBar: View {
         .foregroundStyle(isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(palette.textSecondary))
         .disabled(onVoiceListening == nil)
         .accessibilityLabel(Strings.text(.chatVoice))
+        // Listening or not is a waveform instead of a microphone and a tint,
+        // and nothing else -- so pressed/unpressed is the whole state of the
+        // button as far as a screen reader is concerned.
+        .accessibilityAddTraits(isListening ? .isSelected : [])
         .help(Strings.text(.chatVoice))
     }
 

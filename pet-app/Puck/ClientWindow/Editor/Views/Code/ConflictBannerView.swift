@@ -26,6 +26,8 @@ struct ConflictBannerView: View {
         HStack(spacing: ClientTheme.Metrics.spacingMedium) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(palette.statusWarning)
+                // The two lines beside it say the same thing in words.
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(Strings.text(.editorConflictTitle))
                     .font(ClientTheme.Typography.toolLabel)

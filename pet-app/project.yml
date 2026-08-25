@@ -169,6 +169,10 @@ targets:
       - path: Puck/Bridge/UserInputSender.swift
       - path: Puck/App/CompanionAppLauncher.swift
       - path: Puck/App/AppIdentity.swift
+      # Both apps have something to say that never takes focus: the pet's
+      # speech bubble over there, an approval banner in here. One definition
+      # of how that reaches a screen reader, not two.
+      - path: Puck/App/VoiceOverAnnouncer.swift
       # The island reads the tank's picture from the folder people drop their
       # own into, and this app is the one that draws the island.
       - path: Puck/Customisation/Customisation.swift

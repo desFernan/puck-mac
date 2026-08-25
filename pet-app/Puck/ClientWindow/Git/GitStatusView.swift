@@ -113,6 +113,7 @@ struct GitStatusView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isLoading)
+            .accessibilityLabel(Strings.text(.sessionsRefresh))
             .help(Strings.text(.sessionsRefresh))
         }
         .padding(.horizontal, ClientTheme.Metrics.spacingLarge)
@@ -125,6 +126,7 @@ struct GitStatusView: View {
                 Image(systemName: "arrow.triangle.branch")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text(status.branch ?? Strings.text(.gitDetached))
                     .font(ClientTheme.Typography.toolLabel)
                     .lineLimit(1)
@@ -182,6 +184,12 @@ struct GitStatusView: View {
         .padding(.vertical, ClientTheme.Metrics.spacingSmall)
         .contentShape(.rect)
         .onTapGesture { onOpen(file.path) }
+        // Same reason as the editor's tabs: a tap gesture is not a control
+        // as far as VoiceOver is concerned, so the row could be read and
+        // never opened.
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text(Strings.text(.a11yOpenFile))) { onOpen(file.path) }
         .help(file.path)
     }
 

@@ -183,6 +183,9 @@ struct CodeSplitView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 7, weight: .semibold))
                         .foregroundStyle(palette.textSecondary.opacity(0.5))
+                        // A separator between path components, spoken as
+                        // "chevron right" between every one of them.
+                        .accessibilityHidden(true)
                 }
                 Text(component)
                     .foregroundStyle(index == components.count - 1 ? palette.textPrimary : palette.textSecondary)
