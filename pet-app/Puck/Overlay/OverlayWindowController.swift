@@ -27,8 +27,8 @@ import AppKit
 /// The frame comes from ScreenManager's `appKitBounds` (real AppKit screen
 /// coordinates), NOT the normalized Y-down space -- that one is for
 /// movement/FSM logic only; actual window placement needs AppKit's own
-/// bottom-left-origin coordinates (plan/02_pet-app.md F3: "모든 이동 로직은
-/// 픽셀 좌표만 다루고 렌더 직전에만 3D 변환").
+/// bottom-left-origin coordinates (plan/02_pet-app.md F3: every movement rule
+/// works in pixels, and the transform happens only at render time).
 /// `@MainActor`: an NSWindow and the layer tree the pet is drawn into. The
 /// frame loop hops here before touching either.
 @MainActor
