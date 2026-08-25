@@ -24,6 +24,27 @@ final class TankArtworkTests: XCTestCase {
         XCTAssertGreaterThan(image.size.width, image.size.height * 2)
     }
 
+    /// Points are not pixels: a picture tagged 144dpi reports half of itself
+    /// as its size, and how tall the island may be is decided by how many
+    /// pixels there really are.
+    func test_thePixelHeight_isTheRealOneNotThePointOne() throws {
+        let image = try XCTUnwrap(TankArtwork.image())
+
+        XCTAssertEqual(TankArtwork.pixelHeight(image), 447)
+    }
+
+    /// Enough of it to fill the island the app opens at, which is the whole
+    /// point of the limit that reads this.
+    func test_theArtwork_canFillTheIslandItOpensAt() throws {
+        let image = try XCTUnwrap(TankArtwork.image())
+        let limit = PetTankView.maximumHeight(
+            artworkPixelHeight: TankArtwork.pixelHeight(image),
+            displayScale: 2
+        )
+
+        XCTAssertGreaterThan(limit, PetTankView.islandHeight)
+    }
+
     /// Asked for on every frame the island draws.
     func test_theArtwork_isCached() throws {
         let first = try XCTUnwrap(TankArtwork.image())

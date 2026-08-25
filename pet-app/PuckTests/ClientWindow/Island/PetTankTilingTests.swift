@@ -8,6 +8,66 @@
 import XCTest
 @testable import Puck
 
+final class PetTankHeightLimitTests: XCTestCase {
+    /// The shipped seabed: 3596x447, eight points across for every point
+    /// down. On a Retina display one point of island costs two pixels of
+    /// picture, so 447 pixels is 223 points of island and no more.
+    func test_theDragStopsWhereThePictureStopsBeingAbleToFillIt() {
+        let limit = PetTankView.maximumHeight(artworkPixelHeight: 447, displayScale: 2)
+
+        XCTAssertEqual(limit, 223.5, accuracy: 0.001)
+        XCTAssertLessThan(limit, PetTankView.maximumIslandHeight, "the design ceiling was the bug")
+    }
+
+    /// Below that limit the picture is drawn smaller than it is, which is
+    /// where it looks its best -- so nothing about the range people already
+    /// use changes.
+    func test_theIslandOpensAndSitsWellInsideTheLimit() {
+        let limit = PetTankView.maximumHeight(artworkPixelHeight: 447, displayScale: 2)
+
+        XCTAssertGreaterThan(limit, PetTankView.islandHeight)
+        XCTAssertGreaterThan(limit, PetTankView.minimumIslandHeight)
+    }
+
+    /// A 1x display asks half as many pixels of the same picture, so the same
+    /// artwork allows a taller island -- up to the design's own ceiling,
+    /// which is where "a shelf, not a pane" takes over from sharpness.
+    func test_aDisplayThatAsksForFewerPixelsGetsTheDesignsOwnCeiling() {
+        XCTAssertEqual(
+            PetTankView.maximumHeight(artworkPixelHeight: 447, displayScale: 1),
+            PetTankView.maximumIslandHeight
+        )
+    }
+
+    /// Somebody's own picture, dropped in the customisation folder. A taller
+    /// one buys back the full range; a tiny one must still leave an island
+    /// the pet fits in, magnified or not -- an island below the floor is
+    /// refused outright, and a refusal looks like the pet ignoring the window.
+    func test_aCustomPictureMovesTheLimitWithIt() {
+        XCTAssertEqual(
+            PetTankView.maximumHeight(artworkPixelHeight: 2000, displayScale: 2),
+            PetTankView.maximumIslandHeight
+        )
+        XCTAssertEqual(
+            PetTankView.maximumHeight(artworkPixelHeight: 40, displayScale: 2),
+            PetTankView.minimumIslandHeight
+        )
+    }
+
+    /// No picture at all: the island is its own plain ground, and there is
+    /// nothing that could be blown up.
+    func test_withNoPictureTheCeilingIsTheOnlyLimit() {
+        XCTAssertEqual(
+            PetTankView.maximumHeight(artworkPixelHeight: 0, displayScale: 2),
+            PetTankView.maximumIslandHeight
+        )
+        XCTAssertEqual(
+            PetTankView.maximumHeight(artworkPixelHeight: 447, displayScale: 0),
+            PetTankView.maximumIslandHeight
+        )
+    }
+}
+
 final class PetTankTilingTests: XCTestCase {
     /// A 6:1 picture in a 90pt-tall island is 540pt per copy.
     private let aspect: CGFloat = 6

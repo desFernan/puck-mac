@@ -50,6 +50,20 @@ enum TankArtwork {
         return image.size.width / image.size.height
     }
 
+    /// How many pixels tall the picture actually is -- not how many points
+    /// it claims. `NSImage.size` is points, so a PNG tagged 144dpi reports
+    /// half the pixels it has, and what decides whether the island can fill
+    /// itself out of this picture is how much of it there really is.
+    ///
+    /// The largest representation, because that is the one that would be
+    /// drawn. Falls back to the point height for anything with no bitmap
+    /// representation at all (a PDF, an SVG), where points are the only
+    /// answer there is.
+    static func pixelHeight(_ image: NSImage) -> CGFloat {
+        let heights = image.representations.map { CGFloat($0.pixelsHigh) }.filter { $0 > 0 }
+        return heights.max() ?? image.size.height
+    }
+
     /// Held, not cached. This was an NSCache, which is allowed to throw its
     /// contents away whenever it likes -- and the one thing this must not do
     /// is decode a 3596-pixel-wide PNG again while the island is being drawn.

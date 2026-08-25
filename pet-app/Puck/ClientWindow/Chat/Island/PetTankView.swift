@@ -54,12 +54,28 @@ struct PetTankView: View {
     /// which ran away to whichever limit the drag was heading for.
     @GestureState private var heightAtDragStart: CGFloat?
 
+    /// 2 on a Retina display. Read from the environment rather than the
+    /// screen, so an island dragged onto a 1x display gets its full range
+    /// back on the next redraw instead of keeping the other screen's limit.
+    @Environment(\.displayScale) private var displayScale
+
     /// How tall the pet stands here. Remembered on this side because the
     /// lever has to draw the value it is about to send; pet-app is told on
     /// every change and on every window that opens.
 
     private var islandHeight: CGFloat {
-        Self.clamped(storedHeight, from: Self.minimumIslandHeight, to: Self.maximumIslandHeight)
+        Self.clamped(storedHeight, from: Self.minimumIslandHeight, to: maximumHeight)
+    }
+
+    /// This island's own limit -- see the static behind it. Recomputed rather
+    /// than stored: the picture can be swapped in the customisation folder
+    /// and the window can be moved to a display with a different scale, and
+    /// both change the answer.
+    private var maximumHeight: CGFloat {
+        Self.maximumHeight(
+            artworkPixelHeight: TankArtwork.image().map(TankArtwork.pixelHeight) ?? 0,
+            displayScale: displayScale
+        )
     }
 
     /// Clamps a stored number into its limits, and treats one that is not a
@@ -88,7 +104,44 @@ struct PetTankView: View {
 
     /// Somewhere to stop. Past this the island is a pane rather than a shelf,
     /// and the conversation under it is what the window is for.
+    ///
+    /// The design's limit, not always the reachable one -- see
+    /// `maximumHeight(forArtworkPixelHeight:displayScale:)`, which stops the
+    /// drag earlier when the picture in the island cannot fill that much.
     static let maximumIslandHeight: CGFloat = 260
+
+    /// How tall the island may actually be dragged, given the picture in it.
+    ///
+    /// The picture is scaled by *height* and it is a wide one -- the shipped
+    /// seabed is 3596x447, eight points across for every point down. So each
+    /// point the island grows costs eight points of picture width, and past
+    /// the height where one copy is as wide as the picture has pixels, the
+    /// island is asking to have it blown up: 260pt tall is a 1.16x
+    /// magnification of art that is drawn at 0.40x at the island's default
+    /// 90pt, i.e. every soft edge in it is suddenly three times the size it
+    /// was designed to be seen at. That is what "the picture goes strange
+    /// when the island gets big" was.
+    ///
+    /// There is no way to fill a taller island from a shorter picture without
+    /// that magnification -- the aspect is fixed and the whole scene has to
+    /// stay in frame (see `tiles`) -- so the drag stops where the picture
+    /// stops being able to serve it.
+    ///
+    /// - Parameters:
+    ///   - artworkPixelHeight: the real pixels (TankArtwork.pixelHeight), or
+    ///     0 when there is no picture at all -- then nothing can look soft
+    ///     and the design's own ceiling is the only limit.
+    ///   - displayScale: 2 on a Retina display, where a point of island costs
+    ///     two pixels of picture.
+    static func maximumHeight(artworkPixelHeight: CGFloat, displayScale: CGFloat) -> CGFloat {
+        guard artworkPixelHeight > 0, displayScale > 0 else { return maximumIslandHeight }
+        let sharpest = artworkPixelHeight / displayScale
+        // Never below the floor: a small picture must not make the island
+        // undraggable, and a pet refused an area it cannot stand in looks
+        // like the pet refusing to come home. A picture that small is
+        // magnified, and that is the better of the two failures.
+        return min(maximumIslandHeight, max(minimumIslandHeight, sharpest))
+    }
 
     /// Its own key, not the background's: how tall someone wants the shelf is
     /// not which mood they picked, and one changing should not reset the
@@ -341,7 +394,7 @@ struct PetTankView: View {
                         // Down grows it: the handle is on the bottom edge, so
                         // the edge follows the pointer.
                         storedHeight = Double(
-                            min(max(start + value.translation.height, Self.minimumIslandHeight), Self.maximumIslandHeight)
+                            min(max(start + value.translation.height, Self.minimumIslandHeight), maximumHeight)
                         )
                     }
             )
