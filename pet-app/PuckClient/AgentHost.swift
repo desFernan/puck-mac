@@ -319,6 +319,13 @@ final class AgentHost {
         }
         askPermission = { [weak self] request in
             guard let self else { return false }
+            // The code_editor session has its own permission flow, and it
+            // asked the user every time whatever the setting said -- so a
+            // "묻지 않고 전부" chat still stopped dead the moment it edited a
+            // file. Answered from the setting here, the way the other CLI
+            // path already answers its own requests
+            // (CodingAgentCLIClient.resolvePermission).
+            if AgentConfiguration.permissionMode().approvesWithoutAsking { return true }
             let approvalId = UUID().uuidString
             let summary = request.toolName.map { "코드 편집: \($0)" } ?? "코딩 에이전트가 승인을 요청했어요."
             self.emit(

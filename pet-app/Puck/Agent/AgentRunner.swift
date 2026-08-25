@@ -87,6 +87,11 @@ final class AgentRunner {
     private let client: any AgentLLMClient
     private let dispatcher: PetToolDispatcher
     private let approve: AgentApprovalGate
+    /// Read per tool call rather than captured once: `/permissions` writes the
+    /// setting mid-conversation, and the answer that matters is the one in
+    /// force when the tool is about to run -- the same rule
+    /// CodingAgentCLIClient.resolvePermission follows for the other gate.
+    private let permissions: () -> AgentPermissionMode
     private let sink: AgentEventSink
 
     /// Every event names the chat it belongs to. `key` is the run's own
@@ -227,6 +232,7 @@ final class AgentRunner {
         client: any AgentLLMClient,
         dispatcher: PetToolDispatcher,
         approve: @escaping AgentApprovalGate,
+        permissions: @escaping () -> AgentPermissionMode = { AgentConfiguration.permissionMode() },
         emit: @escaping AgentEventSink,
         delegateCodeEditor: AgentCodeEditorDelegation? = nil,
         openTaskSession: AgentTaskSessionOpener? = nil,
@@ -240,6 +246,7 @@ final class AgentRunner {
         self.client = client
         self.dispatcher = dispatcher
         self.approve = approve
+        self.permissions = permissions
         self.sink = emit
         self.delegateCodeEditor = delegateCodeEditor
         self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
@@ -635,7 +642,11 @@ final class AgentRunner {
         emit(.toolCall(id: callId, tool: name, args: arguments, detail: nil), to: key)
         logger?.log(.agentToolCall(id: callId, tool: name, args: arguments))
 
-        if ToolRegistry.tool(named: name)?.requiresApproval == true {
+        // `.auto` is the user having said "stop asking me" (AgentPermissionMode):
+        // no prompt is emitted at all, rather than one emitted and answered
+        // for them -- a banner that appears and resolves itself is a banner
+        // the chat would leave sitting there unanswerable.
+        if ToolRegistry.tool(named: name)?.requiresApproval == true, !permissions().approvesWithoutAsking {
             let summary = Self.approvalSummary(
                 tool: name,
                 arguments: argumentsText ?? arguments.jsonText ?? ""

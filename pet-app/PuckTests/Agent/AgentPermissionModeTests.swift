@@ -33,6 +33,7 @@ final class AgentPermissionModeTests: XCTestCase {
         XCTAssertEqual(AgentPermissionMode.resolved(fromRawValue: "tools"), .toolsOnly)
         XCTAssertEqual(AgentPermissionMode.resolved(fromRawValue: "edits"), .edits)
         XCTAssertEqual(AgentPermissionMode.resolved(fromRawValue: "ALL"), .everything)
+        XCTAssertEqual(AgentPermissionMode.resolved(fromRawValue: "Auto"), .auto)
     }
 
     /// Puck's own tools carry their own approval gate. Asking again here
@@ -66,6 +67,24 @@ final class AgentPermissionModeTests: XCTestCase {
         XCTAssertTrue(AgentPermissionMode.everything.allows(request(kind: "edit"), ownMCPServer: server))
         XCTAssertTrue(AgentPermissionMode.everything.allows(request(kind: "execute"), ownMCPServer: server))
         XCTAssertTrue(AgentPermissionMode.everything.allows(request(kind: nil), ownMCPServer: server))
+    }
+
+    func test_autoAllowsWhateverTheCLIAsksFor() {
+        XCTAssertTrue(AgentPermissionMode.auto.allows(request(kind: "edit"), ownMCPServer: server))
+        XCTAssertTrue(AgentPermissionMode.auto.allows(request(kind: "execute"), ownMCPServer: server))
+        XCTAssertTrue(AgentPermissionMode.auto.allows(request(kind: nil), ownMCPServer: server))
+    }
+
+    /// The whole point of the mode, and the whole risk of it: `.auto` is the
+    /// only one that also opens Puck's own gate, so a shell command the model
+    /// asks the pet to run happens with nobody asked. The other three leave
+    /// that prompt exactly where it was -- including `.everything`, which is
+    /// about what the CLI may do by itself and not about the pet.
+    func test_onlyAutoSkipsPucksOwnApprovalPrompt() {
+        XCTAssertTrue(AgentPermissionMode.auto.approvesWithoutAsking)
+        for mode in AgentPermissionMode.allCases where mode != .auto {
+            XCTAssertFalse(mode.approvesWithoutAsking, "\(mode) would run a shell command unprompted")
+        }
     }
 
     func test_readsTheModeFromTheEnvironment() {

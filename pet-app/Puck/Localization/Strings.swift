@@ -87,7 +87,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case codingAgentLabel, cliProviderExplanation
     /// How much the CLI may do without being asked each time.
     case permissionsLabel, permissionsExplanation
-    case permissionsToolsOnly, permissionsEdits, permissionsEverything
+    case permissionsToolsOnly, permissionsEdits, permissionsEverything, permissionsAuto
     /// The skills the coding CLI loads, and where each came from.
     case skillsHeader, skillSourcePersonal, skillSourceProject
     /// The right sidebar's tabs, and the session list inside one of them.
@@ -323,7 +323,7 @@ enum Strings {
         .modelExplanationFormat: "비워 두고 저장하면 기본값 %1$@을(를) 씁니다. 환경변수 %2$@가 있으면 그쪽이 우선합니다.",
         .codingAgentLabel: "코딩 CLI",
         .permissionsLabel: "자동 허용",
-        .permissionsExplanation: "CLI가 스스로 하는 일을 매번 묻지 않고 허용할 범위입니다. 파일 쓰기는 어느 설정에서든 선택한 프로젝트 폴더 밖으로 나가지 못합니다.",
+        .permissionsExplanation: "CLI가 스스로 하는 일을 매번 묻지 않고 허용할 범위입니다. 파일 쓰기는 어느 설정에서든 선택한 프로젝트 폴더 밖으로 나가지 못합니다. '묻지 않고 전부'는 펫의 명령 실행·AppleScript·클릭까지 승인 없이 바로 실행합니다.",
         .slashModelCurrentFormat: "지금 모델: %1$@. 바꾸려면 /model 이름 을 쓰세요.",
         .slashModelSetFormat: "모델을 %1$@(으)로 바꿨어요.",
         .slashModelUnsupportedFormat: "%1$@ 공급자는 모델을 고를 수 없어요 — CLI가 자기 설정을 씁니다.",
@@ -331,7 +331,7 @@ enum Strings {
         .slashEffortSetFormat: "사고량을 '%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
         .slashUnknownFormat: "%1$@ 은(는) 없는 명령이에요. /help 로 목록을 보세요.",
         .slashWriteFailed: "설정 파일을 저장하지 못했어요.",
-        .slashPermissionsCurrentFormat: "지금은 '%1$@'예요. `/permissions tools|edits|all` 로 바꿀 수 있어요.",
+        .slashPermissionsCurrentFormat: "지금은 '%1$@'예요. `/permissions tools|edits|all|auto` 로 바꿀 수 있어요.",
         .slashPermissionsSetFormat: "'%1$@'(으)로 바꿨어요. 다음 turn부터 적용됩니다.",
         .slashSummaryModel: "모델 보기 · 바꾸기",
         .slashSummaryEffort: "사고량 보기 · 바꾸기",
@@ -375,6 +375,7 @@ enum Strings {
         .permissionsToolsOnly: "펫 도구만",
         .permissionsEdits: "파일 수정까지",
         .permissionsEverything: "명령 실행까지",
+        .permissionsAuto: "묻지 않고 전부",
         .cliProviderExplanation:
             "선택한 CLI와 안정적인 설정 토큰 또는 API 키를 씁니다. 펫 도구는 MCP로 연결되고, 선택한 프로젝트 안의 파일 작업은 샌드박스 안에서 실행됩니다.",
         .installedFormat: "'%1$@' 설치 완료.",
@@ -654,7 +655,7 @@ enum Strings {
         .modelExplanationFormat: "Save it empty to use the default, %1$@. A %2$@ environment variable takes precedence.",
         .codingAgentLabel: "Coding CLI",
         .permissionsLabel: "Auto-allow",
-        .permissionsExplanation: "How much the CLI may do without asking each time. File writes stay inside the selected project folder whichever setting is chosen.",
+        .permissionsExplanation: "How much the CLI may do without asking each time. File writes stay inside the selected project folder whichever setting is chosen. \"Never ask\" also runs the pet's own shell commands, AppleScripts and clicks with no approval prompt.",
         .slashModelCurrentFormat: "The model is %1$@. Use /model <name> to change it.",
         .slashModelSetFormat: "Model set to %1$@.",
         .slashModelUnsupportedFormat: "The %1$@ provider has no model to choose -- the CLI uses its own.",
@@ -662,7 +663,7 @@ enum Strings {
         .slashEffortSetFormat: "Effort set to '%1$@'. It applies from the next turn.",
         .slashUnknownFormat: "%1$@ is not a command. Try /help.",
         .slashWriteFailed: "Couldn't write the settings file.",
-        .slashPermissionsCurrentFormat: "Currently '%1$@'. `/permissions tools|edits|all` changes it.",
+        .slashPermissionsCurrentFormat: "Currently '%1$@'. `/permissions tools|edits|all|auto` changes it.",
         .slashPermissionsSetFormat: "Changed to '%1$@'. It applies from the next turn.",
         .slashSummaryModel: "Show or change the model",
         .slashSummaryEffort: "Show or change how much it thinks",
@@ -706,6 +707,7 @@ enum Strings {
         .permissionsToolsOnly: "Puck's tools only",
         .permissionsEdits: "…and file edits",
         .permissionsEverything: "…and commands",
+        .permissionsAuto: "Never ask",
         .cliProviderExplanation:
             "Uses the selected CLI with a stable setup token or API key. Puck's tools are wired in over MCP, and file work inside the selected project runs in a sandbox.",
         .installedFormat: "Installed '%1$@'.",

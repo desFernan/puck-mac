@@ -625,6 +625,11 @@ final class AgentRunnerTests: XCTestCase {
         client: any AgentLLMClient = RecordingLLMClient(),
         dispatched: UncheckedBox<[BridgeMessage]>? = nil,
         approve: @escaping AgentApprovalGate = { _, _ in false },
+        // Stated, not defaulted to the real one: the runner reads this from
+        // the machine's own .env, so a developer who has set AGENT_PERMISSIONS
+        // to auto would otherwise watch the approval tests below stop asking
+        // and pass for the wrong reason.
+        permissions: @escaping () -> AgentPermissionMode = { .toolsOnly },
         emit: @escaping AgentEventSink = { _, _ in },
         delegateReadFile: AgentFileDelegation? = nil
     ) -> AgentRunner {
@@ -638,6 +643,7 @@ final class AgentRunnerTests: XCTestCase {
                 return false
             }),
             approve: approve,
+            permissions: permissions,
             emit: emit,
             delegateReadFile: delegateReadFile
         )
@@ -694,6 +700,60 @@ final class AgentRunnerTests: XCTestCase {
             return false
         }, "the user has to see the normal in-chat approval prompt")
         XCTAssertEqual(dispatched.value.count, 1, "approved means it actually runs")
+    }
+
+    /// The 묻지 않고 전부 setting, which is the whole of the feature: the same
+    /// tool, no prompt, nobody asked. The event matters as much as the gate --
+    /// a prompt that appears and answers itself would sit in the chat with
+    /// two buttons that no longer do anything.
+    func test_invokeTool_underAutoPermissions_runsWithoutAskingAtAll() async {
+        let events = UncheckedBox([BridgeEvent]())
+        let asked = UncheckedBox([String]())
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let runner = makeRunner(
+            dispatched: dispatched,
+            approve: { summary, _ in
+                asked.value.append(summary)
+                return true
+            },
+            permissions: { .auto },
+            emit: { event, _ in events.value.append(event) }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("ls")]),
+            callId: "c-auto"
+        )
+
+        XCTAssertTrue(asked.value.isEmpty, "the gate was not opened for the user, it was skipped")
+        XCTAssertFalse(events.value.contains { event in
+            if case .awaitApproval = event { return true }
+            return false
+        }, "no approval banner is put in the chat")
+        XCTAssertEqual(dispatched.value.count, 1, "and the tool actually ran")
+    }
+
+    /// Every other mode leaves that prompt exactly where it was -- including
+    /// the one that lets the CLI run commands by itself, which is about the
+    /// CLI and not about the pet.
+    func test_invokeTool_underEverything_stillAsksBeforePucksOwnShell() async {
+        let asked = UncheckedBox([String]())
+        let runner = makeRunner(
+            approve: { summary, _ in
+                asked.value.append(summary)
+                return true
+            },
+            permissions: { .everything }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("ls")]),
+            callId: "c-all"
+        )
+
+        XCTAssertEqual(asked.value.count, 1)
     }
 
     /// And the other one: silently denied, so the user sees nothing and the
