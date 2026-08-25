@@ -26,6 +26,10 @@ final class TestStateWorld {
     let body: CharacterBody
     private(set) var requestedTransitions: [StateKind] = []
     var roamableArea = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    /// One rect per display. Left empty by default -- one screen, which is
+    /// what every test that doesn't say otherwise means -- and the context
+    /// falls back to `roamableArea` for it.
+    var roamableAreas: [CGRect] = []
     var avatarHeight: CGFloat = 0
     /// A pet with real extent by default: the screen-edge limits every
     /// containment/bounce test exercises are measured from this, and a zero
@@ -45,6 +49,7 @@ final class TestStateWorld {
         StateContext(
             body: body,
             roamableArea: roamableArea,
+            roamableAreas: roamableAreas,
             avatarHeight: avatarHeight,
             visualBounds: visualBounds,
             walkSpeed: walkSpeed,
@@ -130,6 +135,69 @@ final class WalkStateTests: XCTestCase {
         world.run(state, seconds: 1)
 
         XCTAssertEqual(world.body.position.x, MovementSolver.walkSpeed * 2, accuracy: 1)
+    }
+
+    // MARK: - Two displays
+
+    /// The pet walking toward the space beside a shorter monitor is walking
+    /// off the world -- there is no screen there and nothing would draw it.
+    func test_stopsAtTheEdgeOfTheDisplays_ratherThanWalkingIntoTheGap() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 500))
+        // A second display to the right whose floor is 100 higher: everything
+        // below that line, beyond x = 1000, is on no screen.
+        world.roamableAreas = [
+            CGRect(x: 0, y: 0, width: 1000, height: 500),
+            CGRect(x: 1000, y: 0, width: 800, height: 400),
+        ]
+        world.roamableArea = ScreenGround.union(world.roamableAreas)
+        let state = WalkState()
+        state.target = CGPoint(x: 1700, y: 500)
+
+        world.run(state, seconds: 3)
+
+        XCTAssertLessThanOrEqual(
+            world.body.position.x + world.visualBounds.maxX, 1000,
+            "the pet's whole drawing should still be on the first display"
+        )
+        XCTAssertEqual(world.requestedTransitions.first, .idle)
+    }
+
+    /// ...unless it can climb up onto that display, which is the only way
+    /// back once it has come down the other way.
+    func test_climbsTheLedgeWhenTheDisplayAheadIsHigher() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 500))
+        world.roamableAreas = [
+            CGRect(x: 0, y: 0, width: 1000, height: 500),
+            CGRect(x: 1000, y: 0, width: 800, height: 400),
+        ]
+        world.roamableArea = ScreenGround.union(world.roamableAreas)
+        let ledge = ClimbLedgeState()
+        let state = WalkState()
+        state.climbLedgeState = ledge
+        state.target = CGPoint(x: 1700, y: 500)
+
+        world.run(state, seconds: 3)
+
+        XCTAssertEqual(world.requestedTransitions.first, .climbLedge)
+        XCTAssertEqual(ledge.target?.y, 400, "onto the higher display's floor")
+        XCTAssertEqual(ledge.target?.x, 1050, "far enough in that all of the pet lands on it")
+    }
+
+    /// The other direction is a fall, not a stop: the floor under the pet's
+    /// next step is lower than the one it is on.
+    func test_fallsWhenItWalksOntoADisplayWithALowerFloor() {
+        let world = TestStateWorld(position: CGPoint(x: 1100, y: 400))
+        world.roamableAreas = [
+            CGRect(x: 0, y: 0, width: 1000, height: 500),
+            CGRect(x: 1000, y: 0, width: 800, height: 400),
+        ]
+        world.roamableArea = ScreenGround.union(world.roamableAreas)
+        let state = WalkState()
+        state.target = CGPoint(x: 200, y: 400)
+
+        world.run(state, seconds: 3)
+
+        XCTAssertEqual(world.requestedTransitions.first, .fall)
     }
 
     func test_arrivalIsRequestedOnlyOnce() {

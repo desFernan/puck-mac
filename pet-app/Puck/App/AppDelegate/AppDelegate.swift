@@ -41,12 +41,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     let pendingPointTracker = PendingPointTracker()
     var focusModeObserver: FocusModeObserver?
 
-    /// OverlayWindowController creates one window per display, but every
-    /// ground/roamable/click-through computation in this file is scoped to
-    /// a single display -- multi-monitor support is not implemented, this
-    /// just names the existing single-display assumption in one place
-    /// instead of repeating `overlayController?.windows.first` at each site.
-    var primaryWindow: NSWindow? { overlayController?.windows.first }
+    /// The one window the pet is drawn in, covering every display (see
+    /// OverlayWindowController). Named here rather than repeating
+    /// `overlayController?.window` at each of its call sites.
+    var overlayWindow: NSWindow? { overlayController?.window }
+
+    /// Every display's work area, in that window's coordinates -- one rect
+    /// per display, the Dock and menu bar already taken off. Kept on the
+    /// controller as `roamableAreas`; this is where it is measured.
+    /// Empty before the overlay exists.
+    var screenWorkAreas: [CGRect] {
+        guard let window = overlayWindow, let space = screenManager?.current else { return [] }
+        let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
+        return NSScreen.screens.map { screen in
+            // visibleFrame, not frame: it is macOS's own answer to "where may
+            // something be put on this display", which is the Dock and the
+            // menu bar already subtracted -- per display, which matters the
+            // moment the Dock is on one of two monitors, and per Space, which
+            // is how a fullscreen Space gives the pet the whole screen back.
+            let visible = screen.visibleFrame
+            let topLeft = space.normalized(fromAppKit: CGPoint(x: visible.minX, y: visible.maxY))
+            return CGRect(
+                x: topLeft.x - origin.x,
+                y: topLeft.y - origin.y,
+                width: visible.width,
+                height: visible.height
+            )
+        }
+    }
 
     // One shared instance per FSM state, reused for every transition into it.
     // CharacterController.transition's same-state no-op guard is reference
@@ -57,6 +79,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     let idleState = IdleState()
     let walkState = WalkState()
     let climbState = ClimbState()
+    /// The step between two displays of different heights -- see
+    /// ClimbLedgeState. Idle on a single-display machine, where WalkState
+    /// never finds a ledge to hand it.
+    let climbLedgeState = ClimbLedgeState()
     let walkOnTopState = WalkOnTopState()
     let fallState = FallState()
     let landState = LandState()
@@ -69,9 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// The tank the client last reported, in overlay-local coordinates. Nil
     /// when there is none to go to.
     var petTankArea: CGRect?
-    /// The roamable area the pet had before it went home, so coming out
+    /// The roamable areas the pet had before it went home, so coming out
     /// restores the desktop it actually had rather than a recomputed guess.
-    var desktopRoamableArea: CGRect?
+    /// Nil is also the answer to "is the pet out on the desktop right now".
+    var desktopRoamableAreas: [CGRect]?
     /// The avatar scale the pet had before it went home. There is no stored
     /// setting to read it back from -- the size slider passes a scale straight
     /// to applyLiveAvatarScale and nothing keeps it -- so it is remembered

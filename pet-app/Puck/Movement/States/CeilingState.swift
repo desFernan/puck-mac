@@ -60,16 +60,21 @@ final class CeilingState: StateHandler {
         // here instead used to turn the pet with half of it off-screen, which
         // CharacterController's containment backstop then pulled back on the
         // same frame: the turn and the render disagreed.
+        // The ceiling of the display the pet is on, not the top of the box
+        // around every display: with a taller monitor beside this one, that
+        // box's top edge is somewhere off this screen entirely, and a crawl
+        // aimed at it takes the pet off the top of the screen it is on.
+        let area = context.area(at: context.body.position)
         let travelled = CGPoint(
             x: context.body.position.x + direction * context.walkSpeed * CGFloat(dt),
-            y: context.roamableArea.minY
+            y: area.minY
         )
-        let contained = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: context.roamableArea)
+        let contained = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: area)
         // An oversized avatar (Settings' size slider) has no position where
         // it actually fits -- `contain` always pins to leftLimit regardless
         // of `travelled`, so comparing against it would flip `direction`
         // every frame forever instead of settling.
-        if contained.x != travelled.x, !ScreenBounds.isOversizedHorizontally(visualBounds: context.visualBounds, in: context.roamableArea) {
+        if contained.x != travelled.x, !ScreenBounds.isOversizedHorizontally(visualBounds: context.visualBounds, in: area) {
             direction = -direction
         }
 

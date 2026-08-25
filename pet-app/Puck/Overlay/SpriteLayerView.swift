@@ -55,7 +55,13 @@ final class SpriteLayerView: NSView {
         // than 1x -- overshooting only costs memory, undershooting is the
         // visible blur this exists to prevent, and viewDidChangeBackingProperties
         // corrects it the moment the view lands in a real window.
-        let scale = window?.backingScaleFactor ?? 2
+        // The sharpest display, not the window's own factor: one overlay
+        // window covers every display (see OverlayWindowController), and
+        // AppKit answers `backingScaleFactor` for whichever one holds most of
+        // it -- so a pet walking onto a Retina display from a 1x one would
+        // rasterize at half resolution and stay that way. Overshooting only
+        // costs memory, which is the same trade the 2x guess below makes.
+        let scale = NSScreen.screens.map(\.backingScaleFactor).max() ?? window?.backingScaleFactor ?? 2
         contentLayer.contentsScale = scale
         // The avatar's sprite layer is already parented in by the time a
         // display change arrives, so the container alone is not enough.

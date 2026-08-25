@@ -38,9 +38,20 @@ final class CharacterController {
     /// note); a kind with nothing registered is simply not reachable.
     private var states: [StateKind: StateHandler] = [:]
 
-    /// Where the pet may roam, and what it lands on. Set at bootstrap and
-    /// refreshed when the display configuration or window list changes.
-    var roamableArea: CGRect = .zero
+    /// Where the pet may roam: one area per display, or the single rect of
+    /// its tank while it is in one. Set at bootstrap and refreshed when the
+    /// display configuration, the Space or the client's island changes.
+    ///
+    /// A list rather than a rectangle because two displays are not one: the
+    /// box around them contains space belonging to neither, and a pet put
+    /// there is off every screen (see ScreenGround).
+    var roamableAreas: [CGRect] = [] {
+        didSet { roamableArea = ScreenGround.union(roamableAreas) }
+    }
+
+    /// The box around `roamableAreas`. What horizontal containment measures
+    /// against, so a throw can still cross from one display to the next.
+    private(set) var roamableArea: CGRect = .zero
     /// Kept in sync with the live avatar's rendered height -- see
     /// StateContext.avatarHeight.
     var avatarHeight: CGFloat = 0
@@ -88,6 +99,12 @@ final class CharacterController {
         if kind == .idle { idleState = state }
     }
 
+    /// The display `point` is on -- see StateContext.area(at:), which is the
+    /// same question asked from inside a frame.
+    func area(at point: CGPoint) -> CGRect {
+        ScreenGround.area(at: point, in: roamableAreas) ?? roamableArea
+    }
+
     /// Cached at register time -- update(dt:) asks "is the pet idle?" every
     /// frame, and the answer never changes after bootstrap.
     private var idleState: StateHandler?
@@ -132,6 +149,7 @@ final class CharacterController {
         let context = StateContext(
             body: body,
             roamableArea: roamableArea,
+            roamableAreas: roamableAreas,
             avatarHeight: avatarHeight,
             visualBounds: body.visualBounds,
             walkSpeed: walkSpeed,
@@ -158,6 +176,16 @@ final class CharacterController {
         // by landing surfaces and the ceiling, which legitimately sit on the
         // area's own edges.
         body.position = ScreenBounds.contain(body.position, visualBounds: context.visualBounds, in: roamableArea)
+        // And the other half of that backstop, which only a second display
+        // makes necessary: inside the box is not the same as on a screen.
+        // Enforced here rather than in the states that can put the pet there
+        // -- a throw, a drag, a monitor unplugged mid-walk, and whatever
+        // state gets written next -- because missing one of them costs the
+        // pet entirely: it comes to rest in the space between two displays,
+        // where nothing draws it and nothing looks for it again.
+        if !context.artworkHasGround(at: body.position) {
+            body.position = ScreenGround.standable(body.position, visualBounds: context.visualBounds, in: roamableAreas)
+        }
         stateElapsedTime += dt
         body.updateBounce(clip: currentState.clipKey, elapsed: stateElapsedTime)
 

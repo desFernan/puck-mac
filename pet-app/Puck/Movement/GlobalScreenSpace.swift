@@ -57,6 +57,12 @@ struct GlobalScreenSpace: Equatable {
         }
     }
 
+    /// Bounding box of every display combined, in AppKit's own space --
+    /// the frame of the one overlay window that covers them all.
+    var appKitBounds: CGRect {
+        appKitFrames.reduce(CGRect.null) { $0.union($1) }
+    }
+
     /// Bounding box of every display combined, in the normalized space
     var bounds: CGRect {
         normalizedScreenFrames.reduce(CGRect.null) { $0.union($1) }

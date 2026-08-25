@@ -44,11 +44,11 @@ extension AppDelegate {
                 return WindowSupport.nearestClimbTarget(
                     from: body.position,
                     in: windows,
-                    roamableTop: controller.roamableArea.minY,
+                    roamableTop: petArea(controller).minY,
                     avatarHeight: avatarHitboxSize.height,
                     excluding: unclimbableWindowIDs(in: windows)
                 )
-            } ?? Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
+            } ?? self.randomRoamPoint(controller)
             controller.transition(to: .walk)
         case .climbToCeiling:
             // ClimbToCeilingState falls back to .fall on its own if there's no
@@ -64,7 +64,7 @@ extension AppDelegate {
                       in: ceilingWindows,
                       excluding: unclimbableWindowIDs(in: ceilingWindows)
                   ) != nil else {
-                walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
+                walkState.target = self.randomRoamPoint(controller)
                 controller.transition(to: .walk)
                 return
             }
@@ -82,7 +82,7 @@ extension AppDelegate {
                       petPosition: characterBody?.position ?? .zero
                   )
             else {
-                walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: self.currentRoamX(in: controller))
+                walkState.target = self.randomRoamPoint(controller)
                 controller.transition(to: .walk)
                 return
             }
@@ -146,7 +146,7 @@ extension AppDelegate {
               let perch = WindowSupport.perchTarget(
                   on: window,
                   from: body.position,
-                  roamableTop: controller.roamableArea.minY,
+                  roamableTop: petArea(controller).minY,
                   avatarHeight: avatarHitboxSize.height,
                   petHalfWidth: avatarHitboxSize.width / 2
               )
@@ -182,12 +182,25 @@ extension AppDelegate {
     /// shuffles with the occasional long trip, which is what reads as
     /// wandering rather than commuting.
     ///
+    /// `area` is the display the pet is on, which is what the distance is
+    /// drawn against -- a wander is a stroll across the screen in front of
+    /// you, and scaling it to the box around three monitors would turn every
+    /// long trip into a half-minute commute. `limits` is how far it may
+    /// actually end up, which is every display: the pet is allowed to wander
+    /// onto the next monitor, it just doesn't set off across two of them in
+    /// one leg. Defaults to `area`, i.e. one display, i.e. what this was.
+    ///
     /// Static and pure so the distribution is testable without a screen.
-    nonisolated static func randomRoamPoint(in area: CGRect, from currentX: CGFloat) -> CGPoint {
+    nonisolated static func randomRoamPoint(
+        in area: CGRect,
+        from currentX: CGFloat,
+        limitedTo limits: CGRect? = nil
+    ) -> CGPoint {
         guard area.width > 0 else { return .zero }
-        let margin = area.width * roamEdgeMargin
-        let low = area.minX + margin
-        let high = max(low, area.maxX - margin)
+        let bounds = limits ?? area
+        let margin = bounds.width * roamEdgeMargin
+        let low = bounds.minX + margin
+        let high = max(low, bounds.maxX - margin)
 
         let range = CGFloat.random(in: 0...1) < longTripChance ? longTripDistance : shortHopDistance
         let distance = CGFloat.random(in: range) * area.width
@@ -222,7 +235,7 @@ extension AppDelegate {
     /// each time.
     private func startWanderLeg(_ controller: CharacterController) {
         varyWalkSpeed()
-        walkState.target = Self.randomRoamPoint(in: controller.roamableArea, from: currentRoamX(in: controller))
+        walkState.target = randomRoamPoint(controller)
         controller.transition(to: .walk)
     }
 
@@ -242,7 +255,7 @@ extension AppDelegate {
         wanderLegPause -= dt
         guard wanderLegPause <= 0 else { return }
         pendingWanderLegs -= 1
-        wanderLegPause = Self.randomLegPause(atHome: desktopRoamableArea != nil)
+        wanderLegPause = Self.randomLegPause(atHome: desktopRoamableAreas != nil)
         startWanderLeg(controller)
     }
 
@@ -280,6 +293,26 @@ extension AppDelegate {
     /// body to ask -- a wander drawn without one has nothing to be relative to.
     private func currentRoamX(in controller: CharacterController) -> CGFloat {
         characterBody?.position.x ?? controller.roamableArea.midX
+    }
+
+    /// The display the pet is standing on. Wander draws happen in it rather
+    /// than in the box around every display: that box's floor is the lowest
+    /// monitor's and parts of it are on no screen at all, so a point drawn
+    /// there sends the pet walking down and off its own screen.
+    private func petArea(_ controller: CharacterController) -> CGRect {
+        controller.area(at: characterBody?.position ?? .zero)
+    }
+
+    /// One wander destination: a stroll's worth of distance, anywhere on any
+    /// display. WalkState is what stops at an edge with nothing beyond it and
+    /// what climbs the step onto a taller monitor, so a target on the display
+    /// next door is an ordinary walk rather than a special case.
+    private func randomRoamPoint(_ controller: CharacterController) -> CGPoint {
+        Self.randomRoamPoint(
+            in: petArea(controller),
+            from: currentRoamX(in: controller),
+            limitedTo: controller.roamableArea
+        )
     }
 
     /// As a fraction of the roamable width.

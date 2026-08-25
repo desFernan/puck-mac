@@ -24,7 +24,7 @@ extension AppDelegate {
         self.overlayController = overlayController
 
         guard
-            let window = overlayController.windows.first,
+            let window = overlayController.window,
             let spriteView = window.contentView as? SpriteLayerView
         else {
             return
@@ -130,7 +130,8 @@ extension AppDelegate {
         // Keeps the pet where it already stood across a switch rather than
         // re-spawning it -- only the very first activation (no prior
         // characterBody) has no "where it already stood" to keep.
-        let initialPosition = characterBody?.position ?? GroundedSpawnPosition.position(in: groundAwareSize(of: window))
+        let initialPosition = characterBody?.position
+            ?? GroundedSpawnPosition.position(in: screenWorkAreas.first ?? CGRect(origin: .zero, size: window.frame.size))
         newAvatar.setScreenPosition(initialPosition)
         avatar = newAvatar
 
@@ -166,13 +167,14 @@ extension AppDelegate {
             (.petting, pettingState), (.spin, spinState),
             (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
             (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
+            (.climbLedge, climbLedgeState),
             (.pinned, pinnedState),
             (.travel, travelState),
         ] {
             controller.register(state, as: kind)
         }
         controller.idleChatter.keys = soundTable.keys(withPrefix: "chatter_")
-        controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
+        controller.roamableAreas = screenWorkAreas
         controller.avatarHeight = avatarHitboxSize.height
         controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
         // F4 reports global Quartz frames; the pet lives in overlay-local
@@ -184,7 +186,7 @@ extension AppDelegate {
         // change, found via review since handleWindowsRebuilt() never
         // re-assigns this closure.
         controller.windows = { [weak self] in
-            guard let self, let window = self.primaryWindow else { return [] }
+            guard let self, let window = self.overlayWindow else { return [] }
             return self.overlayLocalWindows(excluding: window)
         }
         // The other half of Settings' "포커스된 창 위로는 올라가지 않기": the
@@ -203,16 +205,25 @@ extension AppDelegate {
         controller.landingY = { [weak self, weak controller] point in
             let floor = controller?.roamableArea.maxY ?? 0
             guard let self, let controller else { return floor }
+            // The floor and ceiling of the display under that point, not of
+            // the box around every display: with two monitors of different
+            // heights the box's bottom edge is below one of them, and a pet
+            // falling to it drops off the bottom of its own screen.
+            let area = controller.area(at: point)
             return LandingSurfaceResolver.landingY(
                 atX: point.x,
                 fallingFromY: point.y,
                 windows: self.overlayLocalWindows(excluding: nil),
-                screenBottomY: controller.roamableArea.maxY,
-                roamableTop: controller.roamableArea.minY,
+                screenBottomY: area.maxY,
+                roamableTop: area.minY,
                 avatarHeight: controller.avatarHeight
             )
         }
         idleState.wanderDelegate = self
+        // How the pet gets back onto a taller display after walking down onto
+        // a shorter one. WalkState is what notices the ledge; this is what
+        // climbs it.
+        walkState.climbLedgeState = climbLedgeState
         pointState.onEnter = { [weak self] in self?.beginPointingTimer() }
         characterController = controller
 
@@ -225,7 +236,7 @@ extension AppDelegate {
     }
 
     private func switchAvatar(to name: String) {
-        guard let window = primaryWindow, let spriteView = window.contentView as? SpriteLayerView else { return }
+        guard let window = overlayWindow, let spriteView = window.contentView as? SpriteLayerView else { return }
         activateAvatar(named: name, window: window, spriteView: spriteView)
     }
 
@@ -252,6 +263,33 @@ extension AppDelegate {
         return clickThrough
     }
 
+    /// A point in the global Quartz space F4 and the tools speak (top-left
+    /// origin at the *primary* display), rebased into the overlay window's
+    /// own space, which the pet lives in.
+    ///
+    /// The two used to be the same numbers, because the overlay covered the
+    /// primary display and started at its corner. One window over every
+    /// display starts at the corner of the whole arrangement instead -- which
+    /// is the primary's corner only until a display is put to the left of, or
+    /// above, it. This is the same rebase `overlayLocalWindows` does to the
+    /// window list, for the callers handed a single rect rather than a list.
+    func overlayLocalPoint(fromQuartz point: CGPoint) -> CGPoint {
+        guard let frame = overlayWindow?.frame, let space = screenManager?.current else { return point }
+        let origin = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
+        return CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+    }
+
+    /// The display the pet is standing on. Everything that has to sit
+    /// *beside* the pet rather than inside its own layer -- a speech bubble,
+    /// the input panel -- is placed against this one screen's visibleFrame,
+    /// and the overlay window's own `screen` is no answer: it covers them all,
+    /// so AppKit hands back whichever holds most of it.
+    var petScreen: NSScreen? {
+        guard let window = overlayWindow, let body = characterBody else { return NSScreen.main }
+        let point = globalAppKitPoint(fromWindowLocal: body.position, window: window)
+        return NSScreen.screens.first { $0.frame.contains(point) } ?? window.screen ?? NSScreen.main
+    }
+
     /// ScreenSpaceMapper's screen points are window-local (top-left origin,
     /// Y-down); NSEvent.mouseLocation (which ClickThroughController hit-tests
     /// against) is AppKit's global screen space (bottom-left origin, Y-up).
@@ -259,28 +297,18 @@ extension AppDelegate {
         CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
     }
 
-    /// `window`'s size with the Dock's strip trimmed off the bottom (see
-    /// DockInset's doc comment) -- what roamableArea/GroundedSpawnPosition
-    /// should treat as "the ground," so the pet stands in front of the Dock
-    /// instead of being drawn underneath it.
-    func groundAwareSize(of window: NSWindow) -> CGSize {
-        let dockInset = NSScreen.screens.first
-            .map { DockInset.bottomInset(screenFrame: $0.frame, visibleFrame: $0.visibleFrame) } ?? 0
-        return CGSize(width: window.frame.width, height: window.frame.height - dockInset)
-    }
-
     /// In a fullscreen Space the pet should roam over the whole screen, not
     /// stay confined above where the Dock would be -- OverlayWindow already
-    /// joins fullscreen Spaces
-    /// (.fullScreenAuxiliary), but nothing previously re-checked
-    /// groundAwareSize after initial setup, so roamableArea stayed reserved
-    /// for the Dock's height even in a fullscreen Space where the Dock isn't
-    /// actually shown at all (NSScreen.visibleFrame reports no Dock inset
-    /// there). Space switches don't fire didChangeScreenParametersNotification
-    /// (that's for real display reconfiguration), so this needs its own
-    /// observer. IdleState's existing "supporting surface disappeared" check
-    /// then naturally settles the pet onto the new, taller floor if the pet
-    /// happens to be resting when the Space changes.
+    /// joins fullscreen Spaces (.fullScreenAuxiliary), but nothing
+    /// re-measures `screenWorkAreas` on its own, so the roamable areas stayed
+    /// reserved for the Dock's height even in a fullscreen Space where the
+    /// Dock isn't actually shown at all (NSScreen.visibleFrame reports no
+    /// Dock inset there). Space switches don't fire
+    /// didChangeScreenParametersNotification (that's for real display
+    /// reconfiguration), so this needs its own observer. IdleState's existing
+    /// "supporting surface disappeared" check then naturally settles the pet
+    /// onto the new, taller floor if the pet happens to be resting when the
+    /// Space changes.
     func setUpSpaceChangeObserving() {
         spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
@@ -294,8 +322,11 @@ extension AppDelegate {
     }
 
     private func refreshRoamableAreaForCurrentSpace() {
-        guard let window = primaryWindow, let controller = characterController else { return }
-        controller.roamableArea = CGRect(origin: .zero, size: groundAwareSize(of: window))
+        // Only on the desktop: in its tank the pet's world is the client's
+        // island, and handing it the displays back would take it out of the
+        // glass without anything moving it there.
+        guard desktopRoamableAreas == nil, let controller = characterController else { return }
+        controller.roamableAreas = screenWorkAreas
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
@@ -306,7 +337,7 @@ extension AppDelegate {
     /// before setUpOverlayAndAvatar has built them yet) -- nothing to do then.
     private func handleWindowsRebuilt() {
         guard
-            let window = primaryWindow,
+            let window = overlayWindow,
             let spriteView = window.contentView as? SpriteLayerView,
             let avatar
         else {
@@ -318,13 +349,15 @@ extension AppDelegate {
         // anything reads them: left stale, the floor of the old area sits
         // below the new screen's bottom edge and the pet drops out of sight
         // with no state able to bring it back.
-        let desktop = CGRect(origin: .zero, size: groundAwareSize(of: window))
         // Out of the tank first, if it was in one: that rect was measured
         // against the window just torn down. The client re-reports its island
         // on a display change and the pet walks back into it a moment later.
         leaveTankAfterDisplayChange()
-        characterController?.roamableArea = desktop
-        let position = DisplayChangeRelocation.contained(
+        let desktop = screenWorkAreas
+        characterController?.roamableAreas = desktop
+        // Onto the nearest display that still exists -- which is the whole
+        // point on the day a monitor is unplugged with the pet on it.
+        let position = ScreenGround.standable(
             characterBody?.position ?? .zero,
             visualBounds: characterBody?.visualBounds ?? .zero,
             in: desktop
@@ -366,7 +399,7 @@ extension AppDelegate {
         // already observes and refreshes on).
         guard
             let watcher = windowListWatcher,
-            let overlayFrame = primaryWindow?.frame,
+            let overlayFrame = overlayWindow?.frame,
             let screenSpace = screenManager?.current
         else {
             return []

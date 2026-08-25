@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 강상우 (Sangwoo Kang)
-//  Verifies one window is created per real display and positioned using
-//  AppKit frames (not the normalized, Y-down movement-logic space).
+//  Verifies one window is created across every real display and positioned
+//  using AppKit frames (not the normalized, Y-down movement-logic space).
 //
 
 import XCTest
@@ -14,27 +14,31 @@ import XCTest
 /// window, the status item, or the character they draw.
 @MainActor
 final class OverlayWindowControllerTests: XCTestCase {
-    func test_start_createsOneWindowPerDisplay_positionedAtItsAppKitFrame() throws {
+    /// One window over every display, not one each: the pet is one character
+    /// in one layer tree, and a window per display would mean handing it over
+    /// -- layer, coordinates and all -- every time it crossed an edge.
+    func test_start_createsOneWindowCoveringEveryDisplay() throws {
         let screenManager = try XCTUnwrap(ScreenManager())
         let controller = OverlayWindowController(screenManager: screenManager)
 
         controller.start()
         defer { controller.stop() }
 
-        XCTAssertEqual(controller.windows.count, screenManager.current.appKitFrames.count)
-        for (window, frame) in zip(controller.windows, screenManager.current.appKitFrames) {
-            XCTAssertEqual(window.frame, frame)
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(window.frame, screenManager.current.appKitBounds)
+        for frame in screenManager.current.appKitFrames {
+            XCTAssertTrue(window.frame.contains(frame), "every display is inside the overlay")
         }
     }
 
-    func test_stop_ordersOutAndClearsWindows() throws {
+    func test_stop_ordersOutAndClearsTheWindow() throws {
         let screenManager = try XCTUnwrap(ScreenManager())
         let controller = OverlayWindowController(screenManager: screenManager)
 
         controller.start()
         controller.stop()
 
-        XCTAssertTrue(controller.windows.isEmpty)
+        XCTAssertNil(controller.window)
     }
 
     func test_start_firesOnWindowsRebuilt_soConsumersCanReparentTheAvatar() throws {

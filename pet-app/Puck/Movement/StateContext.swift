@@ -20,8 +20,18 @@ struct StateContext {
     /// Position and facing, already wired to the avatar.
     let body: CharacterBody
 
-    /// The area the pet may roam, normally the union of every display.
+    /// The area the pet may roam, normally the box around every display.
+    ///
+    /// The box, not the displays themselves: `roamableAreas` is the list, and
+    /// anything that has to know whether a spot is actually on a screen asks
+    /// that instead (see `artworkHasGround(at:)`).
     let roamableArea: CGRect
+
+    /// One area per display -- or the single rect of the pet's tank while it
+    /// is in one. Empty means "whoever built this context has only the one
+    /// area", which is what every test and every single-display run is, and
+    /// the helpers below fall back to `roamableArea` for it.
+    var roamableAreas: [CGRect] = []
 
     /// The rendered avatar's current height (manifest hitbox * scale). F3
     /// ceiling-crawling (2026-07-29): ClimbToCeilingState needs this to climb
@@ -65,4 +75,37 @@ struct StateContext {
     /// Asks the FSM to enter another state after this frame. Deferred rather
     /// than immediate so a state never mutates the controller mid-update.
     let requestTransition: (StateKind) -> Void
+
+    /// The display `point` is on -- what "the top of the screen" and "the
+    /// bottom of the screen" mean where the pet currently is. With several
+    /// displays the roamable box has neither: its top edge can be a monitor
+    /// away from the pet, and a ceiling crawl aimed at it walks the pet off
+    /// the top of the screen it is actually on.
+    func area(at point: CGPoint) -> CGRect {
+        ScreenGround.area(at: point, in: roamableAreas) ?? roamableArea
+    }
+
+    /// Whether the pet's whole outline has a display under it at `position`.
+    func artworkHasGround(at position: CGPoint) -> Bool {
+        guard !roamableAreas.isEmpty else { return true }
+        if ScreenGround.artworkHasGround(at: position, visualBounds: visualBounds, in: roamableAreas) {
+            return true
+        }
+        // An avatar wider than the display it stands on (Settings' size
+        // slider, a small display) has no position where all of it is on
+        // screen -- the same case ScreenBounds.isOversizedHorizontally exists
+        // for. Answering "no ground anywhere" for it would freeze the pet
+        // where it stands and pin it there every frame.
+        return ScreenBounds.isOversizedHorizontally(visualBounds: visualBounds, in: area(at: position))
+    }
+
+    /// Where the pet would stand after climbing the ledge in `directionX`.
+    func ledge(beyond position: CGPoint, directionX: CGFloat) -> CGPoint? {
+        ScreenGround.ledge(
+            beyond: position,
+            directionX: directionX,
+            visualBounds: visualBounds,
+            in: roamableAreas
+        )
+    }
 }

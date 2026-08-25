@@ -141,13 +141,21 @@ final class ToyBox {
 
     // MARK: - Per frame
 
-    /// - Parameter landingY: the surface a given toy should come to rest on.
-    ///   Resolved per toy rather than once, because it depends on where that
-    ///   toy is and how big it is (windows below it, the pet's head).
-    func tickAll(dt: TimeInterval, landingY: (BallController) -> CGFloat, roamableArea: CGRect) {
+    /// - Parameters:
+    ///   - landingY: the surface a given toy should come to rest on. Resolved
+    ///     per toy rather than once, because it depends on where that toy is
+    ///     and how big it is (windows below it, the pet's head).
+    ///   - roamableArea: the display that toy is over, per toy for the same
+    ///     reason -- with two monitors there is no single rectangle that is
+    ///     "the screen".
+    func tickAll(
+        dt: TimeInterval,
+        landingY: (BallController) -> CGFloat,
+        roamableArea: (BallController) -> CGRect
+    ) {
         // Copied because a landing handler may remove a toy mid-iteration.
         for controller in all where controller.isActive {
-            controller.tick(dt: dt, landingY: landingY(controller), roamableArea: roamableArea)
+            controller.tick(dt: dt, landingY: landingY(controller), roamableArea: roamableArea(controller))
         }
     }
 

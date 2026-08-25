@@ -47,7 +47,7 @@ extension AppDelegate {
     /// there's nothing left to click on a hidden pet either.
     private func toggleCharacterVisibility() {
         isCharacterHidden.toggle()
-        for window in overlayController?.windows ?? [] {
+        if let window = overlayController?.window {
             if isCharacterHidden {
                 window.orderOut(nil)
             } else {

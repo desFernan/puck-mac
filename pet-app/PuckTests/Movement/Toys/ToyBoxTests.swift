@@ -207,7 +207,7 @@ final class ToyBoxTests: XCTestCase {
         var landed: [String] = []
         box.onLanded = { toy, _ in landed.append(toy.name) }
 
-        box.tickAll(dt: 0.1, landingY: { _ in 500 }, roamableArea: CGRect(x: 0, y: 0, width: 1000, height: 600))
+        box.tickAll(dt: 0.1, landingY: { _ in 500 }, roamableArea: { _ in CGRect(x: 0, y: 0, width: 1000, height: 600) })
 
         XCTAssertEqual(landed, [pumpkin.name])
     }
@@ -217,7 +217,7 @@ final class ToyBoxTests: XCTestCase {
         box.spawn(pumpkin, at: CGPoint(x: 100, y: 0))
         box.spawn(wand, at: CGPoint(x: 400, y: 0))
 
-        box.tickAll(dt: 0.1, landingY: { _ in 500 }, roamableArea: CGRect(x: 0, y: 0, width: 1000, height: 600))
+        box.tickAll(dt: 0.1, landingY: { _ in 500 }, roamableArea: { _ in CGRect(x: 0, y: 0, width: 1000, height: 600) })
 
         for controller in box.all {
             XCTAssertGreaterThan(controller.state?.position.y ?? 0, 0)
@@ -227,7 +227,7 @@ final class ToyBoxTests: XCTestCase {
     func test_candidates_describeEveryToyOutForTheInterestPolicy() {
         let (box, _) = makeBox()
         box.spawn(pumpkin, at: CGPoint(x: 100, y: 495))
-        box.tickAll(dt: 0.5, landingY: { _ in 500 }, roamableArea: CGRect(x: 0, y: 0, width: 1000, height: 600))
+        box.tickAll(dt: 0.5, landingY: { _ in 500 }, roamableArea: { _ in CGRect(x: 0, y: 0, width: 1000, height: 600) })
         box.spawn(wand, at: CGPoint(x: 400, y: 0)) // still falling
 
         let candidates = box.candidates

@@ -14,6 +14,10 @@ import CoreGraphics
 // MARK: - Test doubles
 
 final class SpyAvatarPlayable: AvatarPlayable {
+    /// A pet with real extent, for the tests that care where its edges are.
+    /// Zero -- the protocol's default -- would quietly put them back on the
+    /// old centre-point behaviour.
+    var visualBounds: CGRect = .zero
     private(set) var playedClips: [(clip: String, loop: Bool)] = []
     private(set) var stopCallCount = 0
     private(set) var bounceCalls: [(clip: String, elapsed: TimeInterval)] = []
@@ -54,6 +58,15 @@ private final class TransitioningSpyState: StateHandler {
         if let target { controller?.transition(to: target) }
     }
     func exit() {}
+}
+
+/// Puts the pet wherever it is told, whatever is there -- a throw, a drag,
+/// or a monitor unplugged mid-walk, as far as the controller can tell.
+private final class TeleportingSpyState: StateHandler {
+    let name = "Teleporting"
+    let clipKey = "idle"
+    var destination: CGPoint = .zero
+    func update(dt: TimeInterval, context: StateContext) { context.body.position = destination }
 }
 
 private final class SpyState: StateHandler {
@@ -259,6 +272,51 @@ final class StateTransitionTests: XCTestCase {
         XCTAssertTrue(controller.currentState === walk, "it still happens, just at the end")
         XCTAssertEqual(asker.updateCount, 1, "and the old state's frame ran exactly once")
         XCTAssertEqual(walk.enterCallCount, 1, "the new state is entered once, not once per ask")
+    }
+
+    // MARK: - The pet is on a display when the frame ends
+
+    /// Two displays of different heights leave a step of empty space inside
+    /// the box around them. A pet left there is on no screen at all: nothing
+    /// draws it and no state looks for it again, so the frame does not end
+    /// with it there.
+    func test_aPetLeftBetweenTwoDisplays_isPutBackOnTheNearestOne() {
+        let avatar = SpyAvatarPlayable()
+        avatar.visualBounds = CGRect(x: -50, y: -120, width: 100, height: 120)
+        let body = CharacterBody(avatar: avatar, position: .zero)
+        let state = TeleportingSpyState()
+        let controller = CharacterController(initialState: state, body: body, sfxPlayer: SpySFXTriggering())
+        controller.roamableAreas = [
+            CGRect(x: 0, y: 0, width: 1000, height: 500),
+            CGRect(x: 1000, y: 0, width: 800, height: 400),
+        ]
+        // Below the shorter display's floor: inside the box, on nothing.
+        state.destination = CGPoint(x: 1400, y: 480)
+
+        controller.update(dt: 1.0 / 60)
+
+        XCTAssertEqual(body.position.y, 400, "standing on the display it was nearest")
+        XCTAssertEqual(body.position.x, 1400, "and not dragged sideways for no reason")
+    }
+
+    /// The box around the displays is still what horizontal containment
+    /// measures against -- a throw has to be able to cross from one to the
+    /// other.
+    func test_aPetOnADisplayIsLeftAlone() {
+        let avatar = SpyAvatarPlayable()
+        avatar.visualBounds = CGRect(x: -50, y: -120, width: 100, height: 120)
+        let body = CharacterBody(avatar: avatar, position: .zero)
+        let state = TeleportingSpyState()
+        let controller = CharacterController(initialState: state, body: body, sfxPlayer: SpySFXTriggering())
+        controller.roamableAreas = [
+            CGRect(x: 0, y: 0, width: 1000, height: 500),
+            CGRect(x: 1000, y: 0, width: 800, height: 400),
+        ]
+        state.destination = CGPoint(x: 1400, y: 200)
+
+        controller.update(dt: 1.0 / 60)
+
+        XCTAssertEqual(body.position, CGPoint(x: 1400, y: 200), "mid-air over its own display is fine")
     }
 
     /// From outside a frame it is immediate, which is what every click, drag

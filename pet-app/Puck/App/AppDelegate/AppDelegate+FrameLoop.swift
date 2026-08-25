@@ -47,7 +47,11 @@ extension AppDelegate {
                         }
                         return min(floorLandingY, headLandingY ?? floorLandingY)
                     },
-                    roamableArea: controller.roamableArea
+                    // Per toy, like the landing surface above and for the
+                    // same reason: a ball that rolls off the side of a short
+                    // monitor into the space beside a taller one is a ball
+                    // nobody can see or reach again.
+                    roamableArea: { ball in controller.area(at: ball.state?.position ?? .zero) }
                 )
             }
             // Stroking ends when the cursor stops moving, which by definition
@@ -104,7 +108,7 @@ extension AppDelegate {
 
             // The hitbox has to follow the pet, or clicks only work where it
             // first appeared.
-            if let body = self.characterBody, let window = self.primaryWindow {
+            if let body = self.characterBody, let window = self.overlayWindow {
                 self.clickThroughController?.updateCharacter(
                     screenPosition: self.globalAppKitPoint(fromWindowLocal: body.position, window: window),
                     hitboxSize: self.avatarHitboxSize,
@@ -181,7 +185,10 @@ extension AppDelegate {
         guard attemptsRemaining > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self else { return }
-            guard let appeared = self.overlayLocalWindows(excluding: nil).first(where: { !known.contains($0.windowID) }) else {
+            // Straight off the watcher, not through overlayLocalWindows:
+            // pointAt takes the global frame (it is what the click detector
+            // hit-tests the cursor against) and rebases it itself.
+            guard let appeared = self.windowListWatcher?.windows.first(where: { !known.contains($0.windowID) }) else {
                 self.pointAtNewWindow(excluding: known, attemptsRemaining: attemptsRemaining - 1)
                 return
             }

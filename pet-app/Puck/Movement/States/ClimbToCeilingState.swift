@@ -52,7 +52,10 @@ final class ClimbToCeilingState: StateHandler {
         // also makes this land on exactly the same rendered rect CeilingState
         // computes for position.y == roamableArea.minY once it flips upside
         // down, so the flip reads as an in-place turn, not a jump.
-        let target = CGPoint(x: context.body.position.x, y: context.roamableArea.minY + context.avatarHeight)
+        // The top of the display being climbed on, not of the box around
+        // every display -- see CeilingState, which this hands over to.
+        let ceiling = context.area(at: context.body.position).minY
+        let target = CGPoint(x: context.body.position.x, y: ceiling + context.avatarHeight)
         let step = MovementSolver.step(from: context.body.position, toward: target, speed: context.walkSpeed, dt: dt)
         context.body.position = step.position
 

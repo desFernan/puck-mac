@@ -21,7 +21,11 @@ enum GroundedSpawnPosition {
     /// Small gap so the sprite doesn't visually clip into the very bottom pixel row.
     static let groundMargin: CGFloat = 4
 
-    static func position(in windowSize: CGSize) -> CGPoint {
-        CGPoint(x: windowSize.width / 2, y: windowSize.height - groundMargin)
+    /// A rect rather than a size: with several displays the pet's world does
+    /// not start at the overlay window's own origin, and the middle of the
+    /// window is a point on whichever monitor happens to be in the middle of
+    /// the arrangement -- or in the space between two of them.
+    static func position(in area: CGRect) -> CGPoint {
+        CGPoint(x: area.midX, y: area.maxY - groundMargin)
     }
 }

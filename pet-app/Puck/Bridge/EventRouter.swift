@@ -19,6 +19,9 @@ enum StateKind: Equatable, CaseIterable {
     case idle
     case walk
     case climb
+    /// The step between two displays of different heights. Reached only from
+    /// WalkState, when the walk runs out of floor -- see ClimbLedgeState.
+    case climbLedge
     case walkOnTop
     case fall
     case land

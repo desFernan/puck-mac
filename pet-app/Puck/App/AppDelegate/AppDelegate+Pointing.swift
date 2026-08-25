@@ -16,6 +16,11 @@ extension AppDelegate {
     /// point_at: walk to the target, then point at it. The tool only learns
     /// the pet arrived when Point is actually entered, which is what protocol
     /// section 4 promises the agent.
+    ///
+    /// `frame` is in the global Quartz space the tools and the window list
+    /// speak. It is handed to ClickDetector as-is (it compares against the
+    /// cursor in that same space) and rebased for the walk, which happens in
+    /// the pet's.
     func pointAt(frame: CGRect, holdSeconds: TimeInterval? = nil, onPointingStarted: @escaping () -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self, let controller = self.characterController else {
@@ -53,7 +58,9 @@ extension AppDelegate {
             // Stand beside the target rather than on top of it, so the
             // character isn't covering what it is trying to show.
             let standOffset: CGFloat = 60
-            self.moveToState.target = CGPoint(x: frame.midX - standOffset, y: frame.maxY)
+            self.moveToState.target = self.overlayLocalPoint(
+                fromQuartz: CGPoint(x: frame.midX - standOffset, y: frame.maxY)
+            )
             self.moveToState.nextState = .point
             controller.transition(to: .moveTo)
         }

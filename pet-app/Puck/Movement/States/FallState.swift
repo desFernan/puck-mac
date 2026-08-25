@@ -88,11 +88,15 @@ final class FallState: StateHandler {
         // simply leaves the display. Applied after the fall step so gravity
         // has already been integrated: what bounces is the velocity the pet
         // actually has at the ceiling.
+        // Off the top of the display the pet is over, for the same reason
+        // CeilingState crawls along that one: the box around several displays
+        // has a top edge that can be a monitor away, and a throw bouncing off
+        // that one leaves the screen on the way up.
         let ceiling = ScreenBounds.bounceOffCeiling(
             position: step.position,
             velocity: step.velocity,
             visualBounds: context.visualBounds,
-            in: context.roamableArea
+            in: context.area(at: step.position)
         )
         context.body.position = ceiling.position
         velocity = ceiling.velocity

@@ -285,9 +285,9 @@ extension AppDelegate {
         bubbleWindow.setContentSize(size)
 
         guard
-            let window = primaryWindow,
-            let screen = window.screen ?? NSScreen.main,
-            let body = characterBody
+            let window = overlayWindow,
+            let body = characterBody,
+            let screen = petScreen
         else {
             return
         }
@@ -316,9 +316,9 @@ extension AppDelegate {
             // Speech only. The input panel sits at its own fixed spot, is
             // being typed into, and honours a drag the user made.
             bubbleWindow.isShowingSpeech,
-            let window = primaryWindow,
-            let screen = bubbleWindow.screen ?? window.screen ?? NSScreen.main,
-            let body = characterBody
+            let window = overlayWindow,
+            let body = characterBody,
+            let screen = petScreen
         else {
             return
         }
@@ -338,7 +338,7 @@ extension AppDelegate {
     private static let bottomModalMargin: CGFloat = 60
 
     func makeBubble() -> (TextInputBubbleWindow, TextInputBubbleView)? {
-        guard let screen = primaryWindow?.screen ?? NSScreen.main else { return nil }
+        guard let screen = petScreen else { return nil }
 
         let size = TextInputBubbleView.panelSize
         let bubbleWindow = textInputBubbleWindow ?? {
@@ -369,15 +369,15 @@ extension AppDelegate {
         // now that MoveToState exists and is used by point_at/launch_app)
         // isn't wired up here yet. For now this just re-centers the pet on
         // the primary display, standing on the ground.
-        guard let window = primaryWindow else { return }
-        moveCharacter(to: GroundedSpawnPosition.position(in: groundAwareSize(of: window)))
+        guard let area = screenWorkAreas.first else { return }
+        moveCharacter(to: GroundedSpawnPosition.position(in: area))
     }
 
     /// Teleports the pet -- through characterBody (see handleWindowsRebuilt's
     /// comment) so the frame loop's hitbox tracking and any in-flight
     /// movement state stay consistent with where the pet actually renders.
     private func moveCharacter(to windowLocalPoint: CGPoint) {
-        guard let window = primaryWindow else { return }
+        guard let window = overlayWindow else { return }
         characterBody?.position = windowLocalPoint
         clickThroughController?.updateCharacter(
             screenPosition: globalAppKitPoint(fromWindowLocal: windowLocalPoint, window: window),

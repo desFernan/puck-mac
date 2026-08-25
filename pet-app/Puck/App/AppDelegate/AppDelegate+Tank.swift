@@ -40,12 +40,15 @@ extension AppDelegate {
         // travels at is worked out from it -- see `tankScale`.
         lastTankSize = rect.map { CGSize(width: $0.width, height: $0.height) }
         petTankArea = rect.flatMap { wire in
-            guard let window = primaryWindow, let space = screenManager?.current else { return nil }
+            guard let window = overlayWindow, let space = screenManager?.current else { return nil }
             let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
             return PetTankArea.roamableArea(
                 fromWire: wire,
                 overlayOriginInQuartz: origin,
-                overlaySize: groundAwareSize(of: window),
+                // The whole window, Dock and menu bar included: this is only
+                // asking what part of the island the overlay can draw on, and
+                // the island is a window's, not the desktop's.
+                overlaySize: window.frame.size,
                 petSize: CGSize(
                     width: baseHitboxSize.width * self.tankScale,
                     height: baseHitboxSize.height * self.tankScale
@@ -59,9 +62,9 @@ extension AppDelegate {
         // dragged or resized client window while the pet is already home
         // would otherwise never reach roamableArea again. The pet isn't
         // going anywhere -- the room around it moved -- so no fade.
-        if let tank = petTankArea, desktopRoamableArea != nil,
+        if let tank = petTankArea, desktopRoamableAreas != nil,
            let controller = characterController, let body = characterBody {
-            controller.roamableArea = tank
+            controller.roamableAreas = [tank]
             body.position = ScreenBounds.contain(
                 CGPoint(x: body.position.x, y: tank.maxY),
                 visualBounds: body.visualBounds,
@@ -92,7 +95,7 @@ extension AppDelegate {
     /// the whole point of putting the lever there is watching what it does.
     func applyPetIslandHeight(_ height: Double) {
         Self.tankPetHeight = CGFloat(height)
-        guard desktopRoamableArea != nil, let controller = characterController else { return }
+        guard desktopRoamableAreas != nil, let controller = characterController else { return }
         // The size a trip in progress is heading for, so a drag during the
         // flight home lands at the size that was chosen rather than the one
         // chosen before it: the trip lerps toward this every frame, and
@@ -103,7 +106,7 @@ extension AppDelegate {
         // The area was measured against the old size; a pet that just grew
         // would be standing through the floor of it.
         if let tank = petTankArea, let body = characterBody {
-            controller.roamableArea = tank
+            controller.roamableAreas = [tank]
             body.position = ScreenBounds.contain(
                 CGPoint(x: body.position.x, y: tank.maxY),
                 visualBounds: body.visualBounds,
@@ -126,14 +129,14 @@ extension AppDelegate {
         // A shelf a few pets wide, in the window being looked at: the pet
         // potters about on it rather than keeping the desktop's slower beat.
         idleState.pace = .island
-        if desktopRoamableArea == nil {
-            desktopRoamableArea = controller.roamableArea
+        if desktopRoamableAreas == nil {
+            desktopRoamableAreas = controller.roamableAreas
             desktopAvatarScale = currentAvatarScale
         }
         carryPet(
             of: controller,
             to: CGPoint(x: tank.midX, y: tank.maxY),
-            arrivingIn: tank,
+            arrivingIn: [tank],
             scale: tankScale
         )
     }
@@ -148,21 +151,25 @@ extension AppDelegate {
     /// and the memory of having been home cleared, without which the pet
     /// stays island-sized on the desktop forever and can never leave again.
     func leaveTankAfterDisplayChange() {
-        guard desktopRoamableArea != nil else { return }
+        guard desktopRoamableAreas != nil else { return }
         cancelWander()
-        desktopRoamableArea = nil
+        desktopRoamableAreas = nil
         idleState.pace = .desktop
         applyLiveAvatarScale(desktopAvatarScale)
     }
 
     func sendPetToDesktop() {
-        guard let controller = characterController, let desktop = desktopRoamableArea else { return }
+        guard let controller = characterController, let desktop = desktopRoamableAreas else { return }
         cancelWander()
         idleState.pace = .desktop
-        desktopRoamableArea = nil
+        desktopRoamableAreas = nil
+        // Onto the display the pet came from, not the middle of the box
+        // around every display -- that point can be on no screen at all.
+        let home = ScreenGround.area(at: characterBody?.position ?? .zero, in: desktop)
+            ?? ScreenGround.union(desktop)
         carryPet(
             of: controller,
-            to: CGPoint(x: desktop.midX, y: desktop.maxY),
+            to: CGPoint(x: home.midX, y: home.maxY),
             arrivingIn: desktop,
             scale: desktopAvatarScale
         )
@@ -219,7 +226,7 @@ extension AppDelegate {
     private func carryPet(
         of controller: CharacterController,
         to destination: CGPoint,
-        arrivingIn area: CGRect,
+        arrivingIn areas: [CGRect],
         scale: Double
     ) {
         guard let body = characterBody else { return }
@@ -239,8 +246,8 @@ extension AppDelegate {
             let target = self.travelTargetScale
             self.applyLiveAvatarScale(departingScale + (target - departingScale) * progress)
         }
-        travelState.onArrival = { controller.roamableArea = area }
-        controller.roamableArea = controller.roamableArea.union(area)
+        travelState.onArrival = { controller.roamableAreas = areas }
+        controller.roamableAreas = controller.roamableAreas + areas
         controller.transition(to: .travel)
     }
 }

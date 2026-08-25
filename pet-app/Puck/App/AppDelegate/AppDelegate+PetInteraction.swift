@@ -150,7 +150,7 @@ extension AppDelegate {
 
     /// Inverse of globalAppKitPoint(fromWindowLocal:window:).
     func windowLocalPoint(fromGlobalAppKit point: CGPoint) -> CGPoint {
-        guard let window = primaryWindow else { return point }
+        guard let window = overlayWindow else { return point }
         return CGPoint(x: point.x - window.frame.origin.x, y: window.frame.height - (point.y - window.frame.origin.y))
     }
 }
