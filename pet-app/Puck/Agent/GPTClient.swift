@@ -71,6 +71,24 @@ struct GPTToolSpec {
     let name: String
     let description: String
     let parameters: [ToolRegistry.Parameter]
+
+    /// The JSON Schema object both providers wrap: the parameter table, and
+    /// which of them are required.
+    ///
+    /// One definition rather than one per client. The two differ only in the
+    /// envelope they put this in -- Anthropic's `input_schema`, OpenAI's
+    /// nested `function.parameters` -- and each had built the identical
+    /// dictionary itself, so a third parameter type would have had to be
+    /// taught to both.
+    var jsonSchema: [String: Any] {
+        var properties: [String: Any] = [:]
+        var required: [String] = []
+        for parameter in parameters {
+            properties[parameter.name] = ["type": parameter.type.rawValue]
+            if parameter.isRequired { required.append(parameter.name) }
+        }
+        return ["type": "object", "properties": properties, "required": required]
+    }
 }
 
 enum GPTError: LocalizedError {
@@ -268,22 +286,12 @@ final class GPTClient: AgentLLMClient {
     }
 
     private static func encode(_ tool: GPTToolSpec) -> [String: Any] {
-        var properties: [String: Any] = [:]
-        var required: [String] = []
-        for parameter in tool.parameters {
-            properties[parameter.name] = ["type": parameter.type.rawValue]
-            if parameter.isRequired { required.append(parameter.name) }
-        }
-        return [
+        [
             "type": "function",
             "function": [
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": [
-                    "type": "object",
-                    "properties": properties,
-                    "required": required,
-                ],
+                "parameters": tool.jsonSchema,
             ],
         ]
     }

@@ -252,20 +252,10 @@ final class ClaudeClient: AgentLLMClient {
     }
 
     private static func encode(_ tool: GPTToolSpec) -> [String: Any] {
-        var properties: [String: Any] = [:]
-        var required: [String] = []
-        for parameter in tool.parameters {
-            properties[parameter.name] = ["type": parameter.type.rawValue]
-            if parameter.isRequired { required.append(parameter.name) }
-        }
-        return [
+        [
             "name": tool.name,
             "description": tool.description,
-            "input_schema": [
-                "type": "object",
-                "properties": properties,
-                "required": required,
-            ],
+            "input_schema": tool.jsonSchema,
         ]
     }
 
