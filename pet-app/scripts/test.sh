@@ -12,6 +12,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Before anything is built: a file added to a folder PuckClient sources one
+# file at a time is absent from that app and nothing else notices. Checked
+# first because it reads only project.yml and the tree, and a build that is
+# going to be wrong should not take ten minutes to say so.
+scripts/check-client-sources.py
+
 # Puck.xcodeproj is generated from project.yml and deliberately untracked (it
 # embeds a per-developer DEVELOPMENT_TEAM), so a fresh clone -- CI included --
 # has no project to test until xcodegen has run.
