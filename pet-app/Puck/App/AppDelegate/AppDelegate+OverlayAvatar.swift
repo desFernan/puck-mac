@@ -305,10 +305,7 @@ extension AppDelegate {
     /// Dock isn't actually shown at all (NSScreen.visibleFrame reports no
     /// Dock inset there). Space switches don't fire
     /// didChangeScreenParametersNotification (that's for real display
-    /// reconfiguration), so this needs its own observer. IdleState's existing
-    /// "supporting surface disappeared" check then naturally settles the pet
-    /// onto the new, taller floor if the pet happens to be resting when the
-    /// Space changes.
+    /// reconfiguration), so this needs its own observer.
     func setUpSpaceChangeObserving() {
         spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
@@ -326,7 +323,26 @@ extension AppDelegate {
         // island, and handing it the displays back would take it out of the
         // glass without anything moving it there.
         guard desktopRoamableAreas == nil, let controller = characterController else { return }
+        // A fullscreen Space gives back the Dock's height, so the floor drops
+        // by that much and a pet standing on the old one is left in mid-air --
+        // the same thing a display change does, for a different reason. This
+        // used to be left to IdleState noticing the gap, which is only true of
+        // a pet that happens to be resting.
+        let body = characterBody
+        let floorBefore = body.map { controller.area(at: $0.position).maxY }
         controller.roamableAreas = screenWorkAreas
+        // Only a pet that was standing on the floor that just moved. Unlike a
+        // display change, a Space switch does not rebuild the world -- window
+        // tops are where they were, and a pet in mid-air (falling, thrown,
+        // chasing a ball) is somewhere it means to be. Cmd-tabbing into a
+        // fullscreen app must not drop it out of the sky.
+        guard let body, let floorBefore,
+              WindowSupport.stands(body.position, on: floorBefore),
+              !petHoldsSomethingOtherThanTheGround
+        else {
+            return
+        }
+        body.position = placement(in: controller.roamableAreas)
     }
 
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
@@ -363,16 +379,7 @@ extension AppDelegate {
         // standing on the line the old floor was on, in mid-air. Idle notices
         // that a frame later and falls; Walk does not notice at all, so the
         // pet strides along a floor that is not there until it stops.
-        let was = characterBody?.position ?? .zero
-        let outline = characterBody?.visualBounds ?? .zero
-        let position: CGPoint
-        if petHoldsSomethingOtherThanTheGround {
-            position = ScreenGround.standable(was, visualBounds: outline, in: desktop)
-        } else {
-            position = ScreenGround.standable(was, visualBounds: outline, in: desktop) { [weak self] point in
-                self?.characterController?.landingY(point) ?? point.y
-            }
-        }
+        let position = placement(in: desktop)
         // OverlayWindowController always orderFrontRegardless()s a freshly
         // rebuilt window -- a display change (monitor plug/unplug) shouldn't
         // silently un-hide a pet the user explicitly hid.
@@ -395,6 +402,18 @@ extension AppDelegate {
         // clicking the pet silently stops working after a display change.
         clickThroughController?.stopMonitoring()
         clickThroughController = makeClickThroughController(window: window, screenPosition: position)
+    }
+
+    /// Where the pet belongs once `areas` have been re-measured.
+    private func placement(in areas: [CGRect]) -> CGPoint {
+        let was = characterBody?.position ?? .zero
+        let outline = characterBody?.visualBounds ?? .zero
+        guard !petHoldsSomethingOtherThanTheGround else {
+            return ScreenGround.standable(was, visualBounds: outline, in: areas)
+        }
+        return ScreenGround.standable(was, visualBounds: outline, in: areas) { [weak self] point in
+            self?.characterController?.landingY(point) ?? point.y
+        }
     }
 
     /// Whether the pet is hanging onto something that is not underneath it,

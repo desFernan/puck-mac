@@ -55,6 +55,11 @@ enum WindowSupport {
         return CGPoint(x: min(max(position.x, left), right), y: window.frame.minY)
     }
 
+    /// Whether the pet's feet are on `surfaceY` rather than above or below it.
+    static func stands(_ position: CGPoint, on surfaceY: CGFloat) -> Bool {
+        abs(position.y - surfaceY) <= footTolerance
+    }
+
     /// The frontmost window whose top edge the pet is standing on.
     static func supportingWindow(under position: CGPoint, in windows: [WindowInfo]) -> WindowInfo? {
         windows.first { window in
