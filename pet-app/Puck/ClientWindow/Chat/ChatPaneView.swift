@@ -235,6 +235,12 @@ struct ChatPaneView: View {
                 .help(Strings.text(.explorerTabFiles))
             }
         }
+        // Beside the other two view toggles, because that is what it is: the
+        // island is a part of this window, and folding it down is the same
+        // kind of act as hiding the editor.
+        ToolbarItem {
+            IslandFoldButton(onPetHeightChange: { store.setPetIslandHeight($0) })
+        }
         ToolbarItem {
             Button {
                 NSApp.sendAction(NSSelectorFromString("showSettings:"), to: nil, from: nil)
