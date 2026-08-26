@@ -42,6 +42,16 @@ struct PetTankView: View {
     /// the pet in an island it does not fit in.
     @AppStorage(PetTankView.heightStorageKey) private var storedHeight = Double(PetTankView.islandHeight)
 
+    /// Whether the island is folded down to its band. Remembered, because it
+    /// is a choice about how much of the window the pet is allowed rather
+    /// than a thing you do to look at something once.
+    @AppStorage(PetTankView.collapsedStorageKey) private var isCollapsed = false
+
+    /// Read here as well as in the slider, so folding the island back open
+    /// can hand the pet its size back without waiting for the slider to be
+    /// rebuilt and say so itself.
+    @AppStorage(PetTankView.petHeightStorageKey) private var storedPetHeight = PetTankView.defaultPetHeight
+
     /// What each drag is working from, captured once when the gesture starts
     /// so it measures against where it began rather than against the value it
     /// is itself changing.
@@ -65,6 +75,27 @@ struct PetTankView: View {
 
     private var islandHeight: CGFloat {
         Self.clamped(storedHeight, from: Self.minimumIslandHeight, to: maximumHeight)
+    }
+
+    /// How tall the island is drawn right now: the height it was dragged to,
+    /// or the band it folds down to.
+    private var shownHeight: CGFloat {
+        isCollapsed ? Self.collapsedHeight : islandHeight
+    }
+
+    /// A folded island does not climb into the toolbar's band. The shoulder
+    /// exists to fill a strip of nothing across the top of the window; folded
+    /// down, the island is that strip, and a shoulder on it would be a raised
+    /// edge on something one line tall.
+    private var shownRise: CGFloat { isCollapsed ? 0 : Self.shoulderRise }
+
+    private var shownLift: CGFloat { isCollapsed ? 0 : Self.baseLift }
+
+    /// Half the height when folded, which is what makes it a capsule: the
+    /// shape clamps its own radius to half the rect, so asking for more than
+    /// that rounds the ends off completely.
+    private var shownCornerRadius: CGFloat {
+        isCollapsed ? Self.collapsedHeight / 2 : Self.cornerRadius
     }
 
     /// This island's own limit -- see the static behind it. Recomputed rather
@@ -143,10 +174,24 @@ struct PetTankView: View {
         return min(maximumIslandHeight, max(minimumIslandHeight, sharpest))
     }
 
+    /// What the island folds down to: a band the width of the window with a
+    /// pet walking along it. Chosen against the pet rather than by eye -- it
+    /// has to hold `collapsedPetHeight` with air above the pet's head, and
+    /// pet-app refuses a tank shorter than the pet standing in it.
+    static let collapsedHeight: CGFloat = 26
+
+    /// How tall the pet stands on the band. Small enough that the band reads
+    /// as a line the pet walks along rather than as a short island.
+    static let collapsedPetHeight: Double = 16
+
     /// Its own key, not the background's: how tall someone wants the shelf is
     /// not which mood they picked, and one changing should not reset the
     /// other.
     static let heightStorageKey = "Puck.islandHeight"
+
+    /// Folded or not. Separate from the height so that folding and unfolding
+    /// gives back the island someone had, not the default one.
+    static let collapsedStorageKey = "Puck.islandCollapsed"
 
     /// How far the island floats from the window's own edges. Was 20 on each
     /// side, which read as a gap rather than as the island floating: the strip
@@ -200,8 +245,8 @@ struct PetTankView: View {
         // it, not a highlight.
         GeometryReader { proxy in
             let shape = IslandShape(
-                cornerRadius: Self.cornerRadius,
-                rise: Self.shoulderRise,
+                cornerRadius: shownCornerRadius,
+                rise: shownRise,
                 shoulderStart: shoulderStart(in: proxy)
             )
             ZStack(alignment: .bottom) {
@@ -221,13 +266,17 @@ struct PetTankView: View {
             // them. Softer than a card's: the island is a shelf, not a dialog.
             .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
         }
-        .frame(height: islandHeight + Self.shoulderRise + Self.baseLift)
-        // The grab area for resizing, on the edge it moves.
-        .overlay(alignment: .bottom) { resizeHandle }
+        .frame(height: shownHeight + shownRise + shownLift)
+        // The grab area for resizing, on the edge it moves. Nothing to drag
+        // while the island is folded: the band is one size, and dragging it
+        // taller is what unfolding is for.
+        .overlay(alignment: .bottom) {
+            if !isCollapsed { resizeHandle }
+        }
         // Up the left edge, the height of the island it sizes the pet for,
         // and clear of the toolbar's band -- which takes every click in it.
         .overlay(alignment: .bottomLeading) {
-            if let onPetHeightChange {
+            if let onPetHeightChange, !isCollapsed {
                 PetSizeSlider(
                     length: max(24, islandHeight - PetSizeSlider.inset * 2),
                     onChange: onPetHeightChange
@@ -236,20 +285,28 @@ struct PetTankView: View {
                 .padding(.bottom, PetSizeSlider.inset)
             }
         }
+        // At the far end, where it is out of the pet's way and does not move
+        // when the island is folded -- the one control that has to be
+        // reachable in both shapes.
+        .overlay(alignment: .bottomTrailing) { foldToggle }
         // Reported from the island's floor rather than its outline: the pet's
         // world is the part it can stand in, and the raised shoulder is a
         // shape, not a room. A frame taken from the padded box would also let
         // it stand in the gap on either side.
         .overlay(alignment: .bottom) {
             Color.clear
-                .frame(height: islandHeight)
+                .frame(height: shownHeight)
                 // Measured *inside* the inset, not outside it. A background
                 // is sized to the view it is attached to, so reporting after
                 // the padding reported the full width and the strip was never
                 // actually kept clear -- the pet went on standing on the bar
                 // and taking the drags meant for it.
                 .background(PaneFrameReporter(onChange: onFrameChange))
-                .padding(.leading, onPetHeightChange == nil ? 0 : PetSizeSlider.footprint)
+                .padding(.leading, onPetHeightChange == nil || isCollapsed ? 0 : PetSizeSlider.footprint)
+                // The same reasoning as the slider's: the pet is drawn by the
+                // window above this one, so a pet standing on the fold button
+                // takes the clicks meant for it.
+                .padding(.trailing, Self.foldFootprint)
                 .allowsHitTesting(false)
         }
     }
@@ -272,8 +329,13 @@ struct PetTankView: View {
             // are placed by arithmetic instead of by layout.
             Canvas { context, size in
                 let image = context.resolve(Image(nsImage: artwork))
-                for tile in Self.tiles(across: size, aspect: TankArtwork.aspect(artwork)) {
-                    context.draw(image, in: tile)
+                let aspect = TankArtwork.aspect(artwork)
+                if isCollapsed {
+                    context.draw(image, in: Self.band(across: size, aspect: aspect))
+                } else {
+                    for tile in Self.tiles(across: size, aspect: aspect) {
+                        context.draw(image, in: tile)
+                    }
                 }
             }
             // Frosting, not Liquid Glass. The real material was tried here
@@ -351,6 +413,24 @@ struct PetTankView: View {
         }
     }
 
+    /// The picture in a folded island: one copy, as wide as the band, with
+    /// the seabed at the bottom of it showing through.
+    ///
+    /// The opposite rule to `tiles`, for the opposite reason. Scaling by
+    /// height is what keeps the whole scene in frame, and at a band's height
+    /// that costs a copy of the scene every couple of hundred points -- nine
+    /// lighthouses across a window, which reads as a patterned rule rather
+    /// than as the pet's water. Folded, a slice is the honest thing to show,
+    /// and the slice worth showing is the one the pet is standing on.
+    static func band(across size: CGSize, aspect: CGFloat) -> CGRect {
+        guard size.width > 0, size.height > 0, aspect > 0 else { return .zero }
+        // As tall as one copy would be at this width -- taller than the band,
+        // which is the point: what hangs off the top is the water above the
+        // sand.
+        let drawn = size.width / aspect
+        return CGRect(x: 0, y: size.height - drawn, width: size.width, height: drawn)
+    }
+
     /// How far each copy reaches under the next one -- see `tiles`.
     static let tileOverlap: CGFloat = 0.5
 
@@ -364,6 +444,49 @@ struct PetTankView: View {
     private func shoulderStart(in proxy: GeometryProxy) -> CGFloat {
         guard let toolbarTrailingX else { return .greatestFiniteMagnitude }
         return toolbarTrailingX + Self.shoulderGap - proxy.frame(in: .global).minX
+    }
+
+    /// How wide the button and its air are, across the island. The pet is
+    /// kept out of this strip the same way it is kept out of the slider's.
+    static let foldFootprint: CGFloat = foldButtonSize + 12
+
+    static let foldButtonSize: CGFloat = 18
+
+    /// Folds the island down to a band, and back.
+    ///
+    /// The pet's size goes with it, because it has to: pet-app refuses a tank
+    /// shorter than the pet standing in it, and a refusal is silent from the
+    /// outside -- the pet just stays on the desktop and the button looks
+    /// broken. Folding therefore hands over `collapsedPetHeight`, and
+    /// unfolding hands back the size the slider had, clamped to the island it
+    /// is coming back to.
+    private var foldToggle: some View {
+        Button {
+            isCollapsed.toggle()
+            onPetHeightChange?(CGFloat(petHeightForCurrentShape))
+        } label: {
+            Image(systemName: isCollapsed ? "chevron.up" : "chevron.down")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(palette.textSecondary)
+                .frame(width: Self.foldButtonSize, height: Self.foldButtonSize)
+                .background(Circle().fill(palette.background.opacity(0.55)))
+                .overlay(Circle().strokeBorder(palette.surfaceBorder.opacity(0.75), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, 8)
+        // Centred in the band when folded, and level with the resize grip
+        // when not -- both times, on the island rather than over its edge.
+        .padding(.bottom, isCollapsed ? (Self.collapsedHeight - Self.foldButtonSize) / 2 : PetSizeSlider.inset)
+        .accessibilityLabel(Strings.text(isCollapsed ? .islandUnfold : .islandFold))
+        .help(Strings.text(isCollapsed ? .islandUnfold : .islandFold))
+    }
+
+    /// The pet's height for the shape the island is in now.
+    private var petHeightForCurrentShape: Double {
+        guard !isCollapsed else { return Self.collapsedPetHeight }
+        // The same ceiling the slider draws itself against, so unfolding
+        // cannot ask for a pet the island it is opening to cannot hold.
+        return min(storedPetHeight, Double(islandHeight) - Self.petHeadroom)
     }
 
     /// Drag the bottom edge to make the shelf taller or shorter.
@@ -412,17 +535,19 @@ struct PetTankView: View {
             // *inside* the strip would push the conversation down by the
             // height of a decoration.
             .frame(
-                height: Self.stripHeight(island: islandHeight) + Self.shoulderRise + Self.baseLift,
+                height: Self.stripHeight(island: shownHeight) + shownRise + shownLift,
                 alignment: .bottom
             )
-            .padding(.top, -(Self.shoulderRise + Self.baseLift))
+            .padding(.top, -(shownRise + shownLift))
         // Nothing behind the island: it floats in the window's own ground.
         // A backdrop the colour of the picture filled the strip edge to edge
         // and the island lost its outline in it.
         //
-        // One element, so the decoration inside it is not announced piece by
-        // piece -- there is nothing in here to operate any more.
-        .accessibilityElement()
-        .accessibilityLabel(Strings.text(.islandPetSize))
+        // `.contain`, not a leaf: the decoration inside is not worth
+        // announcing piece by piece, but the fold button and the size slider
+        // are controls, and a leaf element would take them out of the tree
+        // altogether. No label of its own -- a container named after one of
+        // the two things inside it is worse than an unnamed group.
+        .accessibilityElement(children: .contain)
     }
 }

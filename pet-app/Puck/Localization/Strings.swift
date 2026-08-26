@@ -142,6 +142,8 @@ enum L10nKey: String, CaseIterable, Hashable {
     case chatAttachEditorHelp, chatDetachEditorHelp
     case islandResize
     case islandPetSize
+    case islandFold
+    case islandUnfold
     case terminalTitle
     case terminalToggle
     case terminalHide
@@ -399,6 +401,8 @@ enum Strings {
         .failedToSetEmotionFormat: "'%1$@' 설정 실패: %2$@",
         .islandResize: "섬 높이 조절",
         .islandPetSize: "펫 크기 조절",
+        .islandFold: "섬 접기",
+        .islandUnfold: "섬 펴기",
         .terminalTitle: "터미널",
         .terminalToggle: "터미널 (⌃`)",
         .terminalHide: "터미널 닫기",
@@ -745,6 +749,8 @@ enum Strings {
         .failedToSetEmotionFormat: "Couldn't set '%1$@': %2$@",
         .islandResize: "Resize the island",
         .islandPetSize: "Resize the pet",
+        .islandFold: "Fold the island down",
+        .islandUnfold: "Unfold the island",
         .terminalTitle: "Terminal",
         .terminalToggle: "Terminal (⌃`)",
         .terminalHide: "Hide the terminal",

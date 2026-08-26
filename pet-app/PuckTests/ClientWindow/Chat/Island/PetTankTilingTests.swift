@@ -118,4 +118,44 @@ final class PetTankTilingTests: XCTestCase {
         XCTAssertTrue(PetTankView.tiles(across: CGSize(width: 0, height: 90), aspect: aspect).isEmpty)
         XCTAssertTrue(PetTankView.tiles(across: CGSize(width: 800, height: 0), aspect: aspect).isEmpty)
     }
+
+    // MARK: - The folded band
+
+    private func band(width: CGFloat) -> CGRect {
+        PetTankView.band(
+            across: CGSize(width: width, height: PetTankView.collapsedHeight),
+            aspect: aspect
+        )
+    }
+
+    /// One copy, not nine. Scaling by height at a band's height repeats the
+    /// scene every couple of hundred points, which reads as a patterned rule.
+    func testTheBandIsOneCopyAsWideAsTheIsland() {
+        let drawn = band(width: 1600)
+
+        XCTAssertEqual(drawn.minX, 0)
+        XCTAssertEqual(drawn.width, 1600)
+    }
+
+    /// What the band shows is the bottom of the scene -- the sand the pet
+    /// stands on. The water above it hangs off the top and is clipped away.
+    func testTheBandShowsTheBottomOfTheScene() {
+        let drawn = band(width: 1600)
+
+        XCTAssertEqual(drawn.maxY, PetTankView.collapsedHeight, "the picture's floor is the band's floor")
+        XCTAssertLessThan(drawn.minY, 0, "and the rest of the scene is above the band, clipped")
+    }
+
+    /// The picture keeps its shape: a band is a crop of the scene, never a
+    /// squashed copy of the whole of it.
+    func testTheBandKeepsThePicturesAspect() {
+        let drawn = band(width: 1600)
+
+        XCTAssertEqual(drawn.width / drawn.height, aspect, accuracy: 0.0001)
+    }
+
+    func testNothingToDrawInAnEmptyBand() {
+        XCTAssertEqual(PetTankView.band(across: CGSize(width: 0, height: 26), aspect: aspect), .zero)
+        XCTAssertEqual(PetTankView.band(across: CGSize(width: 800, height: 0), aspect: aspect), .zero)
+    }
 }
