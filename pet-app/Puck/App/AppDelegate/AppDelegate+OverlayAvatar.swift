@@ -356,12 +356,23 @@ extension AppDelegate {
         let desktop = screenWorkAreas
         characterController?.roamableAreas = desktop
         // Onto the nearest display that still exists -- which is the whole
-        // point on the day a monitor is unplugged with the pet on it.
-        let position = ScreenGround.standable(
-            characterBody?.position ?? .zero,
-            visualBounds: characterBody?.visualBounds ?? .zero,
-            in: desktop
-        )
+        // point on the day a monitor is unplugged with the pet on it. A pet
+        // that was standing on something is put down on the re-measured
+        // surface under it as well: being back inside the new area is not the
+        // same as being on its floor, and a screen that grew leaves the pet
+        // standing on the line the old floor was on, in mid-air. Idle notices
+        // that a frame later and falls; Walk does not notice at all, so the
+        // pet strides along a floor that is not there until it stops.
+        let was = characterBody?.position ?? .zero
+        let outline = characterBody?.visualBounds ?? .zero
+        let position: CGPoint
+        if petHoldsSomethingOtherThanTheGround {
+            position = ScreenGround.standable(was, visualBounds: outline, in: desktop)
+        } else {
+            position = ScreenGround.standable(was, visualBounds: outline, in: desktop) { [weak self] point in
+                self?.characterController?.landingY(point) ?? point.y
+            }
+        }
         // OverlayWindowController always orderFrontRegardless()s a freshly
         // rebuilt window -- a display change (monitor plug/unplug) shouldn't
         // silently un-hide a pet the user explicitly hid.
@@ -384,6 +395,25 @@ extension AppDelegate {
         // clicking the pet silently stops working after a display change.
         clickThroughController?.stopMonitoring()
         clickThroughController = makeClickThroughController(window: window, screenPosition: position)
+    }
+
+    /// Whether the pet is hanging onto something that is not underneath it,
+    /// and so must not be put down on the floor after a display change.
+    ///
+    /// The ceiling and a window's side are both "the surface below is not
+    /// where this pet is standing"; a pet in somebody's hand is not standing
+    /// anywhere at all, and one in mid-trip between the desktop and its tank
+    /// is being carried along a path of its own that a snap to the floor
+    /// would fight.
+    private var petHoldsSomethingOtherThanTheGround: Bool {
+        if characterBody?.isUpsideDown == true { return true }
+        guard let current = characterController?.currentState else { return false }
+        return current === climbState
+            || current === climbToCeilingState
+            || current === climbLedgeState
+            || current === ceilingState
+            || current === reactDragState
+            || current === travelState
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

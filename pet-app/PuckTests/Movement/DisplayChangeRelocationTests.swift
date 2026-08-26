@@ -57,4 +57,58 @@ final class DisplayChangeRelocationTests: XCTestCase {
 
         XCTAssertEqual(contained(CGPoint(x: 600, y: 400), in: shelf).y, shelf.maxY)
     }
+
+    // MARK: - Standing on the new surface
+
+    private func standing(
+        _ position: CGPoint,
+        in area: CGRect? = nil,
+        onSurfaceUnder surfaceY: @escaping (CGPoint) -> CGFloat
+    ) -> CGPoint {
+        DisplayChangeRelocation.standing(
+            position,
+            visualBounds: visualBounds,
+            in: area ?? screen,
+            onSurfaceUnder: surfaceY
+        )
+    }
+
+    /// The reported bug, the other way round from the one containment was
+    /// written for. A 900-tall display becomes a 1080-tall one; the pet is
+    /// inside the new area the moment it grows, so containment leaves it
+    /// exactly where it was -- standing on a line 180pt above the floor with
+    /// nothing under it.
+    func testATallerScreenPutsThePetDownOnTheNewFloor() {
+        let taller = CGRect(x: 0, y: 0, width: 1440, height: 1080)
+
+        let position = standing(CGPoint(x: 600, y: 900), in: taller) { _ in taller.maxY }
+
+        XCTAssertEqual(position.y, 1080, "the pet stands on the new floor, not the old one")
+        XCTAssertEqual(position.x, 600, "and keeps the place it had")
+    }
+
+    /// The surface, not the area's floor: what a pet stands on is a window
+    /// top as often as it is the bottom of the screen, and a display change
+    /// re-measures both.
+    func testThePetComesDownOnAWindowTopRatherThanThroughIt() {
+        let taller = CGRect(x: 0, y: 0, width: 1440, height: 1080)
+
+        let position = standing(CGPoint(x: 600, y: 900), in: taller) { _ in 1000 }
+
+        XCTAssertEqual(position.y, 1000)
+    }
+
+    /// A shorter screen still works the way it did: containment brings the
+    /// pet up onto the new floor, and the surface is asked about the position
+    /// it was brought to rather than the one it had off-screen.
+    func testAShorterScreenAsksAboutTheContainedPosition() {
+        var asked: CGPoint?
+        let position = standing(CGPoint(x: 1900, y: 1080)) { point in
+            asked = point
+            return point.y
+        }
+
+        XCTAssertEqual(asked, CGPoint(x: 1420, y: 900))
+        XCTAssertEqual(position, CGPoint(x: 1420, y: 900))
+    }
 }

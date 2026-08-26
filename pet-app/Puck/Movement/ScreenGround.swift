@@ -65,6 +65,25 @@ enum ScreenGround {
         return DisplayChangeRelocation.contained(position, visualBounds: visualBounds, in: area)
     }
 
+    /// The same, for a pet that was standing on something: on the nearest
+    /// display, and with its feet on whatever the re-measured world put under
+    /// it there. See DisplayChangeRelocation.standing for why being inside
+    /// the new area is not the same as standing on its floor.
+    static func standable(
+        _ position: CGPoint,
+        visualBounds: CGRect,
+        in areas: [CGRect],
+        onSurfaceUnder surfaceY: (CGPoint) -> CGFloat
+    ) -> CGPoint {
+        guard let area = nearestArea(to: position, in: areas) else { return position }
+        return DisplayChangeRelocation.standing(
+            position,
+            visualBounds: visualBounds,
+            in: area,
+            onSurfaceUnder: surfaceY
+        )
+    }
+
     /// Where the pet would stand after climbing the ledge in `directionX`,
     /// or nil if there is no display that way with a higher floor.
     ///
