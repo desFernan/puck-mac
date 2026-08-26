@@ -64,6 +64,19 @@ extension AppDelegate {
         // going anywhere -- the room around it moved -- so no fade.
         if let tank = petTankArea, desktopRoamableAreas != nil,
            let controller = characterController, let body = characterBody {
+            // The size as well as the room. `tankScale` fits the pet to the
+            // tank it is standing in, so a tank that changed shape changes the
+            // answer -- and the report of the new shape arrives after whoever
+            // changed it has already asked for a height. Folding the island
+            // down to its band and back is exactly that: the height for the
+            // open island was asked for while the band was still the last
+            // thing reported, fitted to the band, and never revisited, so the
+            // pet stayed band-sized on a full island. Not while a trip is
+            // running -- that lerps the scale itself, and this would fight it
+            // every frame.
+            if controller.currentState !== travelState {
+                applyLiveAvatarScale(tankScale)
+            }
             controller.roamableAreas = [tank]
             body.position = ScreenBounds.contain(
                 CGPoint(x: body.position.x, y: tank.maxY),
