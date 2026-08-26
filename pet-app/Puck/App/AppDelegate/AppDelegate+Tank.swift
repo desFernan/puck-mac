@@ -62,27 +62,33 @@ extension AppDelegate {
         // dragged or resized client window while the pet is already home
         // would otherwise never reach roamableArea again. The pet isn't
         // going anywhere -- the room around it moved -- so no fade.
-        if let tank = petTankArea, desktopRoamableAreas != nil,
-           let controller = characterController, let body = characterBody {
+        if let tank = petTankArea, desktopRoamableAreas != nil, let controller = characterController {
             // The size as well as the room. `tankScale` fits the pet to the
             // tank it is standing in, so a tank that changed shape changes the
             // answer -- and the report of the new shape arrives after whoever
             // changed it has already asked for a height. Folding the island
             // down to its band and back is exactly that: the height for the
             // open island was asked for while the band was still the last
-            // thing reported, fitted to the band, and never revisited, so the
-            // pet stayed band-sized on a full island. Not while a trip is
-            // running -- that lerps the scale itself, and this would fight it
-            // every frame.
-            if controller.currentState !== travelState {
+            // thing reported, fitted to the band, and never revisited.
+            if controller.currentState === travelState {
+                // A trip already in the air toward this tank. Retargeted
+                // rather than interrupted: writing the position and the area
+                // directly here would land the pet in a tank it is still
+                // flying to, and undo the widened area the trip needs to
+                // cross. The trip lerps toward this scale every frame, so it
+                // arrives at the size the tank it is arriving in can hold.
+                travelState.destination = CGPoint(x: tank.midX, y: tank.maxY)
+                travelState.onArrival = { controller.roamableAreas = [tank] }
+                travelTargetScale = tankScale
+            } else if let body = characterBody {
                 applyLiveAvatarScale(tankScale)
+                controller.roamableAreas = [tank]
+                body.position = ScreenBounds.contain(
+                    CGPoint(x: body.position.x, y: tank.maxY),
+                    visualBounds: body.visualBounds,
+                    in: tank
+                )
             }
-            controller.roamableAreas = [tank]
-            body.position = ScreenBounds.contain(
-                CGPoint(x: body.position.x, y: tank.maxY),
-                visualBounds: body.visualBounds,
-                in: tank
-            )
         }
     }
 
