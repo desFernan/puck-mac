@@ -172,10 +172,14 @@ struct PetTankView: View {
     }
 
     /// What the island folds down to: a band the width of the window with a
-    /// pet walking along it. Chosen against the pet rather than by eye -- it
-    /// has to hold `collapsedPetHeight` with air above the pet's head, and
-    /// pet-app refuses a tank shorter than the pet standing in it.
-    static let collapsedHeight: CGFloat = 26
+    /// pet walking along it.
+    ///
+    /// A toolbar button's height, because that is the row it sits in -- a band
+    /// beside the buttons that is not their height reads as a second row
+    /// rather than as part of theirs. It still has to hold
+    /// `collapsedPetHeight` with air above the pet's head: pet-app refuses a
+    /// tank shorter than the pet standing in it.
+    static let collapsedHeight: CGFloat = 28
 
     /// How tall the pet stands on the band. Small enough that the band reads
     /// as a line the pet walks along rather than as a short island.
@@ -320,7 +324,25 @@ struct PetTankView: View {
                 let image = context.resolve(Image(nsImage: artwork))
                 let aspect = TankArtwork.aspect(artwork)
                 if isCollapsed {
-                    context.draw(image, in: Self.band(across: size, aspect: aspect))
+                    for (index, tile) in Self.bandTiles(across: size, aspect: aspect).enumerated() {
+                        // Every other copy is drawn back to front, so each
+                        // join meets its own edge and there is no seam to
+                        // find. The open island never does this -- turning
+                        // the scene round puts two lighthouses face to face,
+                        // which reads as a mistake in a way a repeat does not
+                        // -- but a band shows sand and stones, and a stone
+                        // has no way round to be wrong about.
+                        if index.isMultiple(of: 2) {
+                            context.draw(image, in: tile)
+                        } else {
+                            context.drawLayer { copy in
+                                copy.translateBy(x: tile.midX, y: 0)
+                                copy.scaleBy(x: -1, y: 1)
+                                copy.translateBy(x: -tile.midX, y: 0)
+                                copy.draw(image, in: tile)
+                            }
+                        }
+                    }
                 } else {
                     for tile in Self.tiles(across: size, aspect: aspect) {
                         context.draw(image, in: tile)
@@ -402,22 +424,38 @@ struct PetTankView: View {
         }
     }
 
-    /// The picture in a folded island: one copy, as wide as the band, with
-    /// the seabed at the bottom of it showing through.
+    /// How much of the picture's height a folded band shows: the seabed at
+    /// the bottom of it, and none of the water above.
     ///
-    /// The opposite rule to `tiles`, for the opposite reason. Scaling by
-    /// height is what keeps the whole scene in frame, and at a band's height
-    /// that costs a copy of the scene every couple of hundred points -- nine
-    /// lighthouses across a window, which reads as a patterned rule rather
-    /// than as the pet's water. Folded, a slice is the honest thing to show,
-    /// and the slice worth showing is the one the pet is standing on.
-    static func band(across size: CGSize, aspect: CGFloat) -> CGRect {
-        guard size.width > 0, size.height > 0, aspect > 0 else { return .zero }
-        // As tall as one copy would be at this width -- taller than the band,
-        // which is the point: what hangs off the top is the water above the
-        // sand.
-        let drawn = size.width / aspect
-        return CGRect(x: 0, y: size.height - drawn, width: size.width, height: drawn)
+    /// A band is too short to hold a scene. Fitting the whole of one into it
+    /// costs a copy every couple of hundred points -- nine lighthouses across
+    /// a window, which reads as a patterned rule -- and stretching a single
+    /// copy the width of the window blows the stones up to the size of the
+    /// pet. Showing a slice and repeating *that* is what a band wants: sand
+    /// and stones are a texture, and a texture is the one thing that repeats
+    /// without anybody noticing.
+    static let bandCrop: CGFloat = 0.28
+
+    /// The picture laid end to end across a folded band, cropped to its
+    /// seabed and scaled to fill.
+    ///
+    /// Each copy is drawn taller than the band and anchored to its floor, so
+    /// what hangs off the top -- the open water and the sky above it -- is
+    /// clipped away and the sand lands on the sand.
+    static func bandTiles(across size: CGSize, aspect: CGFloat) -> [CGRect] {
+        guard size.width > 0, size.height > 0, aspect > 0, bandCrop > 0 else { return [] }
+        let drawn = size.height / bandCrop
+        let unit = max(drawn * aspect, 1)
+        let copies = max(Int(ceil(size.width / unit)), 1)
+        let start = (size.width - unit * CGFloat(copies)) / 2
+        return (0..<copies).map { index in
+            CGRect(
+                x: start + unit * CGFloat(index),
+                y: size.height - drawn,
+                width: unit + Self.tileOverlap,
+                height: drawn
+            )
+        }
     }
 
     /// How far each copy reaches under the next one -- see `tiles`.
@@ -471,7 +509,9 @@ struct PetTankView: View {
             .help(Strings.text(.islandResize))
     }
 
-    var body: some View {
+    /// The island at its full height: a strip across the top of the pane,
+    /// with the shoulder drawn outside it.
+    private var openIsland: some View {
         island
             .padding(.horizontal, Self.horizontalInset)
             .padding(.vertical, Self.verticalInset)
@@ -481,10 +521,49 @@ struct PetTankView: View {
             // *inside* the strip would push the conversation down by the
             // height of a decoration.
             .frame(
-                height: Self.stripHeight(island: shownHeight) + shownRise + shownLift,
+                height: Self.stripHeight(island: shownHeight) + Self.shoulderRise + Self.baseLift,
                 alignment: .bottom
             )
-            .padding(.top, -(shownRise + shownLift))
+            .padding(.top, -(Self.shoulderRise + Self.baseLift))
+    }
+
+    /// The folded island, up in the toolbar's own row beside its buttons.
+    ///
+    /// Not in a row of its own below them, which is where it landed first: the
+    /// band is a line the pet walks along, the toolbar is already a band with
+    /// nothing in the half past its buttons, and two thin rows stacked on each
+    /// other is a thicker top than the island it replaced.
+    ///
+    /// It sits exactly where the open island's raised shoulder sits -- the
+    /// same line, so folding and unfolding do not move the top edge of the
+    /// pet's world. Zero height in the layout, so the conversation gets the
+    /// whole strip back rather than being pushed down by a line.
+    private var foldedBand: some View {
+        GeometryReader { proxy in
+            island
+                .padding(.leading, bandStart(in: proxy))
+                .padding(.trailing, Self.horizontalInset)
+                .padding(.vertical, Self.verticalInset)
+        }
+        .frame(height: Self.shoulderRise + Self.baseLift, alignment: .top)
+        .padding(.top, -(Self.shoulderRise + Self.baseLift))
+    }
+
+    /// Where the band begins: past the toolbar's last button, with the same
+    /// gap the shoulder leaves. The whole width when nothing has measured the
+    /// toolbar yet, which is one layout pass at most.
+    private func bandStart(in proxy: GeometryProxy) -> CGFloat {
+        guard let toolbarTrailingX else { return Self.horizontalInset }
+        return max(
+            Self.horizontalInset,
+            toolbarTrailingX + Self.shoulderGap - proxy.frame(in: .global).minX
+        )
+    }
+
+    var body: some View {
+        Group {
+            if isCollapsed { foldedBand } else { openIsland }
+        }
         // Nothing behind the island: it floats in the window's own ground.
         // A backdrop the colour of the picture filled the strip edge to edge
         // and the island lost its outline in it.

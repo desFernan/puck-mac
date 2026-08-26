@@ -121,41 +121,50 @@ final class PetTankTilingTests: XCTestCase {
 
     // MARK: - The folded band
 
-    private func band(width: CGFloat) -> CGRect {
-        PetTankView.band(
+    private func bandTiles(width: CGFloat) -> [CGRect] {
+        PetTankView.bandTiles(
             across: CGSize(width: width, height: PetTankView.collapsedHeight),
             aspect: aspect
         )
     }
 
-    /// One copy, not nine. Scaling by height at a band's height repeats the
-    /// scene every couple of hundred points, which reads as a patterned rule.
-    func testTheBandIsOneCopyAsWideAsTheIsland() {
-        let drawn = band(width: 1600)
-
-        XCTAssertEqual(drawn.minX, 0)
-        XCTAssertEqual(drawn.width, 1600)
+    /// The band shows the bottom of the scene -- the sand the pet stands on.
+    /// The water above it hangs off the top and is clipped away.
+    func testEveryCopySitsOnTheBandsFloorWithTheRestAbove() {
+        for tile in bandTiles(width: 1600) {
+            XCTAssertEqual(tile.maxY, PetTankView.collapsedHeight, accuracy: 0.0001)
+            XCTAssertLessThan(tile.minY, 0, "the water above the sand is clipped, not squashed in")
+        }
     }
 
-    /// What the band shows is the bottom of the scene -- the sand the pet
-    /// stands on. The water above it hangs off the top and is clipped away.
-    func testTheBandShowsTheBottomOfTheScene() {
-        let drawn = band(width: 1600)
-
-        XCTAssertEqual(drawn.maxY, PetTankView.collapsedHeight, "the picture's floor is the band's floor")
-        XCTAssertLessThan(drawn.minY, 0, "and the rest of the scene is above the band, clipped")
+    /// Cropped, never squashed: a copy keeps the picture's own proportions
+    /// and the band takes a slice out of it.
+    func testEveryCopyKeepsThePicturesAspect() {
+        for tile in bandTiles(width: 1600) {
+            XCTAssertEqual((tile.width - PetTankView.tileOverlap) / tile.height, aspect, accuracy: 0.0001)
+        }
     }
 
-    /// The picture keeps its shape: a band is a crop of the scene, never a
-    /// squashed copy of the whole of it.
-    func testTheBandKeepsThePicturesAspect() {
-        let drawn = band(width: 1600)
+    /// Only `bandCrop` of the picture's height is inside the band. This is
+    /// what keeps the stones the size of stones: filling the width with one
+    /// copy instead blows them up to the size of the pet.
+    func testTheBandShowsOnlyItsCropOfThePicture() {
+        let tile = bandTiles(width: 1600)[0]
 
-        XCTAssertEqual(drawn.width / drawn.height, aspect, accuracy: 0.0001)
+        XCTAssertEqual(PetTankView.collapsedHeight / tile.height, PetTankView.bandCrop, accuracy: 0.0001)
+    }
+
+    /// No gap at either end, the same rule the island's own tiling follows.
+    func testTheBandIsCoveredEndToEnd() {
+        for width in stride(from: 200.0, through: 3000.0, by: 37.0) {
+            let tiles = bandTiles(width: width)
+            XCTAssertLessThanOrEqual(tiles.first!.minX, 0, "left edge uncovered at \(width)")
+            XCTAssertGreaterThanOrEqual(tiles.last!.maxX, width, "right edge uncovered at \(width)")
+        }
     }
 
     func testNothingToDrawInAnEmptyBand() {
-        XCTAssertEqual(PetTankView.band(across: CGSize(width: 0, height: 26), aspect: aspect), .zero)
-        XCTAssertEqual(PetTankView.band(across: CGSize(width: 800, height: 0), aspect: aspect), .zero)
+        XCTAssertTrue(PetTankView.bandTiles(across: CGSize(width: 0, height: 28), aspect: aspect).isEmpty)
+        XCTAssertTrue(PetTankView.bandTiles(across: CGSize(width: 800, height: 0), aspect: aspect).isEmpty)
     }
 }
