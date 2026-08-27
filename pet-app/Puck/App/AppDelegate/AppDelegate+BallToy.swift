@@ -16,7 +16,7 @@ extension AppDelegate {
     /// Whether the pet is currently in a toy-play state.
     var isPlayingWithToy: Bool {
         let state = characterController?.currentState
-        return state === chaseBallState || state === juggleBallState || state === kickBallState
+        return state === states.chaseBall || state === states.juggleBall || state === states.kickBall
     }
 
     /// Builds the toy box and wires every callback that involves a toy.
@@ -45,13 +45,13 @@ extension AppDelegate {
                    avatarSize: self.avatarHitboxSize
                ),
                abs(toyBottom - headY) < 0.5 {
-                if self.characterController?.currentState === self.juggleBallState,
+                if self.characterController?.currentState === self.states.juggleBall,
                    ball === self.toyBox?.focused {
                     // Mid-game: caught, not headed. The toy is left resting on
                     // the pet's head and JuggleBall throws it again after a
                     // beat. Popping it here instead would make contact and
                     // re-launch the same instant, which reads as a bounce.
-                    self.juggleBallState.caught()
+                    self.states.juggleBall.caught()
                 } else {
                     // Dropped on the pet's head by the user, out of the blue:
                     // it bounces off and makes its way down rather than
@@ -68,11 +68,11 @@ extension AppDelegate {
             // otherwise the throw's own landing starts the next game.
             guard !self.isRestingFromToys,
                   let controller = self.characterController,
-                  controller.currentState === self.idleState || controller.currentState === self.walkState
+                  controller.currentState === self.states.idle || controller.currentState === self.states.walk
             else { return }
             self.startPlaying(with: toy)
         }
-        juggleBallState.onThrow = { [weak self] in
+        states.juggleBall.onThrow = { [weak self] in
             guard let self, let body = self.characterBody else { return }
             // Straight up over the pet's own x, so it comes back down on the
             // head rather than beside it.
@@ -81,7 +81,7 @@ extension AppDelegate {
                 headTop: body.position.y - self.avatarHitboxSize.height
             )
         }
-        kickBallState.onEnter = { [weak self] in
+        states.kickBall.onEnter = { [weak self] in
             guard let self else { return }
             // The throw-away IS the end of the game, for every toy and both
             // play styles, so this is the one place the break starts from.
@@ -105,14 +105,14 @@ extension AppDelegate {
         // Beside the toy and on the surface it's resting on -- not at the
         // toy's own centre, which is a toy-radius up in the air and puts
         // the pet on top of it.
-        chaseBallState.target = ToyApproach.standingPosition(
+        states.chaseBall.target = ToyApproach.standingPosition(
             toyPosition: position,
             toyBounds: ball.visualBounds,
             petPosition: characterBody?.position ?? position,
             petBounds: characterBody?.visualBounds ?? .zero
         )
-        juggleBallState.style = toy.play
-        juggleBallState.toyName = toy.name
+        states.juggleBall.style = toy.play
+        states.juggleBall.toyName = toy.name
         controller.transition(to: .chaseBall)
     }
 

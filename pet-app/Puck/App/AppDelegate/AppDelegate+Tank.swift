@@ -15,22 +15,6 @@ import AppKit
 import CoreGraphics
 
 extension AppDelegate {
-    /// How much smaller the pet is while it is in the tank. A 90pt strip
-    /// cannot hold a 120pt pet, and the tank reads as a small glass box.
-    /// How tall the pet stands on the island, in points.
-    ///
-    /// A fixed height, not a fraction of whatever the size slider is set to:
-    /// the island is a fixed 90pt whoever is looking at it, so a relative
-    /// scale made the pet fill it at one setting and rattle around in it at
-    /// another. On the desktop the slider still decides.
-    static let defaultTankPetHeight: CGFloat = 72
-
-    /// Where the lever on the island puts it. Written by the client over the
-    /// bridge and kept here rather than in SettingsStore: it is the size of
-    /// the pet in one particular place, which is a property of that place.
-    /// `@MainActor`: written when the bridge's message reaches the main
-    /// thread and read by the frame loop, which runs there too.
-    @MainActor static var tankPetHeight: CGFloat = defaultTankPetHeight
 
     /// The client reported its tank. Stores the geometry and hands the
     /// in-or-out question to the decider; nothing moves until `tickPetHome`
@@ -38,8 +22,8 @@ extension AppDelegate {
     func applyPetHome(rect: BridgeRect?, visible: Bool) {
         // Remembered before the area is worked out, because the size the pet
         // travels at is worked out from it -- see `tankScale`.
-        lastTankSize = rect.map { CGSize(width: $0.width, height: $0.height) }
-        petTankArea = rect.flatMap { wire in
+        tank.lastReportedSize = rect.map { CGSize(width: $0.width, height: $0.height) }
+        tank.area = rect.flatMap { wire in
             guard let window = overlayWindow, let space = screenManager?.current else { return nil }
             let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
             return PetTankArea.roamableArea(
@@ -56,37 +40,37 @@ extension AppDelegate {
             )
         }
         petHomeDecider.isPetHidden = isCharacterHidden
-        petHomeDecider.report(hasTank: petTankArea != nil, visible: visible)
+        petHomeDecider.report(hasTank: tank.area != nil, visible: visible)
 
         // PetHomeDecider only fires on a home<->desktop transition, so a
         // dragged or resized client window while the pet is already home
         // would otherwise never reach roamableArea again. The pet isn't
         // going anywhere -- the room around it moved -- so no fade.
-        if let tank = petTankArea, desktopRoamableAreas != nil, let controller = characterController {
+        if let area = tank.area, desktopRoamableAreas != nil, let controller = characterController {
             // The size as well as the room. `tankScale` fits the pet to the
-            // tank it is standing in, so a tank that changed shape changes the
+            // area it is standing in, so a tank that changed shape changes the
             // answer -- and the report of the new shape arrives after whoever
             // changed it has already asked for a height. Folding the island
             // down to its band and back is exactly that: the height for the
             // open island was asked for while the band was still the last
             // thing reported, fitted to the band, and never revisited.
-            if controller.currentState === travelState {
+            if controller.currentState === states.travel {
                 // A trip already in the air toward this tank. Retargeted
                 // rather than interrupted: writing the position and the area
                 // directly here would land the pet in a tank it is still
                 // flying to, and undo the widened area the trip needs to
                 // cross. The trip lerps toward this scale every frame, so it
-                // arrives at the size the tank it is arriving in can hold.
-                travelState.destination = CGPoint(x: tank.midX, y: tank.maxY)
-                travelState.onArrival = { controller.roamableAreas = [tank] }
-                travelTargetScale = tankScale
+                // arrives at the size the area it is arriving in can hold.
+                states.travel.destination = CGPoint(x: area.midX, y: area.maxY)
+                states.travel.onArrival = { controller.roamableAreas = [area] }
+                tank.travelTargetScale = tankScale
             } else if let body = characterBody {
                 applyLiveAvatarScale(tankScale)
-                controller.roamableAreas = [tank]
+                controller.roamableAreas = [area]
                 body.position = ScreenBounds.contain(
-                    CGPoint(x: body.position.x, y: tank.maxY),
+                    CGPoint(x: body.position.x, y: area.maxY),
                     visualBounds: body.visualBounds,
-                    in: tank
+                    in: area
                 )
             }
         }
@@ -101,7 +85,7 @@ extension AppDelegate {
         // missing (a display change replaces the click monitor mid-drag), and
         // one stuck raised means the pet can never come home again. Asking
         // where the pet *is* cannot get stuck.
-        petHomeDecider.isBeingHeld = characterController?.currentState === reactDragState
+        petHomeDecider.isBeingHeld = characterController?.currentState === states.reactDrag
         switch petHomeDecider.tick(dt: dt) {
         case .home: movePetHome()
         case .desktop: sendPetToDesktop()
@@ -113,23 +97,23 @@ extension AppDelegate {
     /// so the size follows the drag rather than waiting for the next trip:
     /// the whole point of putting the lever there is watching what it does.
     func applyPetIslandHeight(_ height: Double) {
-        Self.tankPetHeight = CGFloat(height)
+        tank.petHeight = CGFloat(height)
         guard desktopRoamableAreas != nil, let controller = characterController else { return }
         // The size a trip in progress is heading for, so a drag during the
         // flight home lands at the size that was chosen rather than the one
         // chosen before it: the trip lerps toward this every frame, and
         // writing the scale directly would just be overwritten by the next.
-        travelTargetScale = tankScale
-        guard controller.currentState !== travelState else { return }
+        tank.travelTargetScale = tankScale
+        guard controller.currentState !== states.travel else { return }
         applyLiveAvatarScale(tankScale)
         // The area was measured against the old size; a pet that just grew
         // would be standing through the floor of it.
-        if let tank = petTankArea, let body = characterBody {
-            controller.roamableAreas = [tank]
+        if let area = tank.area, let body = characterBody {
+            controller.roamableAreas = [area]
             body.position = ScreenBounds.contain(
-                CGPoint(x: body.position.x, y: tank.maxY),
+                CGPoint(x: body.position.x, y: area.maxY),
                 visualBounds: body.visualBounds,
-                in: tank
+                in: area
             )
         }
     }
@@ -137,25 +121,25 @@ extension AppDelegate {
     /// The client went away. The tank went with it, so the pet comes out --
     /// a rect from a process that is gone is not somewhere to live.
     func petHomeConnectionLost() {
-        petTankArea = nil
+        tank.area = nil
         petHomeDecider.report(hasTank: false, visible: false)
         sendPetToDesktop()
     }
 
     private func movePetHome() {
-        guard let controller = characterController, let tank = petTankArea else { return }
+        guard let controller = characterController, let area = tank.area else { return }
         cancelWander()
         // A shelf a few pets wide, in the window being looked at: the pet
         // potters about on it rather than keeping the desktop's slower beat.
-        idleState.pace = .island
+        states.idle.pace = .island
         if desktopRoamableAreas == nil {
             desktopRoamableAreas = controller.roamableAreas
-            desktopAvatarScale = currentAvatarScale
+            tank.desktopScale = currentAvatarScale
         }
         carryPet(
             of: controller,
-            to: CGPoint(x: tank.midX, y: tank.maxY),
-            arrivingIn: [tank],
+            to: CGPoint(x: area.midX, y: area.maxY),
+            arrivingIn: [area],
             scale: tankScale
         )
     }
@@ -173,14 +157,14 @@ extension AppDelegate {
         guard desktopRoamableAreas != nil else { return }
         cancelWander()
         desktopRoamableAreas = nil
-        idleState.pace = .desktop
-        applyLiveAvatarScale(desktopAvatarScale)
+        states.idle.pace = .desktop
+        applyLiveAvatarScale(tank.desktopScale)
     }
 
     func sendPetToDesktop() {
         guard let controller = characterController, let desktop = desktopRoamableAreas else { return }
         cancelWander()
-        idleState.pace = .desktop
+        states.idle.pace = .desktop
         desktopRoamableAreas = nil
         // Onto the display the pet came from, not the middle of the box
         // around every display -- that point can be on no screen at all.
@@ -190,11 +174,11 @@ extension AppDelegate {
             of: controller,
             to: CGPoint(x: home.midX, y: home.maxY),
             arrivingIn: desktop,
-            scale: desktopAvatarScale
+            scale: tank.desktopScale
         )
     }
 
-    /// The scale that puts the pet at `tankPetHeight` -- or at whatever the
+    /// The scale that puts the pet at the height the island's lever asks
     /// tank can actually hold, when that is less. 1 when there is no avatar
     /// yet, which only happens before one is installed and never while a move
     /// is running.
@@ -204,18 +188,7 @@ extension AppDelegate {
     /// Sizing down is the difference between a small pet and no pet -- the
     /// area is refused outright otherwise, and a refusal looks like the pet
     /// ignoring the window.
-    var tankScale: Double {
-        guard baseHitboxSize.height > 0 else { return 1 }
-        guard let lastTankSize, baseHitboxSize.width > 0 else {
-            return Double(Self.tankPetHeight / baseHitboxSize.height)
-        }
-        let fitted = PetTankArea.fittedPetHeight(
-            desired: Self.tankPetHeight,
-            tank: lastTankSize,
-            aspect: baseHitboxSize.width / baseHitboxSize.height
-        )
-        return Double(fitted / baseHitboxSize.height)
-    }
+    var tankScale: Double { tank.scale(forPetOfSize: baseHitboxSize) }
 
     /// What `applyLiveAvatarScale` was last given, derived rather than stored:
     /// that method sets `avatarHitboxSize = baseHitboxSize * scale`, so the
@@ -250,22 +223,22 @@ extension AppDelegate {
     ) {
         guard let body = characterBody else { return }
         let departingScale = currentAvatarScale
-        travelState.origin = body.position
-        travelState.destination = destination
+        states.travel.origin = body.position
+        states.travel.destination = destination
         // Sized along the way rather than on landing. Snapping at the end
         // reads as the pet arriving and *then* being resized, which is two
         // events where the eye expects one -- and going the other way it
         // popped to full size the instant it touched the desktop.
-        travelTargetScale = scale
-        travelState.onProgress = { [weak self] progress in
+        tank.travelTargetScale = scale
+        states.travel.onProgress = { [weak self] progress in
             guard let self else { return }
             // Read live rather than captured: the size lever can move while
             // the pet is in the air, and the trip should end at the size the
             // person is looking at.
-            let target = self.travelTargetScale
+            let target = self.tank.travelTargetScale
             self.applyLiveAvatarScale(departingScale + (target - departingScale) * progress)
         }
-        travelState.onArrival = { controller.roamableAreas = areas }
+        states.travel.onArrival = { controller.roamableAreas = areas }
         controller.roamableAreas = controller.roamableAreas + areas
         controller.transition(to: .travel)
     }

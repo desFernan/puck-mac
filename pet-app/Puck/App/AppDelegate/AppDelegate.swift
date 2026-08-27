@@ -70,78 +70,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
-    // One shared instance per FSM state, reused for every transition into it.
-    // CharacterController.transition's same-state no-op guard is reference
-    // equality (StateHandler: AnyObject) -- constructing a fresh instance per
-    // transition (e.g. `IdleState()` each time) defeated that guard, silently
-    // resetting IdleState's WanderScheduler timer and replaying loop clip/SFX
-    // on every repeated same-kind event.
-    let idleState = IdleState()
-    let walkState = WalkState()
-    let climbState = ClimbState()
-    /// The step between two displays of different heights -- see
-    /// ClimbLedgeState. Idle on a single-display machine, where WalkState
-    /// never finds a ledge to hand it.
-    let climbLedgeState = ClimbLedgeState()
-    let walkOnTopState = WalkOnTopState()
-    let fallState = FallState()
-    let landState = LandState()
-    let moveToState = MoveToState()
-    let travelState = TravelState()
     /// The window the pet fell behind, until it has landed and been moved onto
     /// that window's top edge -- see perchAfterLandingIfNeeded().
     var pendingPerchWindowID: CGWindowID?
+    /// The one long-lived instance of every state the pet can be in, and the
+    /// table that registers them. Twenty-two properties before, each read by
+    /// one or two of this file's extensions -- see PetStates.
+    let states = PetStates()
+
+    /// Where the pet's tank is and how big the pet is while it is in there.
+    /// Four properties and a mutable static before, all touched only by
+    /// AppDelegate+Tank -- see TankResidency.
+    var tank = TankResidency()
     let petHomeDecider = PetHomeDecider()
     /// The tank the client last reported, in overlay-local coordinates. Nil
-    /// when there is none to go to.
-    var petTankArea: CGRect?
     /// The roamable areas the pet had before it went home, so coming out
     /// restores the desktop it actually had rather than a recomputed guess.
     /// Nil is also the answer to "is the pet out on the desktop right now".
     var desktopRoamableAreas: [CGRect]?
-    /// The avatar scale the pet had before it went home. There is no stored
-    /// setting to read it back from -- the size slider passes a scale straight
-    /// to applyLiveAvatarScale and nothing keeps it -- so it is remembered
-    /// here for the trip back out.
-    var desktopAvatarScale: Double = 1
-    /// Legs of the current wander still to walk, and the pause before the next
-    /// one -- see continueWanderIfNeeded(dt:).
-    var pendingWanderLegs = 0
-    var wanderLegPause: TimeInterval = 0
-    let typeState = TypeState()
-    let pointState = PointState()
-    let listenState = ListenState()
-    let reactClickState = ReactClickState()
-    let reactDragState = ReactDragState()
-    // Double-tap "petting" interaction (2026-07-29, more interactions).
-    let pettingState = PettingState()
-    let spinState = SpinState()
-    // F13 (2026-07-29): Option+Shift+Space pins the character while the
-    // client window is open, same "capture then restore" pattern as
-    // stateBeforeListen below.
-    let pinnedState = PinnedState()
+    /// The legs of the current wander and the beat between them -- two
+    /// properties before, both touched only by AppDelegate+Wander. See
+    /// WanderRun.
+    var wanderRun = WanderRun()
     var stateBeforePin: StateHandler?
     /// Recognises the cursor being rubbed over the pet's head. Owned here
     /// rather than by ClickThroughController so that type stays about hit
     /// testing, matching how gesture -> FSM mapping already works.
     var headPetDetector = HeadPetDetector()
-    /// Where the toy sat relative to the cursor when it was picked up.
-    var toyGrabOffset: CGPoint = .zero
     /// How far above the pet's head a spun toy floats.
     static let spinHoverGap: CGFloat = 14
 
-    /// The toy's throw speed, measured the same way the pet's is.
-    var toyThrowVelocity = CursorVelocityTracker()
-    /// Mouse events don't arrive on a clock, so the tracker's dt comes from
-    /// the gap between them.
-    var lastToyDragTime: TimeInterval?
-    // F3 ceiling-crawling (2026-07-29): WanderScheduler's .climbToCeiling outcome.
-    let climbToCeilingState = ClimbToCeilingState()
-    let ceilingState = CeilingState()
-    // F12 (optional, lowest priority): ball-toy interaction.
-    let chaseBallState = ChaseBallState()
-    let juggleBallState = JuggleBallState()
-    let kickBallState = KickBallState()
+    /// A toy in somebody's hand: where it was grabbed and how fast it was
+    /// moving when they let go. Three properties before, all of them touched
+    /// only by AppDelegate+PetInteraction -- see ToyDrag.
+    var toyDrag = ToyDrag()
     /// Every toy that's out, and which one the pet is playing with. The FSM
     /// states above still only ever deal with one toy -- `toyBox.focused`.
     var toyBox: ToyBox?
@@ -182,12 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// granted; cleared by the retry itself once the tap is live.
     var accessibilityRetryTimer: Timer?
     /// The tank's size as the client last reported it, kept so the pet can be
-    /// sized to fit it rather than being refused by it.
-    var lastTankSize: CGSize?
     /// The scale the trip in progress is heading for. Held here rather than
-    /// captured by the trip's closure so the size lever can change it
-    /// mid-flight.
-    var travelTargetScale: Double = 1
     var voiceInputController: VoiceInputController?
     var stateBeforeListen: StateHandler?
 

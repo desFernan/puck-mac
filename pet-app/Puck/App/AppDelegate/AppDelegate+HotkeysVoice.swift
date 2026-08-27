@@ -20,7 +20,7 @@ extension AppDelegate {
         voiceController.onListenStart = { [weak self] in
             guard let self, let characterController = self.characterController else { return }
             self.stateBeforeListen = characterController.currentState
-            characterController.transition(to: self.listenState)
+            characterController.transition(to: self.states.listen)
             // F7: listen_start is an event-name sound key (plan/01_protocol.md
             // section 6), separate from the state's own "listen" clip key that
             // the shared enter() path triggers.
@@ -28,7 +28,7 @@ extension AppDelegate {
         }
         voiceController.onListenEnd = { [weak self] in
             guard let self, let characterController = self.characterController else { return }
-            characterController.transition(to: self.stateBeforeListen ?? self.idleState)
+            characterController.transition(to: self.stateBeforeListen ?? self.states.idle)
             self.stateBeforeListen = nil
             self.closeCaptionBubble()
         }
@@ -224,12 +224,12 @@ extension AppDelegate {
     func pinCharacter() {
         guard let characterController, stateBeforePin == nil else { return }
         stateBeforePin = characterController.currentState
-        characterController.transition(to: pinnedState)
+        characterController.transition(to: states.pinned)
     }
 
     private func unpinCharacter() {
         guard let characterController else { return }
-        characterController.transition(to: stateBeforePin ?? idleState)
+        characterController.transition(to: stateBeforePin ?? states.idle)
         stateBeforePin = nil
     }
 

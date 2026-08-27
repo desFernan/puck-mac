@@ -170,7 +170,7 @@ final class PetTankAreaTests: XCTestCase {
     /// Asked of the *smallest* the island can be dragged to, since that is
     /// the one a person can reach and the one the default no longer protects.
     func test_theIslandIsTallEnoughForThePetThatLivesOnIt() {
-        let petHeight = AppDelegate.tankPetHeight
+        let petHeight = TankResidency.defaultPetHeight
         XCTAssertGreaterThanOrEqual(
             PetTankView.minimumIslandHeight,
             petHeight,

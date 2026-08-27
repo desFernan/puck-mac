@@ -88,7 +88,7 @@ extension AppDelegate {
     ///
     /// Deliberately does NOT touch toyBox or focusObserver: both are
     /// avatar-agnostic and set up exactly once, in setUpOverlayAndAvatar.
-    /// The FSM's StateHandler instances (idleState, walkState, ...) are
+    /// The FSM's StateHandler instances (states.idle, states.walk, ...) are
     /// likewise reused as-is across a switch -- they take body/controller
     /// through StateContext at call time rather than storing either at
     /// construction (see e.g. IdleState.update(dt:context:)), so
@@ -157,22 +157,8 @@ extension AppDelegate {
             bounceIntensity: loadResult.manifest.bounceIntensity ?? CharacterBody.defaultBounceIntensity
         )
         characterBody = body
-        let controller = CharacterController(initialState: idleState, body: body, sfxPlayer: sfxPlayer)
-        for (kind, state) in [
-            (StateKind.idle, idleState as StateHandler),
-            (.walk, walkState), (.climb, climbState), (.walkOnTop, walkOnTopState),
-            (.fall, fallState), (.land, landState), (.moveTo, moveToState),
-            (.point, pointState), (.type, typeState), (.listen, listenState),
-            (.reactClick, reactClickState), (.reactDrag, reactDragState),
-            (.petting, pettingState), (.spin, spinState),
-            (.chaseBall, chaseBallState), (.juggleBall, juggleBallState), (.kickBall, kickBallState),
-            (.climbToCeiling, climbToCeilingState), (.ceiling, ceilingState),
-            (.climbLedge, climbLedgeState),
-            (.pinned, pinnedState),
-            (.travel, travelState),
-        ] {
-            controller.register(state, as: kind)
-        }
+        let controller = CharacterController(initialState: states.idle, body: body, sfxPlayer: sfxPlayer)
+        states.register(in: controller)
         controller.idleChatter.keys = soundTable.keys(withPrefix: "chatter_")
         controller.roamableAreas = screenWorkAreas
         controller.avatarHeight = avatarHitboxSize.height
@@ -219,12 +205,12 @@ extension AppDelegate {
                 avatarHeight: controller.avatarHeight
             )
         }
-        idleState.wanderDelegate = self
+        states.idle.wanderDelegate = self
         // How the pet gets back onto a taller display after walking down onto
         // a shorter one. WalkState is what notices the ledge; this is what
         // climbs it.
-        walkState.climbLedgeState = climbLedgeState
-        pointState.onEnter = { [weak self] in self?.beginPointingTimer() }
+        states.walk.climbLedgeState = states.climbLedge
+        states.point.onEnter = { [weak self] in self?.beginPointingTimer() }
         characterController = controller
 
         // manifest.hitbox was decoded but had no consumer -- ClickThroughController
@@ -426,12 +412,12 @@ extension AppDelegate {
     private var petHoldsSomethingOtherThanTheGround: Bool {
         if characterBody?.isUpsideDown == true { return true }
         guard let current = characterController?.currentState else { return false }
-        return current === climbState
-            || current === climbToCeilingState
-            || current === climbLedgeState
-            || current === ceilingState
-            || current === reactDragState
-            || current === travelState
+        return current === states.climb
+            || current === states.climbToCeiling
+            || current === states.climbLedge
+            || current === states.ceiling
+            || current === states.reactDrag
+            || current === states.travel
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

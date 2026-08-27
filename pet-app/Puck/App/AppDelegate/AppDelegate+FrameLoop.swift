@@ -60,14 +60,14 @@ extension AppDelegate {
 
             // A resting 2D pet can use the lower heartbeat immediately after
             // the policy's idle threshold without losing timer-driven work.
-            let isResting = self.characterController?.currentState === self.idleState
+            let isResting = self.characterController?.currentState === self.states.idle
             self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
 
             // A spin-style toy is carried above the pet's head for as long as
             // the pet is playing with it -- position and rotation both come
             // from here, since it is the frame loop that knows dt.
             if let toyBox = self.toyBox, let body = self.characterBody {
-                let isPlaying = self.characterController?.currentState === self.juggleBallState
+                let isPlaying = self.characterController?.currentState === self.states.juggleBall
                 let spins = toyBox.focusedToy?.play == .spinOverhead
                 for ball in toyBox.all where ball.isActive {
                     // Only a toy the pet actually has. Held means the cursor
@@ -224,8 +224,8 @@ extension AppDelegate {
                 self.sendPetToWindow(ownedBy: pid, attemptsRemaining: attemptsRemaining - 1)
                 return
             }
-            self.moveToState.target = CGPoint(x: window.frame.midX, y: window.frame.minY)
-            self.moveToState.nextState = .idle
+            self.states.moveTo.target = CGPoint(x: window.frame.midX, y: window.frame.minY)
+            self.states.moveTo.nextState = .idle
             controller.transition(to: .moveTo)
         }
     }

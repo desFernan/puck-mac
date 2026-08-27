@@ -67,7 +67,7 @@ final class RoamPointTests: XCTestCase {
     /// One trip and a long sit was the shape that read as monotonous, so a
     /// wander is walked in legs with a beat between them.
     func test_wanderLegs_areMostlyOneSometimesMore() {
-        let draws = (0..<600).map { _ in AppDelegate.drawWanderLegs() }
+        let draws = (0..<600).map { _ in WanderRun.drawLegs() }
 
         XCTAssertTrue(draws.allSatisfy { (1...3).contains($0) })
         XCTAssertGreaterThan(draws.filter { $0 == 1 }.count, 250, "most wanders stay one leg")
@@ -77,7 +77,7 @@ final class RoamPointTests: XCTestCase {
     /// Long enough to look like the pet stopped to consider something, short
     /// enough that the legs still read as one wander rather than two.
     func test_legPause_isABeatNotARest() {
-        let pauses = (0..<100).map { _ in AppDelegate.randomLegPause() }
+        let pauses = (0..<100).map { _ in WanderRun.drawPause() }
 
         XCTAssertTrue(pauses.allSatisfy { $0 >= 0.4 && $0 <= 1.4 })
         XCTAssertGreaterThan(Set(pauses.map { Int($0 * 10) }).count, 3, "not a fixed beat")
@@ -134,14 +134,14 @@ final class RoamPointTests: XCTestCase {
     /// The island is small enough that one leg of it is barely a step, so a
     /// wander there is made of more of them, with less standing about between.
     func test_aWanderOnTheIslandHasMoreLegsAndShorterPauses() {
-        let home = (0..<600).map { _ in AppDelegate.drawWanderLegs(atHome: true) }
-        let desktop = (0..<600).map { _ in AppDelegate.drawWanderLegs(atHome: false) }
+        let home = (0..<600).map { _ in WanderRun.drawLegs(atHome: true) }
+        let desktop = (0..<600).map { _ in WanderRun.drawLegs(atHome: false) }
 
         XCTAssertTrue(home.allSatisfy { (2...4).contains($0) })
         XCTAssertGreaterThan(
             home.reduce(0, +) / home.count,
             desktop.reduce(0, +) / desktop.count
         )
-        XCTAssertTrue((0..<100).allSatisfy { _ in AppDelegate.randomLegPause(atHome: true) <= 0.7 })
+        XCTAssertTrue((0..<100).allSatisfy { _ in WanderRun.drawPause(atHome: true) <= 0.7 })
     }
 }

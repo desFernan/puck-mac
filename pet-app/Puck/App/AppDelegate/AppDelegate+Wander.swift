@@ -35,15 +35,14 @@ extension AppDelegate {
             // A wander is one to three legs with a beat between them, not one
             // straight line to one point. Drawn here; the rest are started by
             // continueWanderIfNeeded once each leg lands.
-            pendingWanderLegs = Self.drawWanderLegs(atHome: atHome) - 1
-            wanderLegPause = Self.randomLegPause(atHome: atHome)
+            wanderRun.begin(atHome: atHome)
             startWanderLeg(controller)
         case .climbNearestWindow:
             // Walk to the nearest climbable window's side; WalkState's own
             // blockingWindow check takes it from there and hands off to Climb.
             // Falls back to roaming when there's nothing to climb, rather
             // than standing still.
-            walkState.target = characterBody.flatMap { body in
+            states.walk.target = characterBody.flatMap { body in
                 let windows = overlayLocalWindows(excluding: nil)
                 return WindowSupport.nearestClimbTarget(
                     from: body.position,
@@ -68,7 +67,7 @@ extension AppDelegate {
                       in: ceilingWindows,
                       excluding: unclimbableWindowIDs(in: ceilingWindows)
                   ) != nil else {
-                walkState.target = self.randomRoamPoint(controller)
+                states.walk.target = self.randomRoamPoint(controller)
                 controller.transition(to: .walk)
                 return
             }
@@ -86,7 +85,7 @@ extension AppDelegate {
                       petPosition: characterBody?.position ?? .zero
                   )
             else {
-                walkState.target = self.randomRoamPoint(controller)
+                states.walk.target = self.randomRoamPoint(controller)
                 controller.transition(to: .walk)
                 return
             }
@@ -132,7 +131,7 @@ extension AppDelegate {
         guard let windowID = pendingPerchWindowID,
               let controller = characterController,
               let body = characterBody,
-              controller.currentState === idleState
+              controller.currentState === states.idle
         else {
             return
         }
@@ -157,7 +156,7 @@ extension AppDelegate {
         else {
             return
         }
-        moveToState.target = perch
+        states.moveTo.target = perch
         controller.transition(to: .moveTo)
     }
 
@@ -247,7 +246,7 @@ extension AppDelegate {
     /// each time.
     private func startWanderLeg(_ controller: CharacterController) {
         varyWalkSpeed()
-        walkState.target = randomRoamPoint(controller)
+        states.walk.target = randomRoamPoint(controller)
         controller.transition(to: .walk)
     }
 
@@ -258,16 +257,13 @@ extension AppDelegate {
     /// hands back to Idle on its own, and Idle's next draw is 8-15s away --
     /// which is the gap that made a wander read as one trip and a long sit.
     func continueWanderIfNeeded(dt: TimeInterval) {
-        guard pendingWanderLegs > 0,
+        guard wanderRun.isRunning,
               let controller = characterController,
-              controller.currentState === idleState
+              controller.currentState === states.idle
         else {
             return
         }
-        wanderLegPause -= dt
-        guard wanderLegPause <= 0 else { return }
-        pendingWanderLegs -= 1
-        wanderLegPause = Self.randomLegPause(atHome: desktopRoamableAreas != nil)
+        guard wanderRun.tick(dt: dt) else { return }
         startWanderLeg(controller)
     }
 
@@ -275,30 +271,7 @@ extension AppDelegate {
     /// another wander outcome, a tool, a fall behind a window -- calls this,
     /// or the pet would resume a walk nobody asked for any more.
     func cancelWander() {
-        pendingWanderLegs = 0
-        wanderLegPause = 0
-    }
-
-    /// Mostly one leg, sometimes two, now and then three. More than that and
-    /// the pet never settles.
-    /// On the island it walks further per wander: the shelf is small enough
-    /// that one leg of it is barely a step, and the pet is being watched
-    /// there rather than glanced at.
-    nonisolated static func drawWanderLegs(atHome: Bool = false) -> Int {
-        let roll = CGFloat.random(in: 0...1)
-        if atHome {
-            if roll < 0.3 { return 2 }
-            return roll < 0.75 ? 3 : 4
-        }
-        if roll < 0.55 { return 1 }
-        return roll < 0.85 ? 2 : 3
-    }
-
-    /// Long enough to read as the pet stopping to look at something, short
-    /// enough that the walk still feels like one wander. Shorter on the
-    /// island, where the legs themselves are short.
-    nonisolated static func randomLegPause(atHome: Bool = false) -> TimeInterval {
-        atHome ? .random(in: 0.2...0.7) : .random(in: 0.4...1.4)
+        wanderRun.cancel()
     }
 
     /// Where the pet is now, or the middle of the area before there is a

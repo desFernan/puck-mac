@@ -58,10 +58,10 @@ extension AppDelegate {
             // Stand beside the target rather than on top of it, so the
             // character isn't covering what it is trying to show.
             let standOffset: CGFloat = 60
-            self.moveToState.target = self.overlayLocalPoint(
+            self.states.moveTo.target = self.overlayLocalPoint(
                 fromQuartz: CGPoint(x: frame.midX - standOffset, y: frame.maxY)
             )
-            self.moveToState.nextState = .point
+            self.states.moveTo.nextState = .point
             controller.transition(to: .moveTo)
         }
     }

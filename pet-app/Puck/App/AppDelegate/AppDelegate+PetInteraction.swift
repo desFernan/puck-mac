@@ -37,11 +37,11 @@ extension AppDelegate {
             // out, and the grab offset would then be captured from wherever
             // the cursor had already moved on by, shifting the pet.
             controller.transition(to: .reactDrag)
-            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
+            states.reactDrag.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragMoved(let point):
-            reactDragState.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
+            states.reactDrag.cursorPosition = windowLocalPoint(fromGlobalAppKit: point)
         case .dragEnded:
-            reactDragState.release()
+            states.reactDrag.release()
         }
     }
 
@@ -98,24 +98,21 @@ extension AppDelegate {
                 toyBox?.clearFocus()
                 characterController?.transition(to: .idle)
             }
-            let local = windowLocalPoint(fromGlobalAppKit: point)
-            toyGrabOffset = CGPoint(
-                x: (ball.state?.position.x ?? local.x) - local.x,
-                y: (ball.state?.position.y ?? local.y) - local.y
+            toyDrag.begin(
+                at: windowLocalPoint(fromGlobalAppKit: point),
+                toyPosition: ball.state?.position,
+                now: CACurrentMediaTime()
             )
-            toyThrowVelocity.reset()
-            lastToyDragTime = CACurrentMediaTime()
             ball.grab()
         case .dragMoved(let point):
-            let local = windowLocalPoint(fromGlobalAppKit: point)
-            let now = CACurrentMediaTime()
-            toyThrowVelocity.track(to: local, dt: now - (lastToyDragTime ?? now))
-            lastToyDragTime = now
-            ball.move(to: CGPoint(x: local.x + toyGrabOffset.x, y: local.y + toyGrabOffset.y))
+            ball.move(to: toyDrag.move(
+                to: windowLocalPoint(fromGlobalAppKit: point),
+                now: CACurrentMediaTime()
+            ))
         case .dragEnded:
             // Let go of a still cursor and this is zero, i.e. the plain drop
             // it was before -- exactly like the pet's throw.
-            ball.release(velocity: toyThrowVelocity.velocity)
+            ball.release(velocity: toyDrag.releaseVelocity)
         case .tapped, .doubleTapped:
             // A tap with no drag still counts as having picked it up and put
             // it straight back down; releasing restarts its fall.
@@ -136,13 +133,13 @@ extension AppDelegate {
             // Never interrupt the pet being carried: a drag is the user's
             // hand already, and the cursor necessarily moves over the head
             // while dragging it around.
-            guard controller.currentState !== reactDragState else { return }
+            guard controller.currentState !== states.reactDrag else { return }
             controller.transition(to: .petting)
             // After the transition -- enter() clears the flag.
-            pettingState.beginStroking()
+            states.petting.beginStroking()
             avatar?.showEmotion("happy")
         case .ended:
-            pettingState.endStroking()
+            states.petting.endStroking()
         case .unchanged:
             break
         }
