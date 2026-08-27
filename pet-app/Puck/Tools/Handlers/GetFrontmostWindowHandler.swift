@@ -40,7 +40,10 @@ final class GetFrontmostWindowHandler: ToolHandler {
             return
         }
 
-        guard let window = watcher.windows.first(where: { $0.ownerPID == frontmostPID }) else {
+        // Asked for now rather than read from the last poll: the rate drops
+        // while the pet rests, and this is the one caller for which a list
+        // half a second old is a wrong answer rather than a late one.
+        guard let window = watcher.windowsNow().first(where: { $0.ownerPID == frontmostPID }) else {
             completion(.success(.null))
             return
         }

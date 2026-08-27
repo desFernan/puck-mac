@@ -10,17 +10,27 @@ import AppKit
 import CoreGraphics
 
 /// Polls the on-screen window list and keeps `windows` (front-to-back Z order,
-/// already filtered to layer-0 app windows) up to date. Polls at `idlePollHz`
-/// by default; an NSWorkspace app-activate/launch/terminate notification
-/// triggers an immediate refresh plus `burstDuration` seconds at `burstPollHz`.
+/// already filtered to layer-0 app windows) up to date. How often it asks is
+/// WindowPollPolicy's decision, driven by `isPetActive`; an NSWorkspace
+/// app-activate/launch/terminate notification triggers an immediate refresh
+/// plus `burstDuration` seconds at the burst rate.
 /// `@MainActor`: a Timer on the main run loop plus NSWorkspace
 /// notifications delivered on `.main`, read every frame by the character
 /// controller -- which runs on the main thread because it moves an NSWindow.
 @MainActor
 final class WindowListWatcher {
-    static let idlePollHz: Double = 10
-    static let burstPollHz: Double = 15
     static let burstDuration: TimeInterval = 3
+
+    /// Whether the pet is doing something that reads the window list. Set by
+    /// the frame loop; false means it is sitting still, which is when asking
+    /// the system for every window on screen ten times a second stops paying
+    /// for itself -- see WindowPollPolicy.
+    var isPetActive = true
+
+    private var pollPolicy = WindowPollPolicy()
+    /// What the timer is currently set to, so a rate that has not changed
+    /// does not tear the timer down and build it again every tick.
+    private var currentHz: Double?
 
     private(set) var windows: [WindowInfo] = []
 
@@ -49,7 +59,7 @@ final class WindowListWatcher {
 
     func start() {
         refresh()
-        scheduleTimer(hz: Self.idlePollHz)
+        scheduleTimer(hz: WindowPollPolicy.activeHz)
 
         let names: [NSNotification.Name] = [
             NSWorkspace.didActivateApplicationNotification,
@@ -84,11 +94,13 @@ final class WindowListWatcher {
 
     private func triggerBurst() {
         burstEndUptime = ProcessInfo.processInfo.systemUptime + Self.burstDuration
-        scheduleTimer(hz: Self.burstPollHz)
+        scheduleTimer(hz: WindowPollPolicy.burstHz)
         refresh()
     }
 
     private func scheduleTimer(hz: Double) {
+        guard hz != currentHz else { return }
+        currentHz = hz
         pollTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / hz, repeats: true) { [weak self] _ in
             // Added to RunLoop.main just below, which is what makes this
@@ -103,10 +115,34 @@ final class WindowListWatcher {
 
     private func tick() {
         refresh()
-        if let end = burstEndUptime, ProcessInfo.processInfo.systemUptime >= end {
+        let now = ProcessInfo.processInfo.systemUptime
+        if let end = burstEndUptime, now >= end {
             burstEndUptime = nil
-            scheduleTimer(hz: Self.idlePollHz)
         }
+        // Rescheduled from the tick rather than from the frame loop: the
+        // interval this decides is this timer's own, so the only moment it
+        // can change without a wasted poll is when one has just happened.
+        // `dt` is the interval that actually elapsed, which is the rate that
+        // was in force -- not the one about to be.
+        scheduleTimer(hz: pollPolicy.hertz(
+            resting: !isPetActive,
+            bursting: burstEndUptime != nil,
+            dt: 1.0 / (currentHz ?? WindowPollPolicy.activeHz)
+        ))
+    }
+
+    /// The list as of right now, for a caller that cannot wait for the next
+    /// tick.
+    ///
+    /// The poll rate drops while the pet rests, which is fine for the pet --
+    /// it is not reading the list -- and not fine for a tool asked "which
+    /// window is frontmost" at that moment. Activating a window posts a
+    /// notification and bursts, so the common case is already covered; this
+    /// is for the rest.
+    @discardableResult
+    func windowsNow() -> [WindowInfo] {
+        refresh()
+        return windows
     }
 
     private func refresh() {

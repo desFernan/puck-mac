@@ -15,11 +15,19 @@ import Foundation
 
 struct IdleFrameRatePolicy {
     /// How long the pet must have been idle before slowing down.
+    ///
+    /// Six seconds, against the eight-to-fifteen the wander scheduler waits
+    /// between draws (WanderScheduler.defaultIntervalRange). It was thirty,
+    /// which is longer than any rest the pet actually takes on the desktop --
+    /// so the lower rate this policy exists to reach was never reached, and
+    /// the loop ran at thirty for the life of the app. Six leaves the busy
+    /// part of a rest at the full rate and spends the tail of it, plus every
+    /// rest that spans two draws, at half.
     let threshold: TimeInterval
 
     private var idleElapsed: TimeInterval = 0
 
-    init(threshold: TimeInterval = 30) {
+    init(threshold: TimeInterval = 6) {
         self.threshold = threshold
     }
 

@@ -62,6 +62,10 @@ extension AppDelegate {
             // the policy's idle threshold without losing timer-driven work.
             let isResting = self.characterController?.currentState === self.states.idle
             self.frameClock.setFramesPerSecond(self.idleFrameRate.framesPerSecond(idle: isResting, dt: dt))
+            // The window list is only worth asking for while something is
+            // happening -- see WindowPollPolicy. The watcher decides what to
+            // do about it; this only says what the pet is doing.
+            self.windowListWatcher?.isPetActive = !isResting
 
             // A spin-style toy is carried above the pet's head for as long as
             // the pet is playing with it -- position and rotation both come

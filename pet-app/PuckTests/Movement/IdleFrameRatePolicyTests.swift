@@ -56,4 +56,20 @@ final class IdleFrameRatePolicyTests: XCTestCase {
             "only 5s idle since the last activity"
         )
     }
+    /// The threshold has to be shorter than the pet's own rests or the lower
+    /// rate is never reached at all.
+    ///
+    /// It was thirty seconds against a wander scheduler that draws every
+    /// eight to fifteen, which meant the policy existed and did nothing: the
+    /// loop ran at the active rate for the life of the app. Pinned here
+    /// because the two numbers live in different files and only make sense
+    /// against each other.
+    func test_theThresholdIsShorterThanTheRestsThePetActuallyTakes() {
+        XCTAssertLessThan(
+            IdleFrameRatePolicy().threshold,
+            WanderScheduler.defaultIntervalRange.lowerBound,
+            "a threshold longer than the shortest rest is a threshold that never fires"
+        )
+    }
+
 }
