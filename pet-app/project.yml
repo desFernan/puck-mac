@@ -130,6 +130,17 @@ targets:
           - Resources/Info.plist
           - Resources/PuckClient.entitlements
       - path: Puck/ClientWindow
+      # A workspace and the chats in it: the domain the window displays,
+      # which the registries that persist it also need. It lived in
+      # ClientWindow, which made those registries depend on the window layer
+      # for the thing they are registries *of*.
+      - path: Puck/Workspaces
+      # The editor without its views: reading a tree, watching it, the open
+      # tabs and their contents. It sat inside ClientWindow/Editor, which made
+      # the agent's read_file/open_in_editor/show_code tools -- built on the
+      # same stores -- reach up into the window's own layer for them. None of
+      # it imports SwiftUI; the views that do are still over there.
+      - path: Puck/Editor
       - path: Puck/Localization
       # AgentSettingsView reuses SettingsSection/SettingsStackedRow rather
       # than hand-duplicating their padding, type sizes and row heights, which
@@ -154,11 +165,6 @@ targets:
       - path: Puck/Diagnostics/AppLogger.swift
       # Both loggers this target compiles append through it.
       - path: Puck/Diagnostics/JSONLinesFileAppender.swift
-      # show_code has to hand point_at a rect in the pet's normalized
-      # (top-left) space, but the editor pane reports AppKit's bottom-left
-      # one. This is the one place that flip is defined; a copy here would be
-      # a second thing to keep right.
-      - path: Puck/Movement/GlobalScreenSpace.swift
       - path: Puck/Resources/Assets.xcassets
       - path: Puck/Bridge/BridgeMessages.swift
       - path: Puck/Bridge/JSONValue.swift
@@ -168,11 +174,13 @@ targets:
       - path: Puck/Bridge/BridgeSocketClient.swift
       - path: Puck/Bridge/UserInputSender.swift
       - path: Puck/App/CompanionAppLauncher.swift
-      - path: Puck/App/AppIdentity.swift
-      # Both apps have something to say that never takes focus: the pet's
-      # speech bubble over there, an approval banner in here. One definition
-      # of how that reaches a screen reader, not two.
-      - path: Puck/App/VoiceOverAnnouncer.swift
+      # What neither app owns and both need: which app this is, how something
+      # that never takes focus reaches a screen reader, and the one definition
+      # of the flip between the pet's top-left space and AppKit's bottom-left
+      # one. Each of these used to be a file picked out of Puck's own App or
+      # Movement folder, which is how a layer ends up depending on the layer
+      # above it for a utility.
+      - path: Puck/Shared
       # The island reads the tank's picture from the folder people drop their
       # own into, and this app is the one that draws the island.
       - path: Puck/Customisation/Customisation.swift

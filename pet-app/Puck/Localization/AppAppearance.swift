@@ -92,5 +92,5 @@ enum AppAppearance: String, Equatable, CaseIterable {
     }
 
     /// Puck's own domain, which is where both apps read this from.
-    static var sharedDefaults: UserDefaults? { ClientThemeStyle.sharedDefaults }
+    static var sharedDefaults: UserDefaults? { SharedDefaults.puck }
 }

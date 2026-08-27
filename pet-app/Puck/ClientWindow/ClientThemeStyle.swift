@@ -103,9 +103,7 @@ enum ClientThemeStyle: String, CaseIterable, Identifiable {
     /// The defaults domain the setting lives in -- Puck's, whichever process
     /// is asking. Same reasoning as `AppLanguage.sharedDefaults`: one setting
     /// with two stores is two settings that disagree.
-    static var sharedDefaults: UserDefaults? {
-        UserDefaults(suiteName: AppIdentity.puckBundleID)
-    }
+    static var sharedDefaults: UserDefaults? { SharedDefaults.puck }
 
     /// nil if `userInfo` carries no recognizable value at all (missing key,
     /// or the notification came with none) -- distinguishing "nothing here"

@@ -8,16 +8,14 @@
 # Adding a line here means: the pet app owns this, the chat window has no part
 # in it. If that stops being true, move it into project.yml instead.
 
-# The pet's own process: its delegate, menu bar, and the toys it carries.
-# PuckClient has no overlay window and no Dock-less menu bar item.
+# The pet's own process: its delegate and its menu bar. PuckClient has no
+# overlay window and no Dock-less menu bar item.
+Puck/App/BridgeMessageRouter.swift
 Puck/App/MenuBarController.swift
 Puck/App/PuckApp.swift
-Puck/App/ToyPresentation.swift
-Puck/App/ToyThumbnail.swift
 
 # The server half of the bridge. Puck hosts the socket and decides who each
 # message is for; PuckClient only dials in, so it compiles the client half.
-Puck/Bridge/BridgeMessageRouter.swift
 Puck/Bridge/BridgeServer.swift
 Puck/Bridge/ClientRelay.swift
 Puck/Bridge/EventRouter.swift
@@ -27,28 +25,6 @@ Puck/Bridge/EventRouter.swift
 Puck/Diagnostics/PermissionGuidance.swift
 Puck/Diagnostics/PermissionOnboarding.swift
 Puck/Diagnostics/PermissionPromptPolicy.swift
-
-# Everything that walks the character around a screen. PuckClient draws the
-# island the pet visits but never moves the pet itself; it asks over the
-# bridge. GlobalScreenSpace is the one exception and is listed in project.yml.
-Puck/Movement/CharacterBody.swift
-Puck/Movement/CharacterController.swift
-Puck/Movement/CursorVelocityTracker.swift
-Puck/Movement/DisplayChangeRelocation.swift
-Puck/Movement/FrameClock.swift
-Puck/Movement/GroundedSpawnPosition.swift
-Puck/Movement/IdleChatter.swift
-Puck/Movement/IdleFrameRatePolicy.swift
-Puck/Movement/MovementSolver.swift
-Puck/Movement/OneShotTransition.swift
-Puck/Movement/PetHomeDecider.swift
-Puck/Movement/PetTankArea.swift
-Puck/Movement/ScreenBounds.swift
-Puck/Movement/ScreenGround.swift
-Puck/Movement/StateContext.swift
-Puck/Movement/StateHandler.swift
-Puck/Movement/WanderScheduler.swift
-Puck/Movement/WindowSupport.swift
 
 # The settings window, which the pet owns. PuckClient reuses only the small
 # controls out of SettingsComponents.swift, which project.yml lists.
