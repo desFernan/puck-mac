@@ -255,6 +255,13 @@ struct ChatSidebarView: View {
     /// since the heading is what separates one group from the next.
     private static let rowInsets = EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0)
 
+    /// What a section header has to add on each side to sit where the rows
+    /// under it sit -- see `sectionHeader` for where the two numbers come
+    /// from. They are a correction, not a style: change the look by changing
+    /// the rows, and these follow.
+    private static let headerLeadingCorrection: CGFloat = 2
+    private static let headerTrailingCorrection: CGFloat = 14
+
     /// A group's name, with whatever acts on the group at its trailing edge.
     private func sectionHeader<Trailing: View>(
         _ title: String,
@@ -273,7 +280,19 @@ struct ChatSidebarView: View {
         // under it, and the gap that says "new group" goes over the top.
         .padding(.top, 12)
         .padding(.bottom, 2)
-        .padding(.horizontal, 4)
+        // Lined up with the rows underneath, which needs two different
+        // numbers because what they are correcting is not symmetric.
+        //
+        // A Section's header does not inherit the `listRowInsets` applied to
+        // its content, and `listRowInsets` on the header itself does nothing
+        // -- so it keeps `List`'s own header insets, which are 22pt leading
+        // and 10pt trailing measured against this column's edges. Every row
+        // under it sits 20pt in on both sides. The "+" at a header's trailing
+        // edge is the rightmost thing in the column, so that 10 was the
+        // gutter the whole sidebar appeared to have, against a leading gutter
+        // twice its width.
+        .padding(.leading, Self.headerLeadingCorrection)
+        .padding(.trailing, Self.headerTrailingCorrection)
     }
 
     /// The chats that belong to no project: the default workspace's, shown
