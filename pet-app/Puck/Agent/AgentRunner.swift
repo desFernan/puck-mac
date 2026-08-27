@@ -375,7 +375,20 @@ final class AgentRunner {
                     emitCancelled(from: key)
                     return
                 }
-                if let opened = await perform(call, in: key) { key = opened }
+                if let opened = await perform(call, in: key) {
+                    // The rest of this turn belongs to the chat that was just
+                    // opened, so its answers land there. The chat it branched
+                    // out of keeps the assistant message that asked for them
+                    // -- and that chat is deliberately kept, since the casual
+                    // session is what this tool is documented to branch out of
+                    // -- so it needs an answer for each of the calls it will
+                    // never see run. Without them it holds a tool_use with no
+                    // result, which both providers reject for the whole
+                    // conversation rather than for that turn: every message
+                    // typed in it afterwards fails, for good.
+                    answerUnrunCalls(turn.toolCalls[(index + 1)...], in: key, content: Self.movedElsewhereAnswer)
+                    key = opened
+                }
             }
         }
 
@@ -394,11 +407,21 @@ final class AgentRunner {
     /// the rest unanswered, and neither provider tolerates that -- nor does
     /// anything here repair it later, since `trimConversation` only drops
     /// leading tool messages and `forgetSession` runs when a chat is deleted.
-    private func answerUnrunCalls(_ calls: ArraySlice<GPTToolCall>, in key: String) {
+    private func answerUnrunCalls(
+        _ calls: ArraySlice<GPTToolCall>,
+        in key: String,
+        content: String = "error: cancelled"
+    ) {
         for call in calls {
-            append(.tool(callId: call.id, content: "error: cancelled"), to: key)
+            append(.tool(callId: call.id, content: content), to: key)
         }
     }
+
+    /// What the chat a run branched out of is told about the calls that ran
+    /// somewhere else. Not an error: nothing failed, the work simply moved,
+    /// and this chat's model should say so if it is asked rather than
+    /// apologise for a tool that did not break.
+    private static let movedElsewhereAnswer = "ok -- 이어지는 작업은 새 작업 세션에서 처리했어요."
 
     /// The one exit a cancelled run takes. Emits `agent_done` like every other
     /// ending does, so the session leaves its running state instead of holding
