@@ -119,52 +119,45 @@ final class PetTankTilingTests: XCTestCase {
         XCTAssertTrue(PetTankView.tiles(across: CGSize(width: 800, height: 0), aspect: aspect).isEmpty)
     }
 
-    // MARK: - The folded band
+    // MARK: - The folded band's water
 
-    private func bandTiles(width: CGFloat) -> [CGRect] {
-        PetTankView.bandTiles(
-            across: CGSize(width: width, height: PetTankView.collapsedHeight),
-            aspect: aspect
+    private let band = CGSize(width: 1200, height: PetTankView.collapsedHeight)
+
+    /// Redrawn on every frame a pet walks across it, so anything placed by
+    /// chance would shimmer. Two calls, the same answer.
+    func testTheWaterIsDrawnTheSameWayEveryFrame() {
+        XCTAssertEqual(PetTankView.bubbles(across: band), PetTankView.bubbles(across: band))
+        XCTAssertEqual(PetTankView.rays(across: band), PetTankView.rays(across: band))
+    }
+
+    /// A wider window gets more light coming through it, not wider shafts.
+    func testAWiderBandGetsMoreRaysRatherThanBiggerOnes() {
+        let narrow = PetTankView.rays(across: CGSize(width: 400, height: band.height))
+        let wide = PetTankView.rays(across: CGSize(width: 1600, height: band.height))
+
+        XCTAssertGreaterThan(wide.count, narrow.count)
+        XCTAssertEqual(
+            wide[0].path.boundingRect.width,
+            narrow[0].path.boundingRect.width,
+            accuracy: 0.0001
         )
     }
 
-    /// The band shows the bottom of the scene -- the sand the pet stands on.
-    /// The water above it hangs off the top and is clipped away.
-    func testEveryCopySitsOnTheBandsFloorWithTheRestAbove() {
-        for tile in bandTiles(width: 1600) {
-            XCTAssertEqual(tile.maxY, PetTankView.collapsedHeight, accuracy: 0.0001)
-            XCTAssertLessThan(tile.minY, 0, "the water above the sand is clipped, not squashed in")
+    /// Bubbles rise through the water above the pet, not across its own line.
+    func testBubblesStayOffThePetsLine() {
+        for bubble in PetTankView.bubbles(across: band) {
+            XCTAssertGreaterThanOrEqual(bubble.minY, 0)
+            XCTAssertLessThan(bubble.maxY, band.height * 0.75, "a bubble is not something the pet walks into")
         }
     }
 
-    /// Cropped, never squashed: a copy keeps the picture's own proportions
-    /// and the band takes a slice out of it.
-    func testEveryCopyKeepsThePicturesAspect() {
-        for tile in bandTiles(width: 1600) {
-            XCTAssertEqual((tile.width - PetTankView.tileOverlap) / tile.height, aspect, accuracy: 0.0001)
-        }
-    }
-
-    /// Only `bandCrop` of the picture's height is inside the band. This is
-    /// what keeps the stones the size of stones: filling the width with one
-    /// copy instead blows them up to the size of the pet.
-    func testTheBandShowsOnlyItsCropOfThePicture() {
-        let tile = bandTiles(width: 1600)[0]
-
-        XCTAssertEqual(PetTankView.collapsedHeight / tile.height, PetTankView.bandCrop, accuracy: 0.0001)
-    }
-
-    /// No gap at either end, the same rule the island's own tiling follows.
-    func testTheBandIsCoveredEndToEnd() {
-        for width in stride(from: 200.0, through: 3000.0, by: 37.0) {
-            let tiles = bandTiles(width: width)
-            XCTAssertLessThanOrEqual(tiles.first!.minX, 0, "left edge uncovered at \(width)")
-            XCTAssertGreaterThanOrEqual(tiles.last!.maxX, width, "right edge uncovered at \(width)")
-        }
-    }
-
+    /// A band that is not on screen has nothing to draw, and neither ray nor
+    /// bubble may divide by its width.
     func testNothingToDrawInAnEmptyBand() {
-        XCTAssertTrue(PetTankView.bandTiles(across: CGSize(width: 0, height: 28), aspect: aspect).isEmpty)
-        XCTAssertTrue(PetTankView.bandTiles(across: CGSize(width: 800, height: 0), aspect: aspect).isEmpty)
+        let empty = CGSize(width: 0, height: PetTankView.collapsedHeight)
+        XCTAssertTrue(PetTankView.rays(across: empty).isEmpty)
+        XCTAssertTrue(PetTankView.bubbles(across: empty).isEmpty)
+        XCTAssertTrue(PetTankView.rays(across: CGSize(width: 800, height: 0)).isEmpty)
+        XCTAssertTrue(PetTankView.bubbles(across: CGSize(width: 800, height: 0)).isEmpty)
     }
 }

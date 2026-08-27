@@ -174,16 +174,22 @@ struct PetTankView: View {
     /// What the island folds down to: a band the width of the window with a
     /// pet walking along it.
     ///
-    /// A toolbar button's height, because that is the row it sits in -- a band
-    /// beside the buttons that is not their height reads as a second row
-    /// rather than as part of theirs. It still has to hold
-    /// `collapsedPetHeight` with air above the pet's head: pet-app refuses a
-    /// tank shorter than the pet standing in it.
-    static let collapsedHeight: CGFloat = 28
+    /// A toolbar button's height and a little over, grown evenly above and
+    /// below their line: the row is what the band belongs to, but a pet that
+    /// fits inside a button is not a pet you can see. Still clear of both the
+    /// window's top edge and the pane below -- the whole band is inside the
+    /// toolbar's own strip.
+    static let collapsedHeight: CGFloat = 38
+
+    /// What the band is measured against: the height of the buttons it sits
+    /// beside. Not a layout value -- `collapsedHeight` is -- but the line the
+    /// band stays centred on however far it grows past them.
+    static let toolbarRowHeight: CGFloat = 28
 
     /// How tall the pet stands on the band. Small enough that the band reads
-    /// as a line the pet walks along rather than as a short island.
-    static let collapsedPetHeight: Double = 16
+    /// as a line the pet walks along rather than as a short island, big
+    /// enough to still be the pet rather than a speck moving along it.
+    static let collapsedPetHeight: Double = 26
 
     /// Its own key, not the background's: how tall someone wants the shelf is
     /// not which mood they picked, and one changing should not reset the
@@ -313,7 +319,15 @@ struct PetTankView: View {
     /// the top edge, it reads as looking down through water.
     @ViewBuilder
     private func islandFill(_ shape: IslandShape) -> some View {
-        if let artwork = TankArtwork.image() {
+        if isCollapsed {
+            waterBand
+                .clipShape(shape)
+                // The same two edges the picture gets: the bright one is the
+                // light caught on the rim, the darker one under it is the
+                // glass having thickness.
+                .overlay { shape.strokeBorder(.white.opacity(0.40), lineWidth: 1) }
+                .overlay { shape.inset(by: 1).strokeBorder(.black.opacity(0.14), lineWidth: 1) }
+        } else if let artwork = TankArtwork.image() {
             // One Canvas, not a stack of Images. Every copy of a 4000px-wide
             // PNG laid out as its own view is rescaled by the render server
             // on each pass, and the island redraws whenever anything in the
@@ -323,30 +337,8 @@ struct PetTankView: View {
             Canvas { context, size in
                 let image = context.resolve(Image(nsImage: artwork))
                 let aspect = TankArtwork.aspect(artwork)
-                if isCollapsed {
-                    for (index, tile) in Self.bandTiles(across: size, aspect: aspect).enumerated() {
-                        // Every other copy is drawn back to front, so each
-                        // join meets its own edge and there is no seam to
-                        // find. The open island never does this -- turning
-                        // the scene round puts two lighthouses face to face,
-                        // which reads as a mistake in a way a repeat does not
-                        // -- but a band shows sand and stones, and a stone
-                        // has no way round to be wrong about.
-                        if index.isMultiple(of: 2) {
-                            context.draw(image, in: tile)
-                        } else {
-                            context.drawLayer { copy in
-                                copy.translateBy(x: tile.midX, y: 0)
-                                copy.scaleBy(x: -1, y: 1)
-                                copy.translateBy(x: -tile.midX, y: 0)
-                                copy.draw(image, in: tile)
-                            }
-                        }
-                    }
-                } else {
-                    for tile in Self.tiles(across: size, aspect: aspect) {
-                        context.draw(image, in: tile)
-                    }
+                for tile in Self.tiles(across: size, aspect: aspect) {
+                    context.draw(image, in: tile)
                 }
             }
             // Frosting, not Liquid Glass. The real material was tried here
@@ -392,6 +384,159 @@ struct PetTankView: View {
         }
     }
 
+    /// The folded band's water: drawn, not photographed.
+    ///
+    /// The picture is a scene, and a band is too short to hold one -- every
+    /// slice of it is either the busiest strip in the scene (the floor, where
+    /// all the drawn things are) or the tops of objects with no bottoms.
+    /// Colour has no such problem: what a band wants is depth and movement,
+    /// which is light through water, and that is three gradients and some
+    /// bubbles rather than a photograph of anything.
+    ///
+    /// One Canvas rather than stacked views, for the same reason the picture
+    /// is one: the island redraws on every frame a pet walks across it.
+    private var waterBand: some View {
+        let tone = TankToneReader.current()
+        return Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size)
+            // Down: the surface is lit and the bottom is not. This is the
+            // whole of the depth, and everything after it is what moves.
+            context.fill(Path(rect), with: .linearGradient(
+                Gradient(colors: tone.depth.map(\.color)),
+                startPoint: .zero,
+                endPoint: CGPoint(x: 0, y: size.height)
+            ))
+            // Along: without this the band is one flat blue the width of a
+            // window, which reads as a painted bar rather than as water.
+            // Kept faint -- it is a current running through the colour, not a
+            // second set of stripes.
+            context.fill(Path(rect), with: .linearGradient(
+                Gradient(colors: Self.currentWash(tone.currents)),
+                startPoint: .zero,
+                endPoint: CGPoint(x: size.width, y: 0)
+            ))
+            for ray in Self.rays(across: size) {
+                // Across the shaft, not down it. Down it leaves two hard
+                // edges the length of the band, which is a stripe; across it
+                // the shaft has no edge at all, which is light.
+                context.fill(ray.path, with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: .white.opacity(0), location: 0),
+                        .init(color: .white.opacity(0.16), location: 0.5),
+                        .init(color: .white.opacity(0), location: 1),
+                    ]),
+                    startPoint: ray.across.start,
+                    endPoint: ray.across.end
+                ))
+            }
+            for bubble in Self.bubbles(across: size) {
+                context.stroke(
+                    Path(ellipseIn: bubble),
+                    with: .color(.white.opacity(0.35)),
+                    lineWidth: 0.75
+                )
+            }
+        }
+    }
+
+    /// The picture's own columns, laid across the band's length over the
+    /// depth gradient.
+    ///
+    /// Every other one is dropped to clear rather than running one straight
+    /// into the next. Column averages of a scene are close together by
+    /// nature, so a gradient through all of them is a wash of one colour;
+    /// letting the depth show between them is what makes the band vary
+    /// along its length instead.
+    static func currentWash(_ currents: [TankSample]) -> [Color] {
+        guard !currents.isEmpty else { return [.clear] }
+        return currents.enumerated().flatMap { index, sample -> [Color] in
+            index.isMultiple(of: 2) ? [sample.color.opacity(Self.currentStrength)] : [.clear]
+        }
+    }
+
+    /// How much of the picture's own colour is laid over the depth. Enough to
+    /// be seen moving along the band, not enough to flatten the depth under
+    /// it.
+    static let currentStrength: Double = 0.45
+
+    /// One shaft of light, and the line to fade it along.
+    struct LightRay: Equatable {
+        var path: Path
+        /// The two edges of the shaft at half its height. Fading between
+        /// these is what stops it being a stripe.
+        var across: (start: CGPoint, end: CGPoint)
+
+        static func == (lhs: LightRay, rhs: LightRay) -> Bool {
+            lhs.path.description == rhs.path.description
+                && lhs.across.start == rhs.across.start
+                && lhs.across.end == rhs.across.end
+        }
+    }
+
+    /// Shafts of light coming down through the water, leaning the way light
+    /// does when it enters at an angle.
+    ///
+    /// Placed by arithmetic rather than by chance: this is redrawn on every
+    /// frame, and rays that moved between frames would be a shimmer nobody
+    /// asked for. Spaced by `rayPitch` so a wider window gets more of them
+    /// rather than wider ones -- wide and far apart, because a shaft of light
+    /// is a broad soft thing and a run of narrow ones is hatching.
+    static func rays(across size: CGSize) -> [LightRay] {
+        guard size.width > 0, size.height > 0 else { return [] }
+        let lean = size.height * 0.9
+        let count = max(Int(size.width / rayPitch), 1)
+        return (0..<count).map { index in
+            // Offset so the first shaft is not pinned to the band's left end,
+            // and widths alternate: evenly spaced identical shafts are a
+            // pattern, and light is not.
+            let x = rayPitch * (CGFloat(index) + 0.35)
+            let width = index.isMultiple(of: 2) ? rayWidth : rayWidth * 0.6
+            var path = Path()
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x + width, y: 0))
+            path.addLine(to: CGPoint(x: x + width - lean, y: size.height))
+            path.addLine(to: CGPoint(x: x - lean, y: size.height))
+            path.closeSubpath()
+            let middle = size.height / 2
+            return LightRay(
+                path: path,
+                across: (
+                    start: CGPoint(x: x - lean / 2, y: middle),
+                    end: CGPoint(x: x + width - lean / 2, y: middle)
+                )
+            )
+        }
+    }
+
+    static let rayPitch: CGFloat = 170
+    static let rayWidth: CGFloat = 70
+
+    /// A few bubbles, drawn as outlines rather than filled: a filled dot at
+    /// this size is a speck of dust, and a ring is a bubble.
+    ///
+    /// Deterministic for the same reason the rays are, and off the pet's own
+    /// line -- they rise through the upper half, where the pet's head is not.
+    static func bubbles(across size: CGSize) -> [CGRect] {
+        guard size.width > 0, size.height > 0 else { return [] }
+        let count = max(Int(size.width / bubblePitch), 1)
+        return (0..<count).map { index in
+            // Three sizes and three heights, cycling at different rates, so
+            // the run does not repeat until it has to.
+            let diameter = bubbleSizes[index % bubbleSizes.count]
+            let heights: [CGFloat] = [0.18, 0.44, 0.30, 0.58]
+            let y = size.height * heights[index % heights.count]
+            return CGRect(
+                x: bubblePitch * (CGFloat(index) + 0.5) - diameter / 2,
+                y: y - diameter / 2,
+                width: diameter,
+                height: diameter
+            )
+        }
+    }
+
+    static let bubblePitch: CGFloat = 74
+    static let bubbleSizes: [CGFloat] = [3, 5, 2, 4, 6]
+
     /// The picture laid end to end across the island, as many copies as it
     /// takes to fill it.
     ///
@@ -420,40 +565,6 @@ struct PetTankView: View {
                 // width where the edge lands between two pixels.
                 width: unit + Self.tileOverlap,
                 height: size.height
-            )
-        }
-    }
-
-    /// How much of the picture's height a folded band shows: the seabed at
-    /// the bottom of it, and none of the water above.
-    ///
-    /// A band is too short to hold a scene. Fitting the whole of one into it
-    /// costs a copy every couple of hundred points -- nine lighthouses across
-    /// a window, which reads as a patterned rule -- and stretching a single
-    /// copy the width of the window blows the stones up to the size of the
-    /// pet. Showing a slice and repeating *that* is what a band wants: sand
-    /// and stones are a texture, and a texture is the one thing that repeats
-    /// without anybody noticing.
-    static let bandCrop: CGFloat = 0.28
-
-    /// The picture laid end to end across a folded band, cropped to its
-    /// seabed and scaled to fill.
-    ///
-    /// Each copy is drawn taller than the band and anchored to its floor, so
-    /// what hangs off the top -- the open water and the sky above it -- is
-    /// clipped away and the sand lands on the sand.
-    static func bandTiles(across size: CGSize, aspect: CGFloat) -> [CGRect] {
-        guard size.width > 0, size.height > 0, aspect > 0, bandCrop > 0 else { return [] }
-        let drawn = size.height / bandCrop
-        let unit = max(drawn * aspect, 1)
-        let copies = max(Int(ceil(size.width / unit)), 1)
-        let start = (size.width - unit * CGFloat(copies)) / 2
-        return (0..<copies).map { index in
-            CGRect(
-                x: start + unit * CGFloat(index),
-                y: size.height - drawn,
-                width: unit + Self.tileOverlap,
-                height: drawn
             )
         }
     }
@@ -545,8 +656,19 @@ struct PetTankView: View {
                 .padding(.trailing, Self.horizontalInset)
                 .padding(.vertical, Self.verticalInset)
         }
-        .frame(height: Self.shoulderRise + Self.baseLift, alignment: .top)
-        .padding(.top, -(Self.shoulderRise + Self.baseLift))
+        .frame(height: Self.bandRaise, alignment: .top)
+        .padding(.top, -Self.bandRaise)
+    }
+
+    /// How far above the pane the folded band is drawn.
+    ///
+    /// The open island's raised shoulder reaches `shoulderRise + baseLift`,
+    /// and at a button's height the band sits exactly on that line. Half of
+    /// whatever it grows past a button is added, so the extra height is taken
+    /// evenly above and below rather than all of it downward -- the band stays
+    /// centred on the buttons' own line however tall it gets.
+    static var bandRaise: CGFloat {
+        shoulderRise + baseLift + (collapsedHeight - toolbarRowHeight) / 2
     }
 
     /// Where the band begins: past the toolbar's last button, with the same
