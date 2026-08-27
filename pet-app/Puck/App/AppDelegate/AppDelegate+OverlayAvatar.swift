@@ -275,8 +275,7 @@ extension AppDelegate {
     /// window list, for the callers handed a single rect rather than a list.
     func overlayLocalPoint(fromQuartz point: CGPoint) -> CGPoint {
         guard let frame = overlayWindow?.frame, let space = screenManager?.current else { return point }
-        let origin = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
-        return CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        return OverlayCoordinates.overlayLocal(fromQuartz: point, windowFrame: frame, in: space)
     }
 
     /// The display the pet is standing on. Everything that has to sit
@@ -294,7 +293,7 @@ extension AppDelegate {
     /// Y-down); NSEvent.mouseLocation (which ClickThroughController hit-tests
     /// against) is AppKit's global screen space (bottom-left origin, Y-up).
     func globalAppKitPoint(fromWindowLocal point: CGPoint, window: NSWindow) -> CGPoint {
-        CGPoint(x: window.frame.origin.x + point.x, y: window.frame.origin.y + (window.frame.height - point.y))
+        OverlayCoordinates.globalAppKit(fromWindowLocal: point, windowFrame: window.frame)
     }
 
     /// In a fullscreen Space the pet should roam over the whole screen, not
