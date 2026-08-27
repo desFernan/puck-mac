@@ -18,6 +18,12 @@ cd "$(dirname "$0")/.."
 # going to be wrong should not take ten minutes to say so.
 scripts/check-client-sources.py
 
+# And that no layer reaches up. One module means the compiler allows every
+# folder to see every other one, so this is the only thing standing between
+# "the movement engine must not know about the chat window" and somebody
+# reaching across for a type filed in the wrong place.
+scripts/check-layering.py
+
 # Puck.xcodeproj is generated from project.yml and deliberately untracked (it
 # embeds a per-developer DEVELOPMENT_TEAM), so a fresh clone -- CI included --
 # has no project to test until xcodegen has run.

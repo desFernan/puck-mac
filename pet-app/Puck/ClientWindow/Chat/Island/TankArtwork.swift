@@ -25,14 +25,7 @@ enum TankArtwork {
     /// draws, and decoding a wide PNG per frame is not a thing to do. A
     /// picture dropped in while the app is running is picked up at its next
     /// launch, which is what the README says.
-    static func image() -> NSImage? {
-        lock.lock()
-        defer { lock.unlock() }
-        if let loaded { return loaded }
-        guard let url = resolvedURL(), let image = NSImage(contentsOf: url) else { return nil }
-        loaded = image
-        return image
-    }
+    static func image() -> NSImage? { held() }
 
     /// The customisation folder's copy if there is one, otherwise the app's
     /// own. Yours wins: that is the whole point of the folder.
@@ -69,9 +62,7 @@ enum TankArtwork {
     /// is decode a 3596-pixel-wide PNG again while the island is being drawn.
     /// One image for the life of the process is what "loaded once and kept"
     /// meant all along.
-    ///
-    /// `nonisolated(unsafe)` with a lock around every access: the island is
-    /// drawn from whichever context SwiftUI evaluates it in.
-    private nonisolated(unsafe) static var loaded: NSImage?
-    private static let lock = NSLock()
+    private static let held = HeldOnce<NSImage> {
+        resolvedURL().flatMap(NSImage.init(contentsOf:))
+    }
 }

@@ -158,13 +158,6 @@ targets:
       # tool_call/tool_result with pet-app's tool_exec_start/end -- without
       # the agent half a failed call is an id with no tool name and no reason.
       - path: Puck/Tools/ToolExecutionLogger.swift
-      # AgentRunner logs a failed run's raw provider response here rather than
-      # putting it in the transcript, so this target needs it too. Only this
-      # file, not all of Puck/Diagnostics -- the rest is the pet's permission
-      # onboarding UI, which this app has no part in.
-      - path: Puck/Diagnostics/AppLogger.swift
-      # Both loggers this target compiles append through it.
-      - path: Puck/Diagnostics/JSONLinesFileAppender.swift
       - path: Puck/Resources/Assets.xcassets
       - path: Puck/Bridge/BridgeMessages.swift
       - path: Puck/Bridge/JSONValue.swift

@@ -1,0 +1,64 @@
+# The order Puck's layers go in, lowest first. check-layering.py fails the
+# build when a layer names a top-level type belonging to one listed below it
+# -- that is, further down this file.
+#
+# "Lower" means "knows less". Shared knows nothing about anything; App knows
+# about everything, because App is where the whole thing is wired together.
+#
+# A line with `->` records an edge that runs the wrong way and is allowed to.
+# Every one of those should either have a reason next to it or be on its way
+# out.
+
+# Knows nothing: which app this is, the coordinate spaces, the shared
+# defaults domain.
+Shared
+
+# Words. Reaches for the shared defaults domain and nothing else.
+Localization
+
+# The wire: what crosses bridge.sock and how. Deliberately knows nothing
+# about what any message means -- see BridgeMessageRouter, which does, and
+# lives up in App because deciding is wiring.
+Bridge
+
+# Things the pet or the window is made of, none of which know about each
+# other.
+Customisation
+# Sound files live inside an avatar package, so the package's layout is
+# something the sound table has to know.
+Avatar
+Audio
+WindowSensing
+Diagnostics
+Voice
+Input
+Pointing
+Editor
+Movement
+Overlay
+
+# What the pet can be asked to do.
+Tools
+Workspaces
+
+# The agent loop, which drives the tools and the editor.
+Agent
+
+# The two windows.
+ClientWindow
+Settings
+
+# Where it is all wired together, and the only layer allowed to know the lot.
+App
+
+# --- allowed to run the wrong way -------------------------------------------
+
+# The settings panel toggles the menu bar item, which belongs to the app's own
+# startup. One type, and a settings panel that cannot reach the thing it sets
+# is not obviously better.
+Settings -> App
+
+# Asking for the microphone and telling somebody how to grant it are two
+# halves of one thing that happen to be filed apart.
+Voice -> Diagnostics
+Diagnostics -> Voice

@@ -20,12 +20,6 @@ Puck/Bridge/BridgeServer.swift
 Puck/Bridge/ClientRelay.swift
 Puck/Bridge/EventRouter.swift
 
-# Screen-recording and accessibility onboarding. Only the pet needs those
-# permissions, so only the pet asks for them.
-Puck/Diagnostics/PermissionGuidance.swift
-Puck/Diagnostics/PermissionOnboarding.swift
-Puck/Diagnostics/PermissionPromptPolicy.swift
-
 # The settings window, which the pet owns. PuckClient reuses only the small
 # controls out of SettingsComponents.swift, which project.yml lists.
 Puck/Settings/AvatarManagementView.swift

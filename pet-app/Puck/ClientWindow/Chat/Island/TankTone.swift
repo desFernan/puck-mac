@@ -175,14 +175,10 @@ enum TankToneReader {
     /// customisation folder is picked up at the next launch, the same as the
     /// picture itself.
     static func current() -> TankTone {
-        lock.lock()
-        defer { lock.unlock() }
-        if let held { return held }
-        let read = TankArtwork.image().flatMap(grid(of:)).map(tone(fromGrid:)) ?? .fallback
-        held = read
-        return read
+        held() ?? .fallback
     }
 
-    private nonisolated(unsafe) static var held: TankTone?
-    private static let lock = NSLock()
+    private static let held = HeldOnce<TankTone> {
+        TankArtwork.image().flatMap(grid(of:)).map(tone(fromGrid:)) ?? .fallback
+    }
 }

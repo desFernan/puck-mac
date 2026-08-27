@@ -24,10 +24,7 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
     /// in the registry, so its cancel guarantee shouldn't be defeatable by a
     /// trap.
     ///
-    /// `nonisolated(unsafe)`: a knob two tests turn down so they do not wait
-    /// half a second, read once per cancel from whichever queue that lands
-    /// on. Nothing in the app writes it.
-    nonisolated(unsafe) static var killGracePeriod: TimeInterval = 0.5
+    static let killGracePeriod: TimeInterval = 0.5
 
     /// How long the output collectors get after the command has exited.
     ///
@@ -51,14 +48,20 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
     /// part the command was run for.
     static let maximumCapturedBytes = 128 * 1024
 
-    /// The shell every command runs under. A `var` only so a test can point it
-    /// at something that cannot launch -- a failed `run()` is otherwise
-    /// unreachable from outside, and it is the path that used to leave a
-    /// never-launched Process behind for the next cancel() to crash on.
-    /// `nonisolated(unsafe)` for the same reason as killGracePeriod above:
-    /// written only by the test that points it at a shell that cannot
-    /// launch, read on the queue the command runs from.
-    nonisolated(unsafe) static var shellPath = "/bin/zsh"
+    /// The shell every command runs under.
+    ///
+    /// Per handler rather than a static a test writes and puts back. A failed
+    /// `run()` is unreachable from outside otherwise -- and it is the path
+    /// that used to leave a never-launched Process behind for the next
+    /// cancel() to crash on -- but a global that one test reassigns is a
+    /// global every *other* test is running inside, and putting it back in a
+    /// `defer` only holds while nothing runs in parallel.
+    static let defaultShellPath = "/bin/zsh"
+    private let shellPath: String
+
+    init(shellPath: String = RunShellHandler.defaultShellPath) {
+        self.shellPath = shellPath
+    }
 
     /// One dispatch's shell.
     ///
@@ -125,7 +128,7 @@ final class RunShellHandler: ToolHandler, @unchecked Sendable {
             call.process = process
             calls[id] = call
         }
-        process.executableURL = URL(fileURLWithPath: Self.shellPath)
+        process.executableURL = URL(fileURLWithPath: shellPath)
         process.arguments = ["-lc", command]
 
         let stdoutPipe = Pipe()

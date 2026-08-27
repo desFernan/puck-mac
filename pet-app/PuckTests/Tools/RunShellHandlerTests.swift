@@ -276,10 +276,7 @@ final class RunShellHandlerTests: XCTestCase {
     /// shared by every run_shell dispatch, so the stale process outlives the
     /// call that created it and a *later* call's timeout is what trips over it.
     func test_cancelAfterAFailedLaunch_doesNotTerminateAnUnlaunchedProcess() {
-        let handler = RunShellHandler()
-
-        RunShellHandler.shellPath = "/nonexistent/shell"
-        defer { RunShellHandler.shellPath = "/bin/zsh" }
+        let handler = RunShellHandler(shellPath: "/nonexistent/shell")
 
         let failed = expectation(description: "launch failed")
         handler.execute(id: "test", args: .object(["command": .string("true")])) { result in
