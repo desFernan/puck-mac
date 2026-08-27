@@ -216,18 +216,15 @@ targets:
       - package: CodeEditSourceEditor
       - package: CodeEditLanguages
       - package: SwiftTerm
+    scheme:
+      testTargets:
+        - PuckClientTests
 
   PuckTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - path: PuckTests
-      # Compiled straight into the test bundle rather than reached through
-      # @testable import: it belongs to PuckClient, and adding it to the
-      # Puck target instead would change the pet's binary (and with it
-      # its ad-hoc signature, i.e. its Accessibility grant) for a file the
-      # pet never uses.
-      - path: PuckClient/ClientMainMenu.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckTests
@@ -235,3 +232,27 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Puck
+
+  # PuckClient's own code, which for a long time had no tests at all -- and
+  # not because it is thin. AgentHost is the agent loop wired to this app: the
+  # approval gate, the code_editor runner, which chat a run's events are
+  # addressed to. It holds more live state than anything in Puck, and none of
+  # it was covered.
+  #
+  # A second bundle rather than folding those files into PuckTests, which is
+  # what ClientMainMenu.swift did: that works only for a file that needs
+  # nothing from Puck, and everything else here needs all of it. A file
+  # compiled into PuckTests cannot say `@testable import Puck` without
+  # breaking the app that also compiles it. A test bundle hosted by PuckClient
+  # can say `@testable import PuckClient` and reach the lot.
+  PuckClientTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PuckClientTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speaki-e.PuckClientTests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: PuckClient

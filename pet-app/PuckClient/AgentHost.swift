@@ -66,7 +66,18 @@ final class AgentHost {
     /// Puck's settings panel while this app is running, and the two are
     /// separate processes -- there is no change notification to subscribe to,
     /// only the file both of them read.
-    var configuration: AgentConfiguration { .load() }
+    /// Read fresh every time rather than held: the .env behind it is a file
+    /// somebody edits while the app is running, and a turn should use what is
+    /// there now.
+    ///
+    /// Through a closure so a test can say what it found. Everything else
+    /// here is reachable without one, but the branch that matters most --
+    /// what a turn does when there is no credential -- is otherwise decided
+    /// by whatever happens to be in the .env of the machine running the
+    /// tests, which is how a suite starts passing on one laptop and failing
+    /// on another.
+    private let loadConfiguration: () -> AgentConfiguration
+    var configuration: AgentConfiguration { loadConfiguration() }
 
     /// Where the events of the current run are addressed. Captured when a run
     /// starts so results land in the session the command came from even if
@@ -138,10 +149,12 @@ final class AgentHost {
     init(
         broadcast: @escaping (BridgeMessage) -> Bool,
         resolveProjectPath: @escaping (String) -> String?,
-        describeWorkspace: @escaping (String) -> AgentRunner.WorkspaceContext? = { _ in nil }
+        describeWorkspace: @escaping (String) -> AgentRunner.WorkspaceContext? = { _ in nil },
+        loadConfiguration: @escaping () -> AgentConfiguration = { .load() }
     ) {
         self.broadcast = broadcast
         self.describeWorkspace = describeWorkspace
+        self.loadConfiguration = loadConfiguration
         self.dispatcher = PetToolDispatcher(send: broadcast)
         self.resolveProjectPath = resolveProjectPath
         self.editorFileDelegate = EditorFileDelegate(resolveProjectPath: resolveProjectPath)

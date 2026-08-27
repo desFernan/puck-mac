@@ -42,9 +42,11 @@ xcodebuild test \
     -skipPackagePluginValidation \
     CODE_SIGNING_ALLOWED=NO | tee "$BUILD_LOG"
 
-# PuckClient is a separate application target, so compiling PuckTests alone
-# cannot prove its target membership and app entry point still build.
-xcodebuild build \
+# PuckClient is a separate application target with tests of its own -- it
+# holds the agent loop, and PuckTests cannot reach a line of it. `test` rather
+# than `build`: building still proves its target membership and entry point,
+# and running proves the half of the product that lives over here.
+xcodebuild test \
     -project Puck.xcodeproj \
     -scheme PuckClient \
     -destination 'platform=macOS' \

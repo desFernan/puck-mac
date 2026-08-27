@@ -10,6 +10,7 @@
 
 import AppKit
 import XCTest
+@testable import PuckClient
 
 final class ClientMainMenuTests: XCTestCase {
     private func shortcuts(in menu: NSMenu) -> [String: NSEvent.ModifierFlags] {
