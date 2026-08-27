@@ -289,10 +289,12 @@ struct AgentSettingsView: View {
     }
 
     private var credentialFieldLabel: String {
-        if agentConfiguration.provider == .cli {
-            return String(format: text(.cliCredentialLabelFormat), agentConfiguration.codingAgent.displayName)
+        switch AgentCredentialField.resolved(for: agentConfiguration) {
+        case .cliToken(let agent):
+            return String(format: text(.cliCredentialLabelFormat), agent.displayName)
+        case .apiKey(let provider):
+            return String(format: text(.apiKeyLabelFormat), provider.displayName)
         }
-        return String(format: text(.apiKeyLabelFormat), agentConfiguration.provider.displayName)
     }
 
     /// Shown only for the CLI provider. The picker writes the *same*
@@ -429,12 +431,16 @@ struct AgentSettingsView: View {
 
     private var apiKeyStatus: String {
         if let message = apiKeyMessage { return message }
-        guard let source = agentConfiguration.keySource else {
-            // Missing is only a problem where a turn needs one. For a CLI it
-            // is the ordinary case: the program is already logged in.
-            return text(agentConfiguration.requiresCredential ? .apiKeyMissing : .apiKeyOptionalForCLI)
+        switch AgentCredentialStatus.resolved(for: agentConfiguration) {
+        case .supplied(let source):
+            return String(format: text(.apiKeySourceFormat), source.displayName)
+        // Missing is only a problem where a turn needs one. For a CLI it is
+        // the ordinary case: the program is already logged in.
+        case .missing:
+            return text(.apiKeyMissing)
+        case .notNeeded:
+            return text(.apiKeyOptionalForCLI)
         }
-        return String(format: text(.apiKeySourceFormat), source.displayName)
     }
 
     /// Passing nil removes the assignment, which is how the Remove button
