@@ -31,13 +31,39 @@ check() {
     fi
 }
 
+# The other half of the same question. A target that sources a whole folder
+# picks up everything in it, including what belongs to the other app -- which
+# nothing notices, because a resource nobody looks up is invisible rather than
+# broken. It is only weight, but it was twelve megabytes of weight.
+refute() {
+    if [ -e "$PRODUCTS/$1.app/Contents/Resources/$2" ]; then
+        echo "error: $1.app carries Resources/$2, which only the other app uses" >&2
+        echo "       Exclude it from that target's sources in project.yml." >&2
+        failed=1
+    fi
+}
+
 # PuckClient runs code_editor and shows the editor pane, so it needs both.
 check PuckClient acp-claude.mjs
 check PuckClient acp-codex.mjs
 check PuckClient FileIcons/icon-map.json
 check Puck Avatars
 # The island's one drawn background. PuckClient is the app that shows the
-# island; Puck picks the folder up implicitly.
+# island.
 check PuckClient TankBackgrounds/seabed.png
+
+# And what the pet has no way to use. ClientWindowView is built in exactly one
+# place and that place is PuckClient's delegate, so the pet draws no file tree
+# and spawns no ACP agent -- only AgentRunner does that, and only PuckClient
+# builds one.
+#
+# The island's picture is the exception: Puck keeps it, because PuckTests is
+# hosted by Puck and TankArtwork resolves against Bundle.main. What it must
+# not have is the second, flattened copy the group used to add beside the
+# folder reference -- two megabytes nothing could look up.
+refute Puck seabed.png
+refute Puck FileIcons
+refute Puck acp-claude.mjs
+refute Puck acp-codex.mjs
 
 exit $failed
