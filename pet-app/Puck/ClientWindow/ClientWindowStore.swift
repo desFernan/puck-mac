@@ -18,42 +18,25 @@ final class ClientWindowStore: ObservableObject {
     /// language-independent value; `ChatSession.displayTitle` translates it.
     private static let casualSessionTitle = ChatSession.casualTitle
 
-    /// Sessions are keyed on (workspaceId, sessionId), not sessionId alone:
-    /// every workspace gets its own "default" casual session (see
-    /// seedDefaultSession), so session_id is only unique within a workspace.
-    private struct SessionKey: Hashable {
-        let workspaceId: String
-        let sessionId: String
-    }
-
     private let sender: UserInputSender
-    private var sessionsByKey: [SessionKey: ChatSession] = [:]
-    private var sessionOrder: [SessionKey] = []
+    /// Every chat this window knows about -- see SessionList, which owns the
+    /// keying and the ordering.
+    private var sessionList = SessionList()
 
     static let tankPinnedKey = "Puck.tankPinned"
 
-    /// Where the island is, in AppKit global coordinates, or nil when it is
-    /// not on screen. One frame: the island is one view above the columns it
-    /// covers, and the sidebar it does not cover is outside it.
-    private(set) var tankFrame: CGRect?
+    /// What this window tells pet-app about the island -- see PetHomeReport,
+    /// which owns the three facts and what they mean together.
+    private var petHome = PetHomeReport()
 
-    /// Whether the client window is the one the user is looking at. Reported
-    /// by the window itself; the pet only comes home for a frontmost window.
-    private(set) var windowIsFrontmost = false
-
-    /// Whether there is a window at all.
-    ///
-    /// Distinct from frontmost on purpose: pinning is what keeps the pet home
-    /// while the window sits behind something else, and pinning must not keep
-    /// it home when the window has been closed. The pet was left standing on
-    /// a tank that no longer existed -- floating in the space where the window
-    /// had been.
-    private(set) var windowIsOpen = true
+    /// Read by the island's own tests and by nothing else in the app: the
+    /// window reports these in and never reads them back.
+    var tankFrame: CGRect? { petHome.tankFrame }
+    var windowIsFrontmost: Bool { petHome.windowIsFrontmost }
+    var windowIsOpen: Bool { petHome.windowIsOpen }
 
     func setTankFrame(_ frame: CGRect?) {
-        guard tankFrame != frame else { return }
-        tankFrame = frame
-        reportPetHome()
+        reportPetHomeIfChanged(petHome.setTankFrame(frame))
     }
 
     /// How tall the pet stands on the island, in points, from the lever on
@@ -65,16 +48,11 @@ final class ClientWindowStore: ObservableObject {
     }
 
     func setWindowIsFrontmost(_ isFrontmost: Bool) {
-        guard windowIsFrontmost != isFrontmost else { return }
-        windowIsFrontmost = isFrontmost
-        reportPetHome()
+        reportPetHomeIfChanged(petHome.setWindowIsFrontmost(isFrontmost))
     }
 
     func setWindowIsOpen(_ isOpen: Bool) {
-        guard windowIsOpen != isOpen else { return }
-        windowIsOpen = isOpen
-        if !isOpen { windowIsFrontmost = false }
-        reportPetHome()
+        reportPetHomeIfChanged(petHome.setWindowIsOpen(isOpen))
     }
 
     /// Sends the tank as it stands, whether or not anything changed.
@@ -86,16 +64,17 @@ final class ClientWindowStore: ObservableObject {
         reportPetHome()
     }
 
-    /// Sent only when something actually moved -- a resize produces a rect per
-    /// layout pass, and an unchanged one carries no news.
+    private func reportPetHomeIfChanged(_ changed: Bool) {
+        guard changed else { return }
+        reportPetHome()
+    }
+
     private func reportPetHome() {
         guard let space = GlobalScreenSpace.current() else { return }
-        // A closed window has no tank whatever its last reported frame was.
-        let wire = (windowIsOpen ? tankFrame : nil).map { frame -> BridgeRect in
-            let topLeft = space.normalized(fromAppKit: CGPoint(x: frame.minX, y: frame.maxY))
-            return BridgeRect(x: topLeft.x, y: topLeft.y, width: frame.width, height: frame.height)
-        }
-        sender.reportPetHome(rect: wire, visible: windowIsFrontmost && wire != nil)
+        sender.reportPetHome(
+            rect: petHome.wireRect(in: space),
+            visible: petHome.isPetVisible(in: space)
+        )
     }
 
     /// F15 (2026-07-31): set when an agent runs in this process, which it now
@@ -190,34 +169,28 @@ final class ClientWindowStore: ObservableObject {
         insertSession(ChatSession(id: Self.defaultSessionId, workspaceId: workspaceId, title: Self.casualSessionTitle, origin: .user))
     }
 
-    /// The one way a session joins the list. `sessionsByKey`/`sessionOrder`
-    /// are not `@Published` (the sidebar reads them through `sessions(in:)`),
-    /// so an insert has to announce itself the way the removal in
-    /// moveTurnToTaskSession does -- a sidebar drawn from a stale snapshot
+    /// The one way a session joins the list. `sessionList` is not
+    /// `@Published` (the sidebar reads it through `sessions(in:)`), so an
+    /// insert has to announce itself -- a sidebar drawn from a stale snapshot
     /// drops rows that exist and leaves the selection under the wrong header.
-    /// Funnelled rather than repeated at each call site: the announcement is
-    /// exactly the kind of thing a fourth insert added later would forget.
-    ///
-    /// Ignores a key already present, which is the idempotence every caller
-    /// wanted anyway: pet-app replays its registry on connect, and F15's agent
-    /// announces its task session on the socket *and* opens it locally, so the
-    /// same session legitimately arrives twice. Re-creating would wipe the
-    /// messages already in it and duplicate the sidebar row.
+    /// See SessionList for why an insert that changes nothing is legitimate
+    /// and must not announce.
     private func insertSession(_ session: ChatSession) {
-        let key = SessionKey(workspaceId: session.workspaceId, sessionId: session.id)
-        guard sessionsByKey[key] == nil else { return }
-        objectWillChange.send()
-        sessionsByKey[key] = session
-        sessionOrder.append(key)
+        announceIfChanged(sessionList.insert(session))
     }
 
     /// The one way a session leaves the list -- the mirror of insertSession,
     /// and it announces for the same reason.
-    private func removeSession(_ key: SessionKey) {
-        guard sessionsByKey[key] != nil else { return }
+    private func removeSession(workspaceId: String, sessionId: String) {
+        announceIfChanged(sessionList.remove(workspaceId: workspaceId, sessionId: sessionId))
+    }
+
+    /// SessionList reports whether it changed; a mutation that changed
+    /// nothing must not announce, or every replayed registry entry redraws
+    /// the sidebar.
+    private func announceIfChanged(_ changed: Bool) {
+        guard changed else { return }
         objectWillChange.send()
-        sessionsByKey.removeValue(forKey: key)
-        sessionOrder.removeAll { $0 == key }
     }
 
     /// Whether the sidebar's Delete should be offered for this chat.
@@ -245,7 +218,7 @@ final class ClientWindowStore: ObservableObject {
     @discardableResult
     func deleteSession(workspaceId: String, sessionId: String) -> Bool {
         guard canDeleteSession(workspaceId: workspaceId, sessionId: sessionId) else { return false }
-        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sessionId))
+        removeSession(workspaceId: workspaceId, sessionId: sessionId)
         // Deleting the chat on screen has to leave the user somewhere, and the
         // casual session is the one that is guaranteed to still be there.
         if activeWorkspaceId == workspaceId, activeSessionId == sessionId {
@@ -257,11 +230,11 @@ final class ClientWindowStore: ObservableObject {
 
     /// Sessions under `workspaceId`, oldest first.
     func sessions(in workspaceId: String) -> [ChatSession] {
-        sessionOrder.compactMap { $0.workspaceId == workspaceId ? sessionsByKey[$0] : nil }
+        sessionList.sessions(in: workspaceId)
     }
 
     func session(workspaceId: String, sessionId: String) -> ChatSession? {
-        sessionsByKey[SessionKey(workspaceId: workspaceId, sessionId: sessionId)]
+        sessionList.session(workspaceId: workspaceId, sessionId: sessionId)
     }
 
     /// Feed for the workspace_create/session_create confirmations off the
@@ -333,17 +306,16 @@ final class ClientWindowStore: ObservableObject {
         title: String,
         userMessage: String
     ) {
-        let key = SessionKey(workspaceId: workspaceId, sessionId: sessionId)
         insertSession(ChatSession(id: sessionId, workspaceId: workspaceId, title: title, origin: .agent))
         if !userMessage.isEmpty {
-            sessionsByKey[key]?.appendUserMessage(userMessage)
+            session(workspaceId: workspaceId, sessionId: sessionId)?.appendUserMessage(userMessage)
         }
 
         activeWorkspaceId = workspaceId
         activeSessionId = sessionId
 
         guard sourceSessionId != Self.defaultSessionId, sourceSessionId != sessionId else { return }
-        removeSession(SessionKey(workspaceId: workspaceId, sessionId: sourceSessionId))
+        removeSession(workspaceId: workspaceId, sessionId: sourceSessionId)
         // The chat is gone, so the agent's memory of it should be too. The
         // task session was handed a copy on the way out, so nothing is lost.
         onSessionDeleted?(workspaceId, sourceSessionId)
@@ -541,9 +513,7 @@ final class ClientWindowStore: ObservableObject {
     func applyWorkspaceDeletion(workspaceId: String) {
         guard workspaces.contains(where: { $0.id == workspaceId }) else { return }
         workspaces.removeAll { $0.id == workspaceId }
-        for key in sessionOrder where key.workspaceId == workspaceId {
-            removeSession(key)
-        }
+        announceIfChanged(sessionList.removeAll(inWorkspace: workspaceId))
         pendingSessionRequests.removeValue(forKey: workspaceId)
         guard activeWorkspaceId == workspaceId else { return }
         // Somewhere to stand: the workspace that cannot be deleted.
