@@ -216,3 +216,155 @@ final class CeilingStateTests: XCTestCase {
         XCTAssertTrue(tail.allSatisfy { $0 == tail.first }, "facing should settle, not alternate every frame: \(tail)")
     }
 }
+
+/// The camera housing at the top of a MacBook, once the pet's world reaches
+/// it. Usually it does not -- the menu bar is exactly as tall as the notch,
+/// so the ceiling is already below it -- but in a fullscreen Space that
+/// height is given back and a black rectangle is hanging into the room.
+@MainActor
+final class CeilingNotchTests: XCTestCase {
+    /// A 1000x500 screen with a notch 200 wide and 40 deep in the middle.
+    private let screen = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    private let notch = ScreenNotch(rect: CGRect(x: 400, y: 0, width: 200, height: 40))
+
+    private func world(startingAt x: CGFloat) -> TestStateWorld {
+        let world = TestStateWorld(position: CGPoint(x: x, y: 0))
+        world.roamableArea = screen
+        world.roamableAreas = [screen]
+        world.notch = notch
+        // Small enough to fit under the notch, so what is being tested is the
+        // ceiling rather than containment refusing an oversized avatar.
+        world.visualBounds = CGRect(x: -10, y: -20, width: 20, height: 20)
+        return world
+    }
+
+    /// The reported behaviour: a crawl that keeps aiming at the screen's own
+    /// top edge walks the pet straight through the camera.
+    func test_theCrawlDucksUnderTheHousing() {
+        let world = world(startingAt: 380)
+        let state = CeilingState()
+        state.enter()
+
+        var wentUnder = false
+        for _ in 0..<600 {
+            world.run(state, seconds: 1.0 / 60)
+            let x = world.body.position.x
+            if x > notch.rect.minX, x < notch.rect.maxX {
+                wentUnder = true
+                XCTAssertEqual(
+                    world.body.position.y, notch.rect.maxY,
+                    accuracy: 0.5,
+                    "under the housing the ceiling is its bottom edge, not the screen's top"
+                )
+            }
+        }
+        XCTAssertTrue(wentUnder, "the crawl has to actually reach the notch for this to have tested anything")
+    }
+
+    /// And comes back up on the other side of it rather than staying low.
+    func test_itRisesAgainPastTheHousing() {
+        let world = world(startingAt: 380)
+        let state = CeilingState()
+        state.enter()
+
+        var sawClearOfTheNotch = false
+        for _ in 0..<900 {
+            world.run(state, seconds: 1.0 / 60)
+            let x = world.body.position.x
+            if x > notch.rect.maxX + 20 {
+                sawClearOfTheNotch = true
+                XCTAssertEqual(world.body.position.y, screen.minY, accuracy: 0.5)
+            }
+        }
+        XCTAssertTrue(sawClearOfTheNotch)
+    }
+
+    /// A screen with no notch is the ordinary case and must be untouched.
+    func test_withoutAHousingTheCeilingIsTheScreensOwnTop() {
+        let world = world(startingAt: 380)
+        world.notch = nil
+        let state = CeilingState()
+        state.enter()
+
+        for _ in 0..<600 {
+            world.run(state, seconds: 1.0 / 60)
+            XCTAssertEqual(world.body.position.y, screen.minY, accuracy: 0.001)
+        }
+    }
+
+    /// Climbing up to a ceiling that has the housing over it stops at the
+    /// housing, or the pet's head goes behind the camera on the way.
+    func test_theClimbStopsUnderTheHousing() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 400))
+        world.roamableArea = screen
+        world.roamableAreas = [screen]
+        world.notch = notch
+        world.avatarHeight = 20
+        world.visualBounds = CGRect(x: -10, y: -20, width: 20, height: 20)
+        // The pet climbs a window's *edge*, so its side has to be where the
+        // pet is -- and that x has to be under the notch for this to be a
+        // test of the notch.
+        world.windows = [WindowInfo(windowID: 1, ownerPID: 1, ownerName: nil, title: nil, layer: 0,
+                                    frame: CGRect(x: 500, y: 0, width: 400, height: 500))]
+        let state = ClimbToCeilingState()
+        state.enter()
+
+        world.run(state, seconds: 4)
+
+        XCTAssertEqual(
+            world.body.position.y, notch.rect.maxY + world.avatarHeight,
+            accuracy: MovementSolver.arrivalRadius,
+            "the head stops at the housing's bottom edge, not the screen's top"
+        )
+    }
+}
+
+/// A thrown pet meets the housing too. Bouncing off the screen's own top
+/// edge under the notch means going behind the camera to do it.
+@MainActor
+final class FallNotchTests: XCTestCase {
+    private let screen = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    private let notch = ScreenNotch(rect: CGRect(x: 400, y: 0, width: 200, height: 40))
+
+    func test_aThrowUnderTheHousingBouncesOffIt() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 300))
+        world.roamableArea = screen
+        world.roamableAreas = [screen]
+        world.notch = notch
+        world.visualBounds = CGRect(x: -10, y: -20, width: 20, height: 20)
+        world.body.launchVelocity = CGPoint(x: 0, y: -2000)
+        let state = FallState()
+        state.enter()
+
+        var highest = CGFloat.greatestFiniteMagnitude
+        for _ in 0..<120 {
+            world.run(state, seconds: 1.0 / 60)
+            highest = min(highest, world.body.position.y + world.visualBounds.minY)
+        }
+
+        XCTAssertGreaterThanOrEqual(
+            highest, notch.rect.maxY - 1,
+            "the head went behind the camera housing"
+        )
+    }
+
+    /// Clear of the notch, the whole screen is still available.
+    func test_aThrowBesideTheHousingReachesTheScreensTop() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 300))
+        world.roamableArea = screen
+        world.roamableAreas = [screen]
+        world.notch = notch
+        world.visualBounds = CGRect(x: -10, y: -20, width: 20, height: 20)
+        world.body.launchVelocity = CGPoint(x: 0, y: -2000)
+        let state = FallState()
+        state.enter()
+
+        var highest = CGFloat.greatestFiniteMagnitude
+        for _ in 0..<120 {
+            world.run(state, seconds: 1.0 / 60)
+            highest = min(highest, world.body.position.y + world.visualBounds.minY)
+        }
+
+        XCTAssertLessThan(highest, notch.rect.maxY, "nothing is in the way over here")
+    }
+}

@@ -92,11 +92,20 @@ final class FallState: StateHandler {
         // CeilingState crawls along that one: the box around several displays
         // has a top edge that can be a monitor away, and a throw bouncing off
         // that one leaves the screen on the way up.
+        // The area with the camera housing taken out of it where the pet is
+        // going up: a throw that bounces off the screen's own top edge under
+        // a MacBook's notch goes behind the camera to do it.
+        let area = context.area(at: step.position)
         let ceiling = ScreenBounds.bounceOffCeiling(
             position: step.position,
             velocity: step.velocity,
             visualBounds: context.visualBounds,
-            in: context.area(at: step.position)
+            in: CGRect(
+                x: area.minX,
+                y: context.ceilingY(atX: step.position.x, on: area),
+                width: area.width,
+                height: area.height
+            )
         )
         context.body.position = ceiling.position
         velocity = ceiling.velocity

@@ -67,6 +67,12 @@ extension AppDelegate {
             // do about it; this only says what the pet is doing.
             self.windowListWatcher?.isPetActive = !isResting
 
+            // Which display the pet is on decides whether there is a housing
+            // hanging into its ceiling, and it can walk between displays --
+            // so this is a frame's question, not a setup one. Reading it is
+            // arithmetic on frames the screen manager already caches.
+            self.characterController?.notch = self.petScreenNotch
+
             // A spin-style toy is carried above the pet's head for as long as
             // the pet is playing with it -- position and rotation both come
             // from here, since it is the frame loop that knows dt.

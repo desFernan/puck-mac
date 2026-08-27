@@ -33,6 +33,16 @@ struct StateContext {
     /// the helpers below fall back to `roamableArea` for it.
     var roamableAreas: [CGRect] = []
 
+    /// The camera housing hanging into the pet's world, when there is one
+    /// and the pet's world reaches it.
+    ///
+    /// Usually nil in effect: the roamable area comes from `visibleFrame`,
+    /// which has the menu bar subtracted, and on a notched Mac the menu bar
+    /// is exactly as tall as the notch. In a fullscreen Space that height is
+    /// given back and the notch really is hanging into the room -- see
+    /// ScreenNotch.
+    var notch: ScreenNotch?
+
     /// The rendered avatar's current height (manifest hitbox * scale). F3
     /// ceiling-crawling (2026-07-29): ClimbToCeilingState needs this to climb
     /// to where the character's HEAD reaches the ceiling, not its feet --
@@ -75,6 +85,15 @@ struct StateContext {
     /// Asks the FSM to enter another state after this frame. Deferred rather
     /// than immediate so a state never mutates the controller mid-update.
     let requestTransition: (StateKind) -> Void
+
+    /// How high the pet may go at `x`: the top of the display it is on, or
+    /// the bottom of the notch where the notch is in the way.
+    ///
+    /// The ceiling is a function of x rather than a line, which is what
+    /// having a physical object hang into the room means.
+    func ceilingY(atX x: CGFloat, on area: CGRect) -> CGFloat {
+        notch?.ceiling(atX: x, areaTop: area.minY) ?? area.minY
+    }
 
     /// The display `point` is on -- what "the top of the screen" and "the
     /// bottom of the screen" mean where the pet currently is. With several

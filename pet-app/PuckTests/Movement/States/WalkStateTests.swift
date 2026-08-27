@@ -40,6 +40,8 @@ final class TestStateWorld {
     var windows: [WindowInfo] = []
     /// Settings' "포커스된 창 위로는 올라가지 않기", as WalkState sees it.
     var unclimbableWindowIDs: Set<CGWindowID> = []
+    /// The camera housing, on the machines that have one.
+    var notch: ScreenNotch?
 
     init(position: CGPoint = .zero) {
         body = CharacterBody(avatar: avatar, position: position)
@@ -50,6 +52,7 @@ final class TestStateWorld {
             body: body,
             roamableArea: roamableArea,
             roamableAreas: roamableAreas,
+            notch: notch,
             avatarHeight: avatarHeight,
             visualBounds: visualBounds,
             walkSpeed: walkSpeed,

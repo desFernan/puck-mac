@@ -65,11 +65,19 @@ final class CeilingState: StateHandler {
         // box's top edge is somewhere off this screen entirely, and a crawl
         // aimed at it takes the pet off the top of the screen it is on.
         let area = context.area(at: context.body.position)
-        let travelled = CGPoint(
-            x: context.body.position.x + direction * context.walkSpeed * CGFloat(dt),
-            y: area.minY
-        )
-        let contained = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: area)
+        // Where the pet is going, and how high the ceiling is *there*. A
+        // MacBook's camera housing hangs into this room once the menu bar is
+        // out of the way, and a crawl that kept aiming at the screen's own
+        // top edge walks the pet straight through it -- see ScreenNotch.
+        let travelledX = context.body.position.x + direction * context.walkSpeed * CGFloat(dt)
+        let travelled = CGPoint(x: travelledX, y: context.ceilingY(atX: travelledX, on: area))
+        // Contained horizontally against the display, then dropped to the
+        // ceiling at wherever containment actually put it: pinning at a wall
+        // and reading the ceiling from before the pin disagree by a step, and
+        // at the notch's edge a step is the difference between hugging it and
+        // clipping the corner.
+        let pinned = ScreenBounds.contain(travelled, visualBounds: context.visualBounds, in: area)
+        let contained = CGPoint(x: pinned.x, y: context.ceilingY(atX: pinned.x, on: area))
         // An oversized avatar (Settings' size slider) has no position where
         // it actually fits -- `contain` always pins to leftLimit regardless
         // of `travelled`, so comparing against it would flip `direction`
