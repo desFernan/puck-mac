@@ -134,7 +134,8 @@ final class AgentRunner {
     /// already in it: asked about a project, the model repeated an earlier
     /// chat's "No project folder is bound to it, so there are no files to read
     /// or list" -- a line that had been true of a different workspace.
-    private var conversations: [String: [GPTMessage]] = [:]
+    /// What the model has been told, per chat -- see AgentConversations.
+    private let conversations = AgentConversations(systemPrompt: AgentRunner.systemPrompt)
 
     /// Guards every stored property below. `run` is async and this is a plain
     /// class, so its body resumes on whatever executor the API call came back
@@ -164,63 +165,30 @@ final class AgentRunner {
     /// notices -- reading it late is how a dying run's last answer would land
     /// in the chat that replaced it.
     private func conversation(_ key: String) -> [GPTMessage] {
-        stateQueue.sync { conversations[key] ?? [.system(Self.systemPrompt)] }
+        conversations.messages(in: key)
     }
 
     private func append(_ message: GPTMessage, to key: String) {
-        stateQueue.sync {
-            var stack = conversations[key] ?? [.system(Self.systemPrompt)]
-            stack.append(message)
-            conversations[key] = stack
-        }
+        conversations.append(message, to: key)
     }
 
     /// Gives `to` the conversation `from` has, for the one case where a new
     /// chat is a continuation rather than a beginning: the agent branching its
     /// work into a task session (openTaskSession).
     func carryConversation(from sourceSessionId: String, to sessionId: String) {
-        stateQueue.sync {
-            guard let source = conversations[sourceSessionId] else { return }
-            conversations[sessionId] = source
-            announcedWorkspaceContexts[sessionId] = announcedWorkspaceContexts[sourceSessionId]
-        }
+        conversations.carry(from: sourceSessionId, to: sessionId)
     }
 
-    /// How many non-system messages a chat keeps. Nothing trimmed the stack
-    /// before, so a long chat grew every turn until it hit the model's context
-    /// limit -- which surfaces to the user as an unexplained API error partway
-    /// through a conversation that had been working.
-    private static let maxMessages = 60
-
-    /// Drops the oldest turns once a chat is over the cap.
-    ///
-    /// System lines are kept whatever their age -- there are a handful of them
-    /// (the prompt, and one per workspace the chat has seen) and losing one
-    /// would silently un-tell the model something it was told once. The head of
-    /// what is kept is never a tool result: the API rejects one whose
-    /// assistant tool_calls message has been trimmed away above it.
+    /// Drops the oldest turns once a chat is over the cap -- see
+    /// AgentConversations.trim for what is kept and why.
     private func trimConversation(_ key: String) {
-        stateQueue.sync {
-            let stack = conversations[key] ?? [.system(Self.systemPrompt)]
-            var systems: [GPTMessage] = []
-            var rest: [GPTMessage] = []
-            for message in stack {
-                if case .system = message { systems.append(message) } else { rest.append(message) }
-            }
-            guard rest.count > Self.maxMessages else { return }
-            var kept = Array(rest.suffix(Self.maxMessages))
-            while let first = kept.first, case .tool = first { kept.removeFirst() }
-            conversations[key] = systems + kept
-        }
+        conversations.trim(key)
     }
 
     /// Drops a deleted chat's conversation. The user threw it away; the model
     /// should not still be holding it.
     func forgetSession(_ sessionId: String) {
-        stateQueue.sync {
-            conversations.removeValue(forKey: sessionId)
-            announcedWorkspaceContexts.removeValue(forKey: sessionId)
-        }
+        conversations.forget(sessionId)
     }
 
     /// A model that keeps calling tools without concluding would otherwise
@@ -267,10 +235,7 @@ final class AgentRunner {
     /// apart by `sessionId` and dropped by `forgetSession` -- but it stays as
     /// the way to hand the runner a clean slate.
     func reset() {
-        stateQueue.sync {
-            conversations.removeAll()
-            announcedWorkspaceContexts.removeAll()
-        }
+        conversations.forgetEverything()
     }
 
     /// Describes the workspace this run belongs to. Injected per run rather
@@ -308,22 +273,8 @@ final class AgentRunner {
     }
     private var storedWorkspaceContext: WorkspaceContext?
 
-    /// What was last announced to each chat, so a ten-turn conversation in one
-    /// workspace does not accumulate ten identical system lines -- and so a
-    /// chat opened later under a different workspace still hears about its
-    /// own, which a single shared value did not do.
-    private var announcedWorkspaceContexts: [String: WorkspaceContext] = [:]
-
-    /// Records `context` as announced to `key`, and reports whether that was
-    /// news. One step, under the lock, because the check and the write have to
-    /// be atomic: two turns in the same chat that both read "not announced"
-    /// would each append the same system line.
     private func markAnnounced(_ context: WorkspaceContext, to key: String) -> Bool {
-        stateQueue.sync {
-            guard announcedWorkspaceContexts[key] != context else { return false }
-            announcedWorkspaceContexts[key] = context
-            return true
-        }
+        conversations.markAnnounced(context, to: key)
     }
 
     /// What the transcript ends with when the user presses Stop. Not an error
