@@ -37,6 +37,9 @@ struct SettingsView: View {
     /// Opens the settings window. Only the panel offers this; the window is
     /// not going to offer to open itself.
     var onOpenSettings: (() -> Void)?
+    /// Applied while the settings window is open, so the notch appears and
+    /// disappears with the switch rather than at the next launch.
+    var onNotchPanelChanged: ((Bool) -> Void)?
 
     /// Whether this is the menu bar's panel rather than the settings window.
     ///
@@ -64,6 +67,7 @@ struct SettingsView: View {
     @State private var autoMuteOnFocus: Bool
     @State private var isMuteComplaintEnabled: Bool
     @State private var avoidClimbingFocusedWindow: Bool
+    @State private var notchPanelEnabled: Bool
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
     @State private var toysOut: Set<String>
@@ -81,6 +85,7 @@ struct SettingsView: View {
         onOpenClient: (() -> Void)? = nil,
         onToggleVisibility: (() -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
+        onNotchPanelChanged: ((Bool) -> Void)? = nil,
         onQuit: (() -> Void)? = nil,
         showsOnlyLiveControls: Bool = false
     ) {
@@ -92,6 +97,7 @@ struct SettingsView: View {
         self.onOpenClient = onOpenClient
         self.onToggleVisibility = onToggleVisibility
         self.onOpenSettings = onOpenSettings
+        self.onNotchPanelChanged = onNotchPanelChanged
         self.onQuit = onQuit
         self.showsOnlyLiveControls = showsOnlyLiveControls
         _appearance = State(initialValue: store.appearance)
@@ -101,6 +107,7 @@ struct SettingsView: View {
         _autoMuteOnFocus = State(initialValue: store.autoMuteOnFocus)
         _isMuteComplaintEnabled = State(initialValue: store.isMuteComplaintEnabled)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
+        _notchPanelEnabled = State(initialValue: store.isNotchPanelEnabled)
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
         _toyScale = State(initialValue: store.toyScale)
         _toysOut = State(initialValue: initialToysOut)
@@ -257,6 +264,15 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(title: text(.tabGeneral)) {
+            SettingsRow(label: text(.notchPanelLabel)) {
+                Toggle("", isOn: $notchPanelEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: notchPanelEnabled) { _, newValue in
+                        store.isNotchPanelEnabled = newValue
+                        onNotchPanelChanged?(newValue)
+                    }
+            }
             // First in General: it changes every other label on screen, so
             // finding it should not require reading the rest in a language
             // you don't have. Options name themselves for the same reason.

@@ -84,7 +84,13 @@ extension AppDelegate {
             )
             created.isReleasedWhenClosed = false
             created.contentViewController = NSHostingController(
-                rootView: SettingsView(store: settingsStore)
+                rootView: SettingsView(
+                    store: settingsStore,
+                    onNotchPanelChanged: { [weak self] _ in
+                        guard let self, let controller = self.characterController else { return }
+                        self.applyScreenNotches(to: controller)
+                    }
+                )
             )
             created.center()
             settingsWindow = created

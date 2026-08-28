@@ -431,6 +431,14 @@ extension AppDelegate {
     /// left behind after the display it was on went away -- is a pet stopping
     /// where there is nothing and walking through what there is.
     func applyScreenNotches(to controller: CharacterController) {
+        // Both halves follow the one switch, or the pet ducks around a
+        // housing nobody can see. Off by default -- see
+        // SettingsStore.isNotchPanelEnabled.
+        guard settingsStore.isNotchPanelEnabled else {
+            controller.notches = []
+            notchPanelController.present(notchAppKitRect: nil)
+            return
+        }
         controller.notches = screenNotches
         notchPanelController.present(notchAppKitRect: panelNotchAppKitRect)
     }

@@ -240,6 +240,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// Option+Shift+Space-opens-the-client-window behavior.
     case menuOpenClient
     case menuSettings
+    case notchPanelLabel
 }
 
 enum Strings {
@@ -610,6 +611,7 @@ enum Strings {
         .menuQuit: "Puck 종료",
         .menuOpenClient: "Puck 채팅 열기",
         .menuSettings: "설정…",
+        .notchPanelLabel: "노치 패널",
     ]
 
     private static let english: [L10nKey: String] = [
@@ -959,5 +961,6 @@ enum Strings {
         .menuQuit: "Quit Puck",
         .menuOpenClient: "Open Puck Chat",
         .menuSettings: "Settings…",
+        .notchPanelLabel: "Notch panel",
     ]
 }

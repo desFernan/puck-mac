@@ -15,6 +15,7 @@ final class SettingsStore {
         static let isMuted = "Puck.isMuted"
         static let autoMuteOnFocus = "Puck.autoMuteOnFocus"
         static let avoidClimbingFocusedWindow = "Puck.avoidClimbingFocusedWindow"
+        static let notchPanelEnabled = "Puck.notchPanelEnabled"
         static let walkSpeedMultiplier = "Puck.walkSpeedMultiplier"
         static let toyScale = "Puck.toyScale"
         static let speechLocale = "Puck.speechLocale"
@@ -94,6 +95,18 @@ final class SettingsStore {
     var autoMuteOnFocus: Bool {
         get { defaults.bool(forKey: Keys.autoMuteOnFocus) }
         set { defaults.set(newValue, forKey: Keys.autoMuteOnFocus) }
+    }
+
+    /// Whether the notch panel is shown at all.
+    ///
+    /// Off unless somebody turns it on. It puts a window over the menu bar
+    /// that takes the pointer where it is drawn, and it gives a display
+    /// without a camera housing one -- neither is something to do to a person
+    /// who installed a desktop pet and has not asked for it. It is on in the
+    /// builds it is being worked on in, and the switch is in Settings.
+    var isNotchPanelEnabled: Bool {
+        get { defaults.object(forKey: Keys.notchPanelEnabled) as? Bool ?? false }
+        set { defaults.set(newValue, forKey: Keys.notchPanelEnabled) }
     }
 
     /// "포커스 창 위로 안 올라감" wander option (02_pet-app.md F3).
