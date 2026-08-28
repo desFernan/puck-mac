@@ -239,6 +239,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// -- this menu item activates/launches it, replacing the old
     /// Option+Shift+Space-opens-the-client-window behavior.
     case menuOpenClient
+    case menuSettings
 }
 
 enum Strings {
@@ -608,6 +609,7 @@ enum Strings {
         .menuShow: "보이기",
         .menuQuit: "Puck 종료",
         .menuOpenClient: "Puck 채팅 열기",
+        .menuSettings: "설정…",
     ]
 
     private static let english: [L10nKey: String] = [
@@ -956,5 +958,6 @@ enum Strings {
         .menuShow: "Show",
         .menuQuit: "Quit Puck",
         .menuOpenClient: "Open Puck Chat",
+        .menuSettings: "Settings…",
     ]
 }

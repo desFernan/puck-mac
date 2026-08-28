@@ -34,6 +34,19 @@ struct SettingsView: View {
     var initialIsCharacterHidden: Bool = false
     var onOpenClient: (() -> Void)?
     var onToggleVisibility: (() -> Void)?
+    /// Opens the settings window. Only the panel offers this; the window is
+    /// not going to offer to open itself.
+    var onOpenSettings: (() -> Void)?
+
+    /// Whether this is the menu bar's panel rather than the settings window.
+    ///
+    /// The panel is one click from the status item and sits over whatever the
+    /// user was doing, so what belongs in it is what the pet is doing now --
+    /// which toys are out, how big they are, which avatar. Volume curves,
+    /// walk speed and the language are set once and then left, and they were
+    /// making a drop-down panel into a scrolling form. They live in a window
+    /// now, and the panel offers a row that opens it.
+    var showsOnlyLiveControls = false
     var onQuit: (() -> Void)?
 
     /// Watched so flipping the language redraws this window's own text
@@ -67,7 +80,9 @@ struct SettingsView: View {
         initialIsCharacterHidden: Bool = false,
         onOpenClient: (() -> Void)? = nil,
         onToggleVisibility: (() -> Void)? = nil,
-        onQuit: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onQuit: (() -> Void)? = nil,
+        showsOnlyLiveControls: Bool = false
     ) {
         self.store = store
         self.onAvatarScaleChanged = onAvatarScaleChanged
@@ -76,7 +91,9 @@ struct SettingsView: View {
         self.initialIsCharacterHidden = initialIsCharacterHidden
         self.onOpenClient = onOpenClient
         self.onToggleVisibility = onToggleVisibility
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+        self.showsOnlyLiveControls = showsOnlyLiveControls
         _appearance = State(initialValue: store.appearance)
         _clientTheme = State(initialValue: store.clientThemeStyle)
         _volume = State(initialValue: Double(store.volume))
@@ -100,18 +117,28 @@ struct SettingsView: View {
             Divider().opacity(0.5)
             ScrollView {
                 VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
+                    // What the pet is doing right now, and only that. Sound,
+                    // movement and the app's own settings moved to a window
+                    // -- see `showsOnlyLiveControls`.
                     avatarSection
                     toySection
-                    soundSection
-                    movementSection
-                    generalSection
+                    if !showsOnlyLiveControls {
+                        soundSection
+                        movementSection
+                        generalSection
+                    }
                 }
                 .padding(ClientTheme.Metrics.spacingMedium)
             }
             Divider().opacity(0.5)
             actionSection
         }
-        .frame(width: MenuBarController.panelSize.width, height: MenuBarController.panelSize.height)
+        .frame(
+            width: MenuBarController.panelSize.width,
+            // The window sizes itself to what it holds; only the popover has
+            // to be told, because a popover has no other way to know.
+            height: showsOnlyLiveControls ? MenuBarController.panelSize.height : nil
+        )
         .preferredColorScheme(appearance.colorScheme)
         // `.id` forces SwiftUI to discard and rebuild this subtree instead of
         // diffing it in place: Light->System looked broken while Light->Dark
@@ -312,6 +339,11 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             SettingsActionRow(label: text(.menuOpenClient), systemImage: "bubble.left.and.bubble.right") {
                 onOpenClient?()
+            }
+            if showsOnlyLiveControls {
+                SettingsActionRow(label: text(.menuSettings), systemImage: "gearshape") {
+                    onOpenSettings?()
+                }
             }
             SettingsActionRow(
                 label: text(isCharacterHidden ? .menuShow : .menuHide),

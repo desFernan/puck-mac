@@ -36,9 +36,52 @@ extension AppDelegate {
                 self?.openClientApp()
             },
             onToggleVisibility: { [weak self] in self?.toggleCharacterVisibility() },
-            onQuit: { NSApplication.shared.terminate(nil) }
+            onOpenSettings: { [weak self] in
+                // Closed first, for the reason the chat row closes it: the
+                // window comes forward and a panel left floating over it
+                // reads as stuck.
+                self?.menuBarController?.closePopover()
+                self?.showSettingsWindow()
+            },
+            onQuit: { NSApplication.shared.terminate(nil) },
+            showsOnlyLiveControls: true
         )
         return NSHostingController(rootView: view)
+    }
+
+    /// The settings the panel no longer carries: sound, movement, and the
+    /// app's own general settings.
+    ///
+    /// A window rather than more panel. The panel drops from the status item
+    /// over whatever the user was doing, so it should hold what the pet is
+    /// doing now -- which toys are out, how big, which avatar. Volume curves,
+    /// walk speed and the language are set once and left, and having them
+    /// there made a drop-down into a scrolling form.
+    ///
+    /// Kept between opens rather than rebuilt: unlike the panel, none of what
+    /// is in here is live state that goes stale while the window is shut.
+    func showSettingsWindow() {
+        let window = settingsWindow ?? {
+            let created = NSWindow(
+                contentRect: .zero,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            created.isReleasedWhenClosed = false
+            created.contentViewController = NSHostingController(
+                rootView: SettingsView(store: settingsStore)
+            )
+            created.center()
+            settingsWindow = created
+            return created
+        }()
+        // Set on every show: the window outlives its closing, and the title
+        // is the one part of it AppKit owns rather than SwiftUI -- nothing
+        // would relabel it on a language change otherwise.
+        window.title = Strings.text(.menuSettings)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// Hides/shows the pet without quitting the
