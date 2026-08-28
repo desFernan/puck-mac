@@ -103,3 +103,65 @@ final class ScreenNotchTests: XCTestCase {
         XCTAssertFalse(notch.clears(CGPoint(x: 1483, y: 100), visualBounds: outline, areaTop: 0))
     }
 }
+
+/// The same reading, taken off whatever screen this actually is.
+///
+/// Everything above is arithmetic on numbers a test wrote down. This checks
+/// the numbers AppKit really reports on the machine running it -- and it has
+/// to pass on both kinds of machine, since most have no notch and CI never
+/// does. What it can assert either way is the relationship the feature rests
+/// on: the menu bar is at least as tall as the notch, which is why the pet
+/// only meets it once the menu bar is gone.
+@MainActor
+final class RealScreenNotchTests: XCTestCase {
+    func test_whateverThisMachineReportsIsCoherent() throws {
+        for screen in NSScreen.screens {
+            guard let notch = ScreenNotch.appKitRect(
+                inScreenFrame: screen.frame,
+                auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
+                auxiliaryTopRight: screen.auxiliaryTopRightArea
+            ) else {
+                continue  // no notch on this display, which is the usual case
+            }
+
+            XCTAssertTrue(screen.frame.contains(notch), "a notch outside its own screen is a rebasing bug")
+            XCTAssertEqual(notch.maxY, screen.frame.maxY, "it hangs from the top edge")
+            XCTAssertGreaterThan(notch.width, 0)
+            XCTAssertLessThan(notch.width, screen.frame.width / 2, "a notch is a notch, not half the screen")
+
+            // The reason this is invisible until a Space goes fullscreen: the
+            // pet's world stops at the menu bar, and the menu bar is at least
+            // as deep as the housing.
+            let menuBar = screen.frame.maxY - screen.visibleFrame.maxY
+            XCTAssertGreaterThanOrEqual(
+                menuBar, notch.height,
+                "if the housing were deeper than the menu bar it would intrude in the ordinary case too"
+            )
+
+            // Both halves of the feature, against this machine's real
+            // measurements rather than a test's invented ones. In the pet's
+            // own space the housing hangs from y=0 to y=height.
+            let housing = ScreenNotch(rect: CGRect(
+                x: notch.minX, y: 0, width: notch.width, height: notch.height
+            ))
+            let underIt = notch.midX
+
+            // With the menu bar there the pet's ceiling is already below the
+            // housing, and the housing must not raise it back up.
+            XCTAssertEqual(
+                housing.ceiling(atX: underIt, areaTop: menuBar), menuBar,
+                "the ordinary case has to stay exactly as it was"
+            )
+            // In a fullscreen Space the menu bar's height is given back, and
+            // then the housing really is what stops the pet.
+            XCTAssertEqual(
+                housing.ceiling(atX: underIt, areaTop: 0), notch.height,
+                "with the menu bar gone the ceiling under the housing is its bottom edge"
+            )
+            XCTAssertEqual(
+                housing.ceiling(atX: notch.minX - 1, areaTop: 0), 0,
+                "and beside it the whole screen is still there"
+            )
+        }
+    }
+}
