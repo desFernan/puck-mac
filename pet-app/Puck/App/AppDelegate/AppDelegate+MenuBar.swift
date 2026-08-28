@@ -17,6 +17,20 @@ extension AppDelegate {
         menuBar.makePopoverContent = { [weak self] in self?.makeSettingsPanel() }
         menuBar.onOpenClient = { [weak self] in self?.openClientApp() }
         menuBarController = menuBar
+
+        // The notch offers the two things that are otherwise a trip
+        // somewhere else: the toys, which are behind a right-click on this
+        // same status item, and a line for the pet, which is behind a hotkey
+        // most people never learn. Both act on the pet now, which is what
+        // keeps this from being a second settings panel.
+        notchPanelController.toysOut = { [weak self] in self?.toyBox?.outToyNames ?? [] }
+        notchPanelController.onToggleToy = { [weak self] toy in self?.toggleToy(toy) ?? [] }
+        // Through the quick-capture bubble's own entry point, so a turn
+        // started at the notch and one started from the keyboard are the
+        // same turn.
+        notchPanelController.onSubmit = { [weak self] text in
+            self?.submitFromInputBubble(text)
+        }
     }
 
     /// The panel the status item drops. Rebuilt per open so it reflects live

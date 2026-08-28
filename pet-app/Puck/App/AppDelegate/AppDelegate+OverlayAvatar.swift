@@ -423,21 +423,36 @@ extension AppDelegate {
             || current === states.travel
     }
 
-    /// Hands the camera housings to the pet and paints the ones this machine
-    /// has not got.
+    /// Hands the camera housings to the pet, and puts the panel on the one
+    /// the pet is likeliest to meet.
     ///
     /// One call, because the two must not disagree: the pet's ceiling is
-    /// worked out from these rects, so a painted housing in a different place
-    /// -- or one left behind after the display it was on went away -- is a
-    /// pet stopping where there is nothing and walking through what there is.
+    /// worked out from these rects, so a panel drawn somewhere else -- or one
+    /// left behind after the display it was on went away -- is a pet stopping
+    /// where there is nothing and walking through what there is.
     func applyScreenNotches(to controller: CharacterController) {
-        let notches = screenNotches
-        controller.notches = notches
+        controller.notches = screenNotches
+        notchPanelController.present(notchAppKitRect: panelNotchAppKitRect)
+    }
 
-        guard let spriteView = overlayWindow?.contentView as? SpriteLayerView else { return }
-        for layer in paintedNotchLayers { layer.removeFromSuperlayer() }
-        paintedNotchLayers = notches.compactMap(NotchLayer.make(for:))
-        for layer in paintedNotchLayers { spriteView.contentLayer.addSublayer(layer) }
+    /// Where the panel goes, in AppKit's own coordinates.
+    ///
+    /// The main screen's housing: the panel is one window, and the notch is
+    /// somewhere you point at rather than somewhere the pet has to be, so it
+    /// belongs on the screen the pointer is usually on. A machine with two
+    /// notched displays gets it on one of them; the pet still ducks around
+    /// both, because that is a different question with a different answer.
+    private var panelNotchAppKitRect: CGRect? {
+        guard let screen = NSScreen.main else { return nil }
+        let real = ScreenNotch.appKitRect(
+            inScreenFrame: screen.frame,
+            auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
+            auxiliaryTopRight: screen.auxiliaryTopRightArea
+        )
+        return real ?? ScreenNotch.virtualAppKitRect(
+            inScreenFrame: screen.frame,
+            visibleFrame: screen.visibleFrame
+        )
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

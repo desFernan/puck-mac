@@ -33,10 +33,9 @@ struct ScreenNotch: Equatable {
 
     /// Whether this display has no camera housing and is being given one.
     ///
-    /// A real notch needs no drawing -- it is a piece of black plastic, and
-    /// anything painted there is behind it. A given one has to be painted or
-    /// the pet ducks around nothing and stops under nothing, which is worse
-    /// than not having the feature.
+    /// A real notch is a piece of black plastic and needs nothing drawn over
+    /// it; a given one is drawn, or the pet ducks around nothing and stops
+    /// under nothing, which is worse than not having the feature.
     var isVirtual = false
 
     /// How far the pet's world is allowed to reach at `x`.

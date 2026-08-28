@@ -55,10 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// showSettingsWindow(). Kept after closing so it reopens where it was.
     var settingsWindow: NSWindow?
 
-    /// The housings currently painted into the overlay, so a rebuild can
-    /// take the old ones down. They belong to the window, and the window is
-    /// thrown away and rebuilt on every display change.
-    var paintedNotchLayers: [CAShapeLayer] = []
+    /// The notch, and the panel it opens into -- see NotchPanelController.
+    let notchPanelController = NotchPanelController()
 
     /// Every camera housing there is, in the pet's own space.
     ///

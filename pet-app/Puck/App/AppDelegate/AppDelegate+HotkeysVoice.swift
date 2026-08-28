@@ -126,7 +126,9 @@ extension AppDelegate {
     /// window up showing the text. Closing or quitting that window changes
     /// nothing here -- it's a separate process, and the pet doesn't observe
     /// its presence.
-    private func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
+    /// Not private: the notch panel sends its line through here too, so a
+    /// turn started there and one started from the bubble are the same turn.
+    func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
         // Brought up first so the window is on its way while the text is
         // delivered; sendUserInput queues it if the connection isn't up yet.
         openClientApp()
