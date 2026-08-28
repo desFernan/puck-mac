@@ -10,6 +10,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import QuartzCore
 import SwiftUI
 
 /// `@MainActor`, stated rather than assumed. Every line of this class and its
@@ -50,6 +51,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// per display, the Dock and menu bar already taken off. Kept on the
     /// controller as `roamableAreas`; this is where it is measured.
     /// Empty before the overlay exists.
+    /// The settings the menu bar panel does not carry -- see
+    /// showSettingsWindow(). Kept after closing so it reopens where it was.
+    var settingsWindow: NSWindow?
+
+    /// The housings currently painted into the overlay, so a rebuild can
+    /// take the old ones down. They belong to the window, and the window is
+    /// thrown away and rebuilt on every display change.
+    var paintedNotchLayers: [CAShapeLayer] = []
+
     /// Every camera housing there is, in the pet's own space.
     ///
     /// Measured here, beside `screenWorkAreas`, and for the same reasons: one
@@ -64,22 +74,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         guard let window = overlayWindow, let space = screenManager?.current else { return [] }
         let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
         return NSScreen.screens.compactMap { screen in
-            guard let appKit = ScreenNotch.appKitRect(
+            // The real one where there is one; otherwise this display is
+            // given a housing of its own -- see ScreenNotch.virtualAppKitRect
+            // for why it is worth giving. A display that has one already gets
+            // nothing painted over it, because it is already a piece of black
+            // plastic.
+            let real = ScreenNotch.appKitRect(
                 inScreenFrame: screen.frame,
                 auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
                 auxiliaryTopRight: screen.auxiliaryTopRightArea
-            ) else {
-                return nil
-            }
+            )
+            let appKit = real ?? ScreenNotch.virtualAppKitRect(
+                inScreenFrame: screen.frame,
+                visibleFrame: screen.visibleFrame
+            )
+            guard let appKit else { return nil }
             // The same rebasing screenWorkAreas does: into Quartz's top-left
             // space, then onto the overlay window's own origin.
             let topLeft = space.normalized(fromAppKit: CGPoint(x: appKit.minX, y: appKit.maxY))
-            return ScreenNotch(rect: CGRect(
-                x: topLeft.x - origin.x,
-                y: topLeft.y - origin.y,
-                width: appKit.width,
-                height: appKit.height
-            ))
+            return ScreenNotch(
+                rect: CGRect(
+                    x: topLeft.x - origin.x,
+                    y: topLeft.y - origin.y,
+                    width: appKit.width,
+                    height: appKit.height
+                ),
+                isVirtual: real == nil
+            )
         }
     }
 

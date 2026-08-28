@@ -31,6 +31,14 @@ struct ScreenNotch: Equatable {
     /// Y down, rebased onto the overlay window.
     let rect: CGRect
 
+    /// Whether this display has no camera housing and is being given one.
+    ///
+    /// A real notch needs no drawing -- it is a piece of black plastic, and
+    /// anything painted there is behind it. A given one has to be painted or
+    /// the pet ducks around nothing and stops under nothing, which is worse
+    /// than not having the feature.
+    var isVirtual = false
+
     /// How far the pet's world is allowed to reach at `x`.
     ///
     /// - Parameter areaTop: the top of the display the pet is on, which is
@@ -56,6 +64,39 @@ struct ScreenNotch: Equatable {
         let right = position.x + visualBounds.maxX
         return head >= ceiling(atX: left, areaTop: areaTop)
             && head >= ceiling(atX: right, areaTop: areaTop)
+    }
+
+    /// How wide a display with no housing is given one.
+    ///
+    /// A MacBook's own is about this: the width is a property of the camera
+    /// and the sensors beside it, not of the screen, so a wider monitor gets
+    /// the same bar rather than a proportionally enormous one.
+    static let virtualWidth: CGFloat = 185
+
+    /// A housing for a display that has none, in AppKit's own coordinates.
+    ///
+    /// Centred at the top, because that is where the real one is and where
+    /// anything calling itself a notch belongs.
+    ///
+    /// As deep as the menu bar, which is the relationship a real one has:
+    /// on a notched Mac the menu bar is exactly as tall as the housing, and
+    /// that is the whole reason a pet only meets it once a fullscreen Space
+    /// takes the menu bar away. Giving a fixed depth instead would make a
+    /// given housing hang a little into the pet's world at all times on a
+    /// screen whose menu bar happens to be shallower -- a permanent two-point
+    /// dip in the ceiling that nothing explains.
+    ///
+    /// - Parameter visibleFrame: the screen's, whose top edge is the menu
+    ///   bar's bottom.
+    static func virtualAppKitRect(inScreenFrame frame: CGRect, visibleFrame: CGRect) -> CGRect? {
+        let depth = frame.maxY - visibleFrame.maxY
+        guard depth > 0, frame.width > virtualWidth else { return nil }
+        return CGRect(
+            x: frame.midX - virtualWidth / 2,
+            y: frame.maxY - depth,
+            width: virtualWidth,
+            height: depth
+        )
     }
 
     /// The notch on `screen`, in AppKit's own coordinates, or nil when there

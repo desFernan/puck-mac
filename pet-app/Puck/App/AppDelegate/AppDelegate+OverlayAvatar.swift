@@ -161,7 +161,7 @@ extension AppDelegate {
         states.register(in: controller)
         controller.idleChatter.keys = soundTable.keys(withPrefix: "chatter_")
         controller.roamableAreas = screenWorkAreas
-        controller.notches = screenNotches
+        applyScreenNotches(to: controller)
         controller.avatarHeight = avatarHitboxSize.height
         controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
         // F4 reports global Quartz frames; the pet lives in overlay-local
@@ -317,7 +317,7 @@ extension AppDelegate {
         let body = characterBody
         let floorBefore = body.map { controller.area(at: $0.position).maxY }
         controller.roamableAreas = screenWorkAreas
-        controller.notches = screenNotches
+        applyScreenNotches(to: controller)
         // Only a pet that was standing on the floor that just moved. Unlike a
         // display change, a Space switch does not rebuild the world -- window
         // tops are where they were, and a pet in mid-air (falling, thrown,
@@ -358,7 +358,7 @@ extension AppDelegate {
         leaveTankAfterDisplayChange()
         let desktop = screenWorkAreas
         characterController?.roamableAreas = desktop
-        characterController?.notches = screenNotches
+        if let controller = characterController { applyScreenNotches(to: controller) }
         // Onto the nearest display that still exists -- which is the whole
         // point on the day a monitor is unplugged with the pet on it. A pet
         // that was standing on something is put down on the re-measured
@@ -421,6 +421,23 @@ extension AppDelegate {
             || current === states.ceiling
             || current === states.reactDrag
             || current === states.travel
+    }
+
+    /// Hands the camera housings to the pet and paints the ones this machine
+    /// has not got.
+    ///
+    /// One call, because the two must not disagree: the pet's ceiling is
+    /// worked out from these rects, so a painted housing in a different place
+    /// -- or one left behind after the display it was on went away -- is a
+    /// pet stopping where there is nothing and walking through what there is.
+    func applyScreenNotches(to controller: CharacterController) {
+        let notches = screenNotches
+        controller.notches = notches
+
+        guard let spriteView = overlayWindow?.contentView as? SpriteLayerView else { return }
+        for layer in paintedNotchLayers { layer.removeFromSuperlayer() }
+        paintedNotchLayers = notches.compactMap(NotchLayer.make(for:))
+        for layer in paintedNotchLayers { spriteView.contentLayer.addSublayer(layer) }
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

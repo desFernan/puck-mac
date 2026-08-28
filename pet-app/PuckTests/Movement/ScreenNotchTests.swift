@@ -243,3 +243,71 @@ final class ScreenNotchPerDisplayTests: XCTestCase {
     }
 }
 
+/// A display with no camera housing is given one -- the thing boring.notch
+/// does, and the reason the feature is worth having on a monitor at all.
+final class VirtualScreenNotchTests: XCTestCase {
+    /// An external monitor: no housing, and a 30pt menu bar.
+    private let monitor = CGRect(x: 0, y: 0, width: 3440, height: 1440)
+    private var visible: CGRect { CGRect(x: 0, y: 0, width: 3440, height: 1410) }
+
+    func test_itIsCentredAtTheTop() throws {
+        let notch = try XCTUnwrap(
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible)
+        )
+
+        XCTAssertEqual(notch.midX, monitor.midX, accuracy: 0.5, "where a real one is")
+        XCTAssertEqual(notch.maxY, monitor.maxY, "hanging from the top edge")
+        XCTAssertEqual(notch.width, ScreenNotch.virtualWidth)
+    }
+
+    /// As deep as the menu bar, which is the relationship a real housing has.
+    ///
+    /// A fixed depth instead would hang into the pet's world at all times on
+    /// a screen whose menu bar is shallower -- on this monitor a 32pt housing
+    /// against a 30pt menu bar is a permanent two-point dip in the ceiling
+    /// that nothing explains.
+    func test_itIsAsDeepAsTheMenuBar() throws {
+        let notch = try XCTUnwrap(
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible)
+        )
+
+        XCTAssertEqual(notch.height, 30)
+
+        let housing = ScreenNotch(rect: CGRect(x: 0, y: 0, width: 185, height: 30), isVirtual: true)
+        XCTAssertEqual(
+            housing.ceiling(atX: 90, areaTop: 30), 30,
+            "so with the menu bar there it changes nothing, exactly like a real one"
+        )
+        XCTAssertEqual(
+            housing.ceiling(atX: 90, areaTop: 0), 30,
+            "and in a fullscreen Space it is what stops the pet"
+        )
+    }
+
+    /// The width is a property of the camera, not of the screen: a wider
+    /// monitor gets the same bar rather than a proportionally enormous one.
+    func test_aWiderScreenGetsTheSameBar() throws {
+        let wide = try XCTUnwrap(ScreenNotch.virtualAppKitRect(
+            inScreenFrame: CGRect(x: 0, y: 0, width: 5120, height: 1440),
+            visibleFrame: CGRect(x: 0, y: 0, width: 5120, height: 1410)
+        ))
+
+        XCTAssertEqual(wide.width, ScreenNotch.virtualWidth)
+    }
+
+    /// Nothing to hang it from, or nowhere to put it.
+    func test_thereHasToBeRoomForIt() {
+        XCTAssertNil(
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: monitor),
+            "no menu bar means no depth to give it"
+        )
+        XCTAssertNil(
+            ScreenNotch.virtualAppKitRect(
+                inScreenFrame: CGRect(x: 0, y: 0, width: 120, height: 400),
+                visibleFrame: CGRect(x: 0, y: 0, width: 120, height: 370)
+            ),
+            "a screen narrower than the bar would be all housing"
+        )
+    }
+}
+
