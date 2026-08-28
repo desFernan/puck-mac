@@ -218,14 +218,29 @@ final class ClimbBouncePresetTests: XCTestCase {
     /// The squash runs at twice the rocking rate: shortest at both extremes
     /// of the lean, tallest passing through upright. Matched frequencies
     /// would make one side droop instead.
+    ///
+    /// Measured as a magnitude, because the sign carries something else: the
+    /// climb's scaleY is negative, which is half of turning the pet over to
+    /// face the wall -- see the preset. The squash is how far from 1 it is.
     func test_squashPeaksAtBothExtremesOfTheLean() {
-        let upright = preset.transform(elapsed: 0, intensity: 1)
-        let leaningRight = preset.transform(elapsed: 0.125, intensity: 1)
-        let leaningLeft = preset.transform(elapsed: 0.375, intensity: 1)
+        let upright = abs(preset.transform(elapsed: 0, intensity: 1).scaleY)
+        let leaningRight = abs(preset.transform(elapsed: 0.125, intensity: 1).scaleY)
+        let leaningLeft = abs(preset.transform(elapsed: 0.375, intensity: 1).scaleY)
 
-        XCTAssertEqual(upright.scaleY, 1, accuracy: 0.0001, "tallest passing through upright")
-        XCTAssertLessThan(leaningRight.scaleY, upright.scaleY)
-        XCTAssertEqual(leaningLeft.scaleY, leaningRight.scaleY, accuracy: 0.0001, "equally short both ways")
+        XCTAssertEqual(upright, 1, accuracy: 0.0001, "tallest passing through upright")
+        XCTAssertLessThan(leaningRight, upright)
+        XCTAssertEqual(leaningLeft, leaningRight, accuracy: 0.0001, "equally short both ways")
+    }
+
+    /// The climb is the one preset that turns the pet over rather than only
+    /// squashing it: a quarter turn onto the wall, and a mirror on each axis
+    /// so it climbs feet-first instead of head-first.
+    func test_theClimbTurnsThePetOntoTheWall() {
+        let transform = preset.transform(elapsed: 0, intensity: 1)
+
+        XCTAssertTrue(transform.rotatesQuarterTurn)
+        XCTAssertLessThan(transform.scaleX, 0, "mirrored across")
+        XCTAssertLessThan(transform.scaleY, 0, "and over")
     }
 
     /// Every other preset must stay purely a scale transform.

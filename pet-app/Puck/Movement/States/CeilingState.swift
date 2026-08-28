@@ -73,23 +73,20 @@ final class CeilingState: StateHandler {
         // Or is there now: the timer runs out during the hang more often
         // than not, and a pause the pet is cut out of mid-way is a pause
         // nobody sees.
-        let hasSomewhereToBe = hangRemaining > 0 || (!hasHung && context.notch != nil)
+        //
+        // The display the pet is on, not the box around every display: with a
+        // taller monitor beside this one that box's top edge is somewhere off
+        // this screen entirely, and a crawl aimed at it takes the pet off the
+        // top of the screen it is actually on. It is also what says which
+        // housing, if any, is overhead.
+        let area = context.area(at: context.body.position)
+        let housing = context.notch(over: area)
+        let hasSomewhereToBe = hangRemaining > 0 || (!hasHung && housing != nil)
         guard elapsed < duration || hasSomewhereToBe else {
             oneShot.fire(.fall, using: context.requestTransition)
             return
         }
 
-        // Turns around where the pet's artwork meets the edge, not where its
-        // centre does -- ScreenBounds owns that limit for every state, so a
-        // ceiling crawl reverses at the same place a walk stops. Measuring it
-        // here instead used to turn the pet with half of it off-screen, which
-        // CharacterController's containment backstop then pulled back on the
-        // same frame: the turn and the render disagreed.
-        // The ceiling of the display the pet is on, not the top of the box
-        // around every display: with a taller monitor beside this one, that
-        // box's top edge is somewhere off this screen entirely, and a crawl
-        // aimed at it takes the pet off the top of the screen it is on.
-        let area = context.area(at: context.body.position)
         // Set off toward the camera housing when there is one.
         //
         // Not for tidiness: a crawl lasts a few seconds and the ceiling is
@@ -100,8 +97,8 @@ final class CeilingState: StateHandler {
         // end -- so the housing is always the way it should be going.
         if !headingChosen {
             headingChosen = true
-            if let notch = context.notch {
-                direction = notch.rect.midX >= context.body.position.x ? 1 : -1
+            if let housing {
+                direction = housing.rect.midX >= context.body.position.x ? 1 : -1
             }
         }
 
@@ -117,8 +114,8 @@ final class CeilingState: StateHandler {
             hangRemaining -= dt
             return
         }
-        if !hasHung, let notch = context.notch, notch.rect.contains(
-            CGPoint(x: context.body.position.x, y: notch.rect.midY)
+        if !hasHung, let housing, housing.rect.contains(
+            CGPoint(x: context.body.position.x, y: housing.rect.midY)
         ) {
             hasHung = true
             hangRemaining = hangProvider()

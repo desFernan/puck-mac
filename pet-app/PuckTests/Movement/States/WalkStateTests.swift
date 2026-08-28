@@ -52,7 +52,7 @@ final class TestStateWorld {
             body: body,
             roamableArea: roamableArea,
             roamableAreas: roamableAreas,
-            notch: notch,
+            notches: [notch].compactMap { $0 },
             avatarHeight: avatarHeight,
             visualBounds: visualBounds,
             walkSpeed: walkSpeed,

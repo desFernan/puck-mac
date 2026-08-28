@@ -186,13 +186,13 @@ enum BouncePreset: Equatable {
             let lean = 8 * .pi / 180 * intensity
             let reach = 0.05 * intensity
             return BounceTransform(
-                // Mirrored, because the quarter turn alone lands the pet on
-                // the wall the wrong way up -- it went up the wall head
-                // first. The turn and the mirror together put its feet
+                // Turned over, both ways. The quarter turn alone lands the
+                // pet on the wall the wrong way round -- it went up head
+                // first -- and the two mirrors on top of it put its feet
                 // against the wall and its head toward the top of the
                 // screen, which is the way something climbing goes.
                 scaleX: -1,
-                scaleY: 1 - reach * abs(phase),
+                scaleY: -(1 - reach * abs(phase)),
                 rotation: lean * phase,
                 rotatesQuarterTurn: true
             )

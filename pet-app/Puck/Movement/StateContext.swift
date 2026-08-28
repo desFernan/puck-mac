@@ -33,15 +33,14 @@ struct StateContext {
     /// the helpers below fall back to `roamableArea` for it.
     var roamableAreas: [CGRect] = []
 
-    /// The camera housing hanging into the pet's world, when there is one
-    /// and the pet's world reaches it.
+    /// Every camera housing there is, in the pet's own space.
     ///
-    /// Usually nil in effect: the roamable area comes from `visibleFrame`,
-    /// which has the menu bar subtracted, and on a notched Mac the menu bar
-    /// is exactly as tall as the notch. In a fullscreen Space that height is
-    /// given back and the notch really is hanging into the room -- see
-    /// ScreenNotch.
-    var notch: ScreenNotch?
+    /// Usually none of them are in the pet's way: the roamable area comes
+    /// from `visibleFrame`, which has the menu bar subtracted, and on a
+    /// notched Mac the menu bar is exactly as tall as the notch. In a
+    /// fullscreen Space that height is given back and a housing really is
+    /// hanging into the room -- see ScreenNotch.
+    var notches: [ScreenNotch] = []
 
     /// The rendered avatar's current height (manifest hitbox * scale). F3
     /// ceiling-crawling (2026-07-29): ClimbToCeilingState needs this to climb
@@ -86,13 +85,31 @@ struct StateContext {
     /// than immediate so a state never mutates the controller mid-update.
     let requestTransition: (StateKind) -> Void
 
+    /// The housing over `area`, if one of them is.
+    ///
+    /// Matched by which display it is horizontally over rather than by an
+    /// index alongside the areas: a MacBook driving an external monitor has
+    /// one housing and two displays, and a pet crawling the external one must
+    /// not duck around a housing that is over the other. It also means a
+    /// housing that has gone -- lid closed, monitor unplugged -- simply stops
+    /// matching, because it is no longer in the list.
+    ///
+    /// Horizontally, not by overlap: with the menu bar present the housing
+    /// sits entirely *above* the roamable area -- that is the whole reason
+    /// the pet does not normally meet it -- so an overlap test would find
+    /// nothing exactly when there is nothing to find, and also exactly when
+    /// there is.
+    func notch(over area: CGRect) -> ScreenNotch? {
+        notches.first { area.minX <= $0.rect.midX && $0.rect.midX <= area.maxX }
+    }
+
     /// How high the pet may go at `x`: the top of the display it is on, or
-    /// the bottom of the notch where the notch is in the way.
+    /// the bottom of the housing where a housing is in the way.
     ///
     /// The ceiling is a function of x rather than a line, which is what
     /// having a physical object hang into the room means.
     func ceilingY(atX x: CGFloat, on area: CGRect) -> CGFloat {
-        notch?.ceiling(atX: x, areaTop: area.minY) ?? area.minY
+        notch(over: area)?.ceiling(atX: x, areaTop: area.minY) ?? area.minY
     }
 
     /// The display `point` is on -- what "the top of the screen" and "the

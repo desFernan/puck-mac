@@ -50,36 +50,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// per display, the Dock and menu bar already taken off. Kept on the
     /// controller as `roamableAreas`; this is where it is measured.
     /// Empty before the overlay exists.
-    /// The camera housing on the display the pet is standing on, in the
-    /// pet's own space, or nil when that display has none.
+    /// Every camera housing there is, in the pet's own space.
     ///
-    /// Per display rather than one for the machine: a MacBook driving an
-    /// external monitor has a notch on exactly one of them, and a pet
-    /// crawling the external screen's ceiling must not duck around a housing
-    /// that is on the other one.
-    var petScreenNotch: ScreenNotch? {
-        guard
-            let window = overlayWindow,
-            let space = screenManager?.current,
-            let screen = petScreen,
-            let appKit = ScreenNotch.appKitRect(
+    /// Measured here, beside `screenWorkAreas`, and for the same reasons: one
+    /// entry per display, because a MacBook driving an external monitor has a
+    /// housing on exactly one of them and a pet crawling the other screen's
+    /// ceiling must not duck around it; and measured when the screens are,
+    /// because that is when the answer changes -- a resolution change, a
+    /// monitor plugged or unplugged, a fullscreen Space. Reading it per frame
+    /// instead meant `NSScreen.screens` thirty times a second for a value
+    /// that changes when the hardware does.
+    var screenNotches: [ScreenNotch] {
+        guard let window = overlayWindow, let space = screenManager?.current else { return [] }
+        let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
+        return NSScreen.screens.compactMap { screen in
+            guard let appKit = ScreenNotch.appKitRect(
                 inScreenFrame: screen.frame,
                 auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
                 auxiliaryTopRight: screen.auxiliaryTopRightArea
-            )
-        else {
-            return nil
+            ) else {
+                return nil
+            }
+            // The same rebasing screenWorkAreas does: into Quartz's top-left
+            // space, then onto the overlay window's own origin.
+            let topLeft = space.normalized(fromAppKit: CGPoint(x: appKit.minX, y: appKit.maxY))
+            return ScreenNotch(rect: CGRect(
+                x: topLeft.x - origin.x,
+                y: topLeft.y - origin.y,
+                width: appKit.width,
+                height: appKit.height
+            ))
         }
-        // The same rebasing screenWorkAreas does: into Quartz's top-left
-        // space, then onto the overlay window's own origin.
-        let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
-        let topLeft = space.normalized(fromAppKit: CGPoint(x: appKit.minX, y: appKit.maxY))
-        return ScreenNotch(rect: CGRect(
-            x: topLeft.x - origin.x,
-            y: topLeft.y - origin.y,
-            width: appKit.width,
-            height: appKit.height
-        ))
     }
 
     var screenWorkAreas: [CGRect] {

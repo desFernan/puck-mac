@@ -37,10 +37,11 @@ final class CharacterController {
         didSet { roamableArea = ScreenGround.union(roamableAreas) }
     }
 
-    /// The camera housing on the display the pet is on, when there is one.
-    /// Set by whoever measures the screens; nil on every Mac without a notch,
-    /// which is most of them.
-    var notch: ScreenNotch?
+    /// Every camera housing on the machine, in the pet's own space. Set
+    /// alongside `roamableAreas`, because they change together and for the
+    /// same reasons; empty on every Mac without a notch, which is most of
+    /// them, and while the pet is in its tank.
+    var notches: [ScreenNotch] = []
 
     /// The box around `roamableAreas`. What horizontal containment measures
     /// against, so a throw can still cross from one display to the next.
@@ -143,7 +144,7 @@ final class CharacterController {
             body: body,
             roamableArea: roamableArea,
             roamableAreas: roamableAreas,
-            notch: notch,
+            notches: notches,
             avatarHeight: avatarHeight,
             visualBounds: body.visualBounds,
             walkSpeed: walkSpeed,

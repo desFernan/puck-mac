@@ -165,3 +165,81 @@ final class RealScreenNotchTests: XCTestCase {
         }
     }
 }
+
+/// Which housing belongs to which display, and what happens when the answer
+/// changes -- a monitor plugged in or out, a lid closed, a resolution
+/// changed. The pet's world is re-measured at each of those, and the
+/// housings are measured with it.
+@MainActor
+final class ScreenNotchPerDisplayTests: XCTestCase {
+    /// A MacBook on the left with a housing, an external monitor on the
+    /// right without one. Both in the pet's own space.
+    private let laptop = CGRect(x: 0, y: 33, width: 1512, height: 870)
+    private let external = CGRect(x: 1512, y: 30, width: 3440, height: 1318)
+    private var housing: ScreenNotch { ScreenNotch(rect: CGRect(x: 663, y: 0, width: 185, height: 32)) }
+
+    private func context(notches: [ScreenNotch]) -> StateContext {
+        StateContext(
+            body: CharacterBody(avatar: SpyAvatarPlayable(), position: .zero),
+            roamableArea: laptop.union(external),
+            roamableAreas: [laptop, external],
+            notches: notches,
+            avatarHeight: 80,
+            visualBounds: CGRect(x: -20, y: -80, width: 40, height: 80),
+            walkSpeed: 90,
+            windows: [],
+            unclimbableWindowIDs: [],
+            landingY: { _ in 0 },
+            requestTransition: { _ in }
+        )
+    }
+
+    /// A MacBook driving an external monitor has one housing and two
+    /// displays. A pet crawling the external screen's ceiling must not duck
+    /// around a housing that is over the other one.
+    func test_theHousingBelongsToTheDisplayItHangsOver() {
+        let context = context(notches: [housing])
+
+        XCTAssertNotNil(context.notch(over: laptop))
+        XCTAssertNil(context.notch(over: external))
+    }
+
+    /// The ceiling follows from that: unchanged on the display with nothing
+    /// over it, whatever x is asked about.
+    func test_theExternalScreensCeilingIsUntouched() {
+        let context = context(notches: [housing])
+
+        // The same x the housing occupies on the laptop, asked of the screen
+        // beside it.
+        XCTAssertEqual(context.ceilingY(atX: 750, on: external), external.minY)
+        XCTAssertEqual(context.ceilingY(atX: 750, on: laptop), laptop.minY, "menu bar still lower than the housing")
+    }
+
+    /// A lid closed or a monitor unplugged empties the list, and the ceiling
+    /// is a plain edge again. This is the case that has to be right without
+    /// anybody remembering to clear anything: the housings are measured
+    /// wherever the screens are, so a screen that is gone takes its housing
+    /// with it.
+    func test_aHousingThatHasGoneStopsMattering() {
+        let fullscreen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        XCTAssertEqual(
+            context(notches: [housing]).ceilingY(atX: 750, on: fullscreen), 32,
+            "with the housing there it is what stops the pet"
+        )
+        XCTAssertEqual(
+            context(notches: []).ceilingY(atX: 750, on: fullscreen), 0,
+            "and with it gone the ceiling is the screen's own top again"
+        )
+    }
+
+    /// Two MacBooks, or a machine somebody has arranged unusually: each
+    /// display gets its own answer rather than the first one found.
+    func test_eachDisplayGetsItsOwnHousing() {
+        let second = ScreenNotch(rect: CGRect(x: 1512 + 1600, y: 0, width: 185, height: 32))
+        let context = context(notches: [housing, second])
+
+        XCTAssertEqual(context.notch(over: laptop)?.rect.minX, 663)
+        XCTAssertEqual(context.notch(over: external)?.rect.minX, 1512 + 1600)
+    }
+}
+

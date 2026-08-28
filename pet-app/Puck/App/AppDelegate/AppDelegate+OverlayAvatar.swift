@@ -161,6 +161,7 @@ extension AppDelegate {
         states.register(in: controller)
         controller.idleChatter.keys = soundTable.keys(withPrefix: "chatter_")
         controller.roamableAreas = screenWorkAreas
+        controller.notches = screenNotches
         controller.avatarHeight = avatarHitboxSize.height
         controller.walkSpeed = MovementSolver.walkSpeed * settingsStore.walkSpeedMultiplier
         // F4 reports global Quartz frames; the pet lives in overlay-local
@@ -316,6 +317,7 @@ extension AppDelegate {
         let body = characterBody
         let floorBefore = body.map { controller.area(at: $0.position).maxY }
         controller.roamableAreas = screenWorkAreas
+        controller.notches = screenNotches
         // Only a pet that was standing on the floor that just moved. Unlike a
         // display change, a Space switch does not rebuild the world -- window
         // tops are where they were, and a pet in mid-air (falling, thrown,
@@ -356,6 +358,7 @@ extension AppDelegate {
         leaveTankAfterDisplayChange()
         let desktop = screenWorkAreas
         characterController?.roamableAreas = desktop
+        characterController?.notches = screenNotches
         // Onto the nearest display that still exists -- which is the whole
         // point on the day a monitor is unplugged with the pet on it. A pet
         // that was standing on something is put down on the re-measured
