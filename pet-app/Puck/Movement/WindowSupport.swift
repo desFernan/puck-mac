@@ -99,6 +99,44 @@ enum WindowSupport {
         return nil
     }
 
+    /// Whether the pet is pressed against the side of the screen itself.
+    ///
+    /// A wall is a wall. Climbing used to need a *window* to hold on to,
+    /// which on a desktop with one maximised window meant nothing to climb at
+    /// all -- `nearestClimbTarget` excludes a window whose top edge leaves no
+    /// headroom, which is exactly what a maximised window is. So the ceiling,
+    /// and the crawl along it, were drawn by the wander and then thrown away
+    /// every time. Measured on a normal desktop: three minutes, two draws,
+    /// nothing to climb either time.
+    ///
+    /// The screen's edge is always there and is the one wall that cannot be
+    /// closed or moved while the pet is on it.
+    /// Asked of the pet's outline, not the point at its feet. Containment
+    /// keeps the whole drawing on screen, so the ground point stops half a
+    /// pet-width short of the edge and never reaches it -- a test against the
+    /// bare position is one that can never be true, which is what made the
+    /// first version of this do nothing at all.
+    static func isAgainstScreenEdge(
+        _ position: CGPoint,
+        visualBounds: CGRect,
+        in area: CGRect
+    ) -> Bool {
+        abs((position.x + visualBounds.minX) - area.minX) <= edgeTolerance
+            || abs((position.x + visualBounds.maxX) - area.maxX) <= edgeTolerance
+    }
+
+    /// Somewhere to climb from, of either kind.
+    static func hasWall(
+        at position: CGPoint,
+        visualBounds: CGRect,
+        in windows: [WindowInfo],
+        area: CGRect,
+        excluding: Set<CGWindowID> = []
+    ) -> Bool {
+        windowBeingClimbed(at: position, in: windows, excluding: excluding) != nil
+            || isAgainstScreenEdge(position, visualBounds: visualBounds, in: area)
+    }
+
     /// The window the user is actually working in: the frontmost window of the
     /// frontmost app. Same rule GetFrontmostWindowHandler applies -- `windows`
     /// is in front-to-back Z order, so the first match is the one on top.

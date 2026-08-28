@@ -20,6 +20,7 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
+        AppLogger.shared.log(.error, "WX draw=\(outcome) pace=\(states.idle.pace) home=\(desktopRoamableAreas != nil)")
         let atHome = desktopRoamableAreas != nil
         let outcome = Self.wanderOutcome(
             outcome,
@@ -61,16 +62,40 @@ extension AppDelegate {
             // terrain. Checking here avoids ever entering the state
             // without a wall to begin with.
             let ceilingWindows = overlayLocalWindows(excluding: nil)
-            guard let body = characterBody,
-                  WindowSupport.windowBeingClimbed(
-                      at: body.position,
-                      in: ceilingWindows,
-                      excluding: unclimbableWindowIDs(in: ceilingWindows)
-                  ) != nil else {
-                states.walk.target = self.randomRoamPoint(controller)
+            guard let body = characterBody else { return }
+            let ceilingArea = petArea(controller)
+            guard WindowSupport.hasWall(
+                at: body.position,
+                visualBounds: body.visualBounds,
+                in: ceilingWindows,
+                area: ceilingArea,
+                excluding: unclimbableWindowIDs(in: ceilingWindows)
+            ) else {
+                // Nothing underfoot to climb, so walk to something first --
+                // the same walk `.climbNearestWindow` makes, remembering that
+                // the ceiling is where this was going.
+                //
+                // It used to give up here and roam instead, which made this
+                // outcome very nearly unreachable: the pet is idle on the
+                // floor or on a window's top, and being pressed against a
+                // wall while idle is a coincidence. Measured over three
+                // minutes on a normal desktop, the draw came up twice and had
+                // nothing to climb either time -- so the ceiling crawl, and
+                // everything up there, was drawn and thrown away.
+                pendingCeilingClimb = true
+                AppLogger.shared.log(.error, "WX no wall at \(body.position) outline=\(body.visualBounds) area=\(ceilingArea)")
+                states.walk.target = WindowSupport.nearestClimbTarget(
+                    from: body.position,
+                    in: ceilingWindows,
+                    roamableTop: ceilingArea.minY,
+                    avatarHeight: avatarHitboxSize.height,
+                    excluding: unclimbableWindowIDs(in: ceilingWindows)
+                ) ?? Self.nearestScreenEdge(from: body.position, visualBounds: body.visualBounds, in: ceilingArea)
+                AppLogger.shared.log(.error, "WX walking to \(String(describing: states.walk.target))")
                 controller.transition(to: .walk)
                 return
             }
+            AppLogger.shared.log(.error, "WX wall underfoot -> climbing now")
             controller.transition(to: .climbToCeiling)
         case .playWithToy:
             // Before this draw, play could only ever start at the moment a toy
@@ -116,6 +141,63 @@ extension AppDelegate {
         cancelWander()
         pendingPerchWindowID = window.windowID
         characterController?.transition(to: .fall)
+    }
+
+    /// Whichever side of the screen is closer, at the pet's own height.
+    ///
+    /// The fallback wall: always there, and the one that cannot be closed or
+    /// moved out from under the pet on the way over.
+    /// Where the pet's feet go for its outline to meet that edge -- the same
+    /// place containment would put it, so the walk arrives rather than being
+    /// clamped a step short of its own target forever.
+    nonisolated static func nearestScreenEdge(
+        from position: CGPoint,
+        visualBounds: CGRect,
+        in area: CGRect
+    ) -> CGPoint {
+        let left = position.x - area.minX
+        let right = area.maxX - position.x
+        let x = left <= right ? area.minX - visualBounds.minX : area.maxX - visualBounds.maxX
+        return CGPoint(x: x, y: position.y)
+    }
+
+    /// Sends a climb that a wander meant for the ceiling all the way up.
+    ///
+    /// Called every frame, and does nothing the rest of the time -- the same
+    /// shape `perchAfterLandingIfNeeded` uses, and for the same reason:
+    /// nothing reports an arrival, so the moment has to be noticed.
+    ///
+    /// Two moments, because there are two kinds of wall. Walking into a
+    /// *window's* side is intercepted by WalkState itself, which hands off to
+    /// Climb the frame it makes contact, so the pet is never idle there to be
+    /// caught. Walking to the *screen's* edge is blocked by nothing, so it
+    /// simply arrives and stands still.
+    func climbToCeilingWhenAtAWall() {
+        guard pendingCeilingClimb, let controller = characterController else { return }
+        let arrived = controller.currentState === states.idle
+        let alreadyClimbing = controller.currentState === states.climb
+        guard arrived || alreadyClimbing else { return }
+        pendingCeilingClimb = false
+        AppLogger.shared.log(.error, "WX arrived state=\(controller.currentState.name) at \(String(describing: characterBody?.position))")
+
+        // Asked again here rather than trusted from the draw: the walk takes
+        // a moment, and a window it was aimed at can be closed or moved
+        // during it. With nothing to hold, the pet stays where it walked to
+        // -- which is what it would have done anyway.
+        guard let body = characterBody else { return }
+        let windows = overlayLocalWindows(excluding: nil)
+        guard WindowSupport.hasWall(
+            at: body.position,
+            visualBounds: body.visualBounds,
+            in: windows,
+            area: petArea(controller),
+            excluding: unclimbableWindowIDs(in: windows)
+        ) else {
+            AppLogger.shared.log(.error, "WX arrived but no wall")
+            return
+        }
+        AppLogger.shared.log(.error, "WX CLIMBING")
+        controller.transition(to: .climbToCeiling)
     }
 
     /// Moves a pet that landed inside a window up onto its top edge. Called
@@ -272,6 +354,10 @@ extension AppDelegate {
     /// or the pet would resume a walk nobody asked for any more.
     func cancelWander() {
         wanderRun.cancel()
+        // The climb this was walking toward is part of the same wander, so
+        // whatever takes the pet over drops it too -- or the pet arrives
+        // somewhere it was sent for another reason and climbs anyway.
+        pendingCeilingClimb = false
     }
 
     /// Where the pet is now, or the middle of the area before there is a

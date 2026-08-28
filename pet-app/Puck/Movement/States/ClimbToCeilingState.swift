@@ -33,10 +33,12 @@ final class ClimbToCeilingState: StateHandler {
 
         // Without `excluding:` -- see ClimbState for why an in-progress
         // climb is not re-decided by a setting about starting one.
-        guard WindowSupport.windowBeingClimbed(
+        guard WindowSupport.hasWall(
             at: context.body.position,
-            in: context.windows
-        ) != nil else {
+            visualBounds: context.visualBounds,
+            in: context.windows,
+            area: context.area(at: context.body.position)
+        ) else {
             // No wall here (or climbed past the top of a short one) --
             // there's nothing left to hold onto.
             oneShot.fire(.fall, using: context.requestTransition)

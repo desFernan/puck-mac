@@ -105,6 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// The window the pet fell behind, until it has landed and been moved onto
     /// that window's top edge -- see perchAfterLandingIfNeeded().
     var pendingPerchWindowID: CGWindowID?
+    /// Set when a wander drew the ceiling with no wall underfoot, so the walk
+    /// to one knows what it is for -- see climbToCeilingIfArrived().
+    var pendingCeilingClimb = false
     /// The one long-lived instance of every state the pet can be in, and the
     /// table that registers them. Twenty-two properties before, each read by
     /// one or two of this file's extensions -- see PetStates.
