@@ -5,8 +5,9 @@
 //
 //   swift pet-app/scripts/gen-avatar.swift <outDir>
 //
-// Writes <outDir>/{avatar,toys,icons,menubar,logo}. Distribution into the
-// repos is the caller's job.
+// Writes <outDir>/{avatar,toys,logo}. Distribution into the repos is the
+// caller's job. The app icon and the menu bar glyph are hand drawn and are
+// deliberately not generated here.
 
 import Foundation
 import CoreGraphics
@@ -459,71 +460,6 @@ func wand(_ w: Int, _ h: Int) -> CGImage {
 write(pumpkin(494, 505), out.appendingPathComponent("toys/pumpkin.png"))
 write(wand(221, 827), out.appendingPathComponent("toys/wand.png"))
 
-// MARK: icons
-
-let idleArt = render(AW, AH) { drawPet($0, CGFloat(AW), CGFloat(AH), pack[0].1) }
-let idleBounds = alphaBounds(idleArt)!
-
-func tile(_ size: Int, rounded: Bool) -> CGImage {
-    render(size, size) { c in
-        let s = CGFloat(size)
-        if rounded {
-            fill(c, CGPath(roundedRect: CGRect(x: 0, y: 0, width: s, height: s),
-                           cornerWidth: s * 0.22, cornerHeight: s * 0.22, transform: nil),
-                 rgb(0xEE, 0xE9, 0xFB))
-        }
-        let b = idleBounds
-        let bw = CGFloat(b.maxX - b.minX + 1), bh = CGFloat(b.maxY - b.minY + 1)
-        let crop = idleArt.cropping(to: CGRect(x: CGFloat(b.minX), y: CGFloat(AH - 1 - b.maxY),
-                                               width: bw, height: bh))!
-        let k = (s * (rounded ? 0.80 : 0.94)) / max(bw, bh)
-        c.draw(crop, in: CGRect(x: (s - bw * k) / 2, y: (s - bh * k) / 2, width: bw * k, height: bh * k))
-    }
-}
-
-// Apple's appiconset / iconset file names, and the pixel size each one wants.
-let iconSizes: [(String, Int)] = [
-    ("icon_16x16", 16), ("icon_16x16@2x", 32),
-    ("icon_32x32", 32), ("icon_32x32@2x", 64),
-    ("icon_128x128", 128), ("icon_128x128@2x", 256),
-    ("icon_256x256", 256), ("icon_256x256@2x", 512),
-    ("icon_512x512", 512), ("icon_512x512@2x", 1024),
-]
-for (name, px) in iconSizes {
-    write(tile(px, rounded: true), out.appendingPathComponent("icons/\(name).png"))
-}
-write(tile(1024, rounded: true), out.appendingPathComponent("icons/source-1024.png"))
-
-// The menu bar wants a template image: one flat silhouette, no colour.
-func menubar(_ size: Int) -> CGImage {
-    render(size, size) { c in
-        let s = CGFloat(size), cx = s / 2
-        let rx = s * 0.34, ry = s * 0.30, base = s * 0.14
-        fill(c, blob(cx, base, rx, ry), rgb(0, 0, 0))
-        let t = CGMutablePath(), ty = base + ry * 2 - s * 0.03
-        t.move(to: CGPoint(x: cx - s * 0.05, y: ty - s * 0.02))
-        t.addCurve(to: CGPoint(x: cx + s * 0.02, y: ty + s * 0.12),
-                   control1: CGPoint(x: cx - s * 0.04, y: ty + s * 0.06),
-                   control2: CGPoint(x: cx - s * 0.015, y: ty + s * 0.1))
-        t.addCurve(to: CGPoint(x: cx + s * 0.045, y: ty - s * 0.015),
-                   control1: CGPoint(x: cx + s * 0.055, y: ty + s * 0.07),
-                   control2: CGPoint(x: cx + s * 0.06, y: ty + s * 0.02))
-        fill(c, t, rgb(0, 0, 0))
-        // Template images carry only alpha, so the face has to be holes.
-        c.setBlendMode(.clear)
-        for sx in [-1.0, 1.0] as [CGFloat] {
-            fill(c, ellipse(cx + s * 0.12 * sx, base + ry * 1.15, s * 0.055, s * 0.075), rgb(0, 0, 0))
-        }
-        fill(c, CGPath(roundedRect: CGRect(x: cx - s * 0.05, y: base + ry * 0.72,
-                                           width: s * 0.10, height: s * 0.03),
-                       cornerWidth: s * 0.015, cornerHeight: s * 0.015, transform: nil), rgb(0, 0, 0))
-        c.setBlendMode(.normal)
-    }
-}
-for (name, px) in [("icon", 18), ("icon@2x", 36), ("icon@3x", 54)] {
-    write(menubar(px), out.appendingPathComponent("menubar/\(name).png"))
-}
-
 // The pumpkin logo, on its own tile.
 for (name, px) in [("logo", 256), ("logo@2x", 512)] {
     let img = render(px, px) { c in
@@ -537,4 +473,4 @@ for (name, px) in [("logo", 256), ("logo@2x", 512)] {
     write(img, out.appendingPathComponent("logo/\(name).png"))
 }
 
-print("wrote \(pack.count) avatar PNGs, 2 toys, \(iconSizes.count + 1) icons, 3 menu bar, 2 logo")
+print("wrote \(pack.count) avatar PNGs, 2 toys, 2 logo")
