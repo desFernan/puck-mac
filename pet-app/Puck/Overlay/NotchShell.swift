@@ -38,6 +38,16 @@ struct NotchShell<Content: View>: View {
 
     /// A closed notch's bottom corners, as a fraction of its depth.
     static var closedCornerFraction: CGFloat { 0.34 }
+
+    /// How far the content is scaled down once the panel is shut.
+    ///
+    /// The same ratio the shell's own height collapses by, so the two read
+    /// as one thing shrinking into the bezel. Left to itself the content
+    /// kept its size and slid upward out of the closing shape, which looked
+    /// like two animations disagreeing about what was happening.
+    static func contentScale(notchHeight: CGFloat) -> CGFloat {
+        max(0, min(1, notchHeight / NotchPanelGeometry.openHeight))
+    }
     /// An open panel's, in points.
     static var openCornerRadius: CGFloat { 22 }
 
@@ -88,18 +98,27 @@ struct NotchShell<Content: View>: View {
                         .strokeBorder(.white.opacity(isOpen ? 0.10 : 0), lineWidth: 1)
                 }
                 .frame(width: size.width, height: size.height)
-                .overlay {
+                // Hung from the top edge, which is the one that does not
+                // move: the shape closes upward into the bezel, so anything
+                // centred in it drifts up as it shrinks.
+                .overlay(alignment: .top) {
                     // Built in both states so the field keeps what was typed
                     // across an open and shut, and faded rather than removed
                     // so the shape has nothing to resize around.
                     content()
+                        .frame(width: NotchPanelGeometry.openWidth, height: NotchPanelGeometry.openHeight)
+                        .scaleEffect(
+                            isOpen ? 1 : Self.contentScale(notchHeight: notchSize.height),
+                            anchor: .top
+                        )
                         .opacity(isOpen ? 1 : 0)
                         .allowsHitTesting(isOpen)
-                        .frame(width: NotchPanelGeometry.openWidth, height: NotchPanelGeometry.openHeight)
-                        // Clipped to the shape, so nothing inside crosses the
-                        // rounded corners on the way out while it closes.
-                        .clipShape(shape)
                 }
+                // Outside the overlay, so the clip follows the shape at the
+                // size it is now rather than the size it will be: clipped
+                // inside, the content spilled past the shell all the way
+                // through the close.
+                .clipShape(shape)
                 // Cast onto the desktop below, not around all four sides: the
                 // top edge is against the bezel and has nothing to cast onto.
                 .shadow(color: .black.opacity(isOpen ? 0.45 : 0), radius: 18, y: 8)

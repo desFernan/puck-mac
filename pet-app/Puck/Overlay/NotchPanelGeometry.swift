@@ -19,13 +19,40 @@
 import CoreGraphics
 
 enum NotchPanelGeometry {
+    /// How tall the band showing what is playing is.
+    ///
+    /// Set by the cover art, which is the tallest thing in it: a title, a
+    /// lyric and a progress bar stack to less than a square big enough to
+    /// recognise an album by.
+    static let musicBandHeight: CGFloat = 62
+
+    /// How tall the row of things you press is. One control height, because
+    /// everything in it is a target and targets that vary in height are
+    /// harder to aim at than ones that do not.
+    static let actionBandHeight: CGFloat = 34
+
+    /// The gap above and below the line between the two bands.
+    static let bandGap: CGFloat = 12
+
+    /// The padding around the content. Deeper at the bottom than the top:
+    /// the bottom corners are rounded, and content run up against a curve
+    /// looks closer to the edge than content beside a straight one.
+    static let topInset: CGFloat = 13
+    static let bottomInset: CGFloat = 16
+
     /// How far the panel reaches below the notch when open.
-    static let openHeight: CGFloat = 148
+    ///
+    /// The two bands, the hairline between them, the gaps around it and the
+    /// padding -- written as the sum rather than a measured number so that
+    /// changing a band moves the window with it, instead of leaving the
+    /// panel clipped or floating above its own bottom edge.
+    static let openHeight: CGFloat =
+        topInset + musicBandHeight + bandGap + 1 + bandGap + actionBandHeight + bottomInset
 
     /// How wide it opens to. Wider than the notch by a good margin, so the
     /// thing that appears reads as a panel coming out of the notch rather
     /// than as the notch itself growing downward.
-    static let openWidth: CGFloat = 420
+    static let openWidth: CGFloat = 560
 
     /// How far outside the closed notch the cursor may stray and still count
     /// as arriving at it.

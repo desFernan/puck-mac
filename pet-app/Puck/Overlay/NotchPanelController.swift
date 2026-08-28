@@ -26,6 +26,11 @@ final class NotchPanelController {
     private var notch: CGRect = .zero
     private var isOpen = false
 
+    /// What is playing. Owned here rather than by the view so it survives the
+    /// view being rebuilt on every open and close, and so it can be polling
+    /// only while somebody is looking at it.
+    private let music = NowPlayingStore()
+
     /// Which toys are out. Asked at the moment the panel opens, because it
     /// can change while it is shut -- the status item's panel puts toys out
     /// too, and so does the pet kicking one away.
@@ -54,6 +59,7 @@ final class NotchPanelController {
         hoverView = nil
         hosting = nil
         isOpen = false
+        music.stop()
     }
 
     private func makeWindow() -> NSPanel {
@@ -96,6 +102,15 @@ final class NotchPanelController {
         // whole panel once it is open, so moving down into it does not
         // immediately close it again.
         hoverView?.activeRect = activeRect(isOpen: open)
+        // Asking a music app what it is playing costs a few milliseconds
+        // over Automation, so it is asked only while the panel is open --
+        // once a second forever for a panel nobody is looking at is a cost
+        // nobody agreed to.
+        if open {
+            music.start()
+        } else {
+            music.stop()
+        }
         // Key only while open, so the field can take typing -- a borderless
         // window that can become key while nobody is looking at it steals the
         // caret from whatever the user is working in.
@@ -124,6 +139,7 @@ final class NotchPanelController {
     private func shell(isOpen: Bool) -> NotchShell<NotchPanelView> {
         NotchShell(isOpen: isOpen, notchSize: notch.size) {
             NotchPanelView(
+                music: self.music,
                 toysOut: self.toysOut?() ?? [],
                 onToggleToy: { [weak self] toy in self?.onToggleToy?(toy) ?? [] },
                 onSubmit: { [weak self] text in self?.onSubmit?(text) }

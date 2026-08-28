@@ -64,6 +64,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// The rest of the pet's own speech-bubble copy.
     case bubbleClientOffline, bubbleMutedComplaint, bubbleCapturePrompt, bubblePlaceholder
 
+    /// Stands in for the track in the notch panel when no music app is
+    /// playing anything.
+    case notchNothingPlaying
+
     // F15: the agent's API key, entered here rather than in a .env.
     case agentHeader, apiKeySave, apiKeyClear
     /// Shown for the CLI provider with no key of ours: not a problem there.
@@ -319,6 +323,7 @@ enum Strings {
         .bubbleMutedComplaint: "제 목소리가 시끄러우신거에요?",
         .bubbleCapturePrompt: "화면 영역 캡처",
         .bubblePlaceholder: "무엇을 도와드릴까요?",
+        .notchNothingPlaying: "재생 중인 음악이 없어요",
 
         .agentHeader: "에이전트",
         .providerLabel: "AI 공급자",
@@ -669,6 +674,7 @@ enum Strings {
         .bubbleMutedComplaint: "Am I being too loud?",
         .bubbleCapturePrompt: "Capture a screen area",
         .bubblePlaceholder: "What can I help with?",
+        .notchNothingPlaying: "Nothing playing",
 
         .agentHeader: "Agent",
         .providerLabel: "AI provider",

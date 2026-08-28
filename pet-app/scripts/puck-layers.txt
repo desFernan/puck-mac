@@ -35,6 +35,10 @@ Input
 Pointing
 Editor
 Movement
+# What a music app says it is playing. Knows about the music apps and a
+# lyric index and nothing about Puck, which is why it sits under the panel
+# that shows it rather than inside it.
+NowPlaying
 Overlay
 
 # What the pet can be asked to do.

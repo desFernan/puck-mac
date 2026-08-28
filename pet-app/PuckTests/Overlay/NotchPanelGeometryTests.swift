@@ -76,4 +76,23 @@ final class NotchPanelGeometryTests: XCTestCase {
     func test_leavingAltogetherClosesIt() {
         XCTAssertFalse(open(at: CGPoint(x: notch.midX, y: 400), isOpen: true))
     }
+
+    /// The window is the only thing that clips the panel, so it has to be at
+    /// least as tall as what is drawn in it. Set as a measured number once,
+    /// this drifted the moment a band changed and the bottom row was cut off.
+    func testTheWindowIsTallEnoughForWhatIsDrawnInIt() {
+        let content = NotchPanelGeometry.topInset
+            + NotchPanelGeometry.musicBandHeight
+            + NotchPanelGeometry.actionBandHeight
+            + NotchPanelGeometry.bottomInset
+
+        XCTAssertGreaterThanOrEqual(NotchPanelGeometry.openHeight, content)
+    }
+
+    /// Wide enough that what opens reads as a panel coming out of the notch
+    /// rather than as the notch itself growing downward.
+    func testTheOpenPanelIsWiderThanAnyNotch() {
+        // Wider than the widest hardware notch by a clear margin.
+        XCTAssertGreaterThan(NotchPanelGeometry.openWidth, 220)
+    }
 }
