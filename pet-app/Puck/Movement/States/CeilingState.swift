@@ -27,13 +27,22 @@ final class CeilingState: StateHandler {
     let preservesUpsideDown = true
 
     private let durationProvider: () -> TimeInterval
+    private let hangProvider: () -> TimeInterval
     private var direction: CGFloat = 1
     private var elapsed: TimeInterval = 0
     private var duration: TimeInterval = 0
+    /// How much of a hang under the camera housing is left, and whether this
+    /// crawl has already had one -- see `hangSecondsRemaining`.
+    private var hangRemaining: TimeInterval = 0
+    private var hasHung = false
     private var oneShot = OneShotTransition()
 
-    init(durationProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 3...8) }) {
+    init(
+        durationProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 3...8) },
+        hangProvider: @escaping () -> TimeInterval = { TimeInterval.random(in: 1.5...3.5) }
+    ) {
         self.durationProvider = durationProvider
+        self.hangProvider = hangProvider
     }
 
     func enter() {
@@ -41,6 +50,8 @@ final class CeilingState: StateHandler {
         elapsed = 0
         duration = durationProvider()
         direction = 1
+        hangRemaining = 0
+        hasHung = false
     }
 
     func update(dt: TimeInterval, context: StateContext) {
@@ -65,6 +76,26 @@ final class CeilingState: StateHandler {
         // box's top edge is somewhere off this screen entirely, and a crawl
         // aimed at it takes the pet off the top of the screen it is on.
         let area = context.area(at: context.body.position)
+        // Under the camera housing, once per crawl, the pet stops and hangs
+        // there for a moment.
+        //
+        // A MacBook's notch is the one landmark on an otherwise blank
+        // ceiling, and a pet that crawls straight past the only feature up
+        // there is a pet that has not noticed the machine it lives on. Once,
+        // because stopping at it every pass would read as being stuck rather
+        // than as pausing.
+        if hangRemaining > 0 {
+            hangRemaining -= dt
+            return
+        }
+        if !hasHung, let notch = context.notch, notch.rect.contains(
+            CGPoint(x: context.body.position.x, y: notch.rect.midY)
+        ) {
+            hasHung = true
+            hangRemaining = hangProvider()
+            return
+        }
+
         // Where the pet is going, and how high the ceiling is *there*. A
         // MacBook's camera housing hangs into this room once the menu bar is
         // out of the way, and a crawl that kept aiming at the screen's own

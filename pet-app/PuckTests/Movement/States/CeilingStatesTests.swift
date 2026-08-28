@@ -242,7 +242,9 @@ final class CeilingNotchTests: XCTestCase {
     /// top edge walks the pet straight through the camera.
     func test_theCrawlDucksUnderTheHousing() {
         let world = world(startingAt: 380)
-        let state = CeilingState()
+        // No pause here: these are about where the ceiling is, and a pet
+        // stopping under the housing never reaches the far side of it.
+        let state = CeilingState(hangProvider: { 0 })
         state.enter()
 
         var wentUnder = false
@@ -264,7 +266,7 @@ final class CeilingNotchTests: XCTestCase {
     /// And comes back up on the other side of it rather than staying low.
     func test_itRisesAgainPastTheHousing() {
         let world = world(startingAt: 380)
-        let state = CeilingState()
+        let state = CeilingState(hangProvider: { 0 })
         state.enter()
 
         var sawClearOfTheNotch = false
@@ -283,7 +285,7 @@ final class CeilingNotchTests: XCTestCase {
     func test_withoutAHousingTheCeilingIsTheScreensOwnTop() {
         let world = world(startingAt: 380)
         world.notch = nil
-        let state = CeilingState()
+        let state = CeilingState(hangProvider: { 0 })
         state.enter()
 
         for _ in 0..<600 {
@@ -366,5 +368,82 @@ final class FallNotchTests: XCTestCase {
         }
 
         XCTAssertLessThan(highest, notch.rect.maxY, "nothing is in the way over here")
+    }
+}
+
+/// The camera housing is the one landmark on an otherwise blank ceiling, so
+/// the pet stops under it -- once per crawl, because stopping every pass
+/// would read as being stuck rather than as pausing.
+@MainActor
+final class CeilingNotchHangTests: XCTestCase {
+    private let screen = CGRect(x: 0, y: 0, width: 1000, height: 500)
+    private let notch = ScreenNotch(rect: CGRect(x: 400, y: 0, width: 200, height: 40))
+
+    private func world(startingAt x: CGFloat) -> TestStateWorld {
+        let world = TestStateWorld(position: CGPoint(x: x, y: 0))
+        world.roamableArea = screen
+        world.roamableAreas = [screen]
+        world.notch = notch
+        world.visualBounds = CGRect(x: -10, y: -20, width: 20, height: 20)
+        return world
+    }
+
+    func test_thePetStopsUnderTheHousing() {
+        let world = world(startingAt: 380)
+        // The hang outlasts the whole measurement, so a pet that has stopped
+        // and one that is merely slow cannot be confused.
+        let state = CeilingState(durationProvider: { 60 }, hangProvider: { 10 })
+        state.enter()
+
+        world.run(state, seconds: 1)
+        let arrived = world.body.position.x
+        XCTAssertGreaterThan(arrived, notch.rect.minX, "it has to reach the housing for this to test anything")
+        XCTAssertLessThan(arrived, notch.rect.maxX)
+
+        world.run(state, seconds: 3)
+        XCTAssertEqual(world.body.position.x, arrived, accuracy: 0.001, "still hanging")
+    }
+
+    func test_itCarriesOnAfterwards() {
+        let world = world(startingAt: 380)
+        let state = CeilingState(durationProvider: { 60 }, hangProvider: { 1 })
+        state.enter()
+
+        world.run(state, seconds: 1)
+        let hanging = world.body.position.x
+        world.run(state, seconds: 3)
+
+        XCTAssertGreaterThan(world.body.position.x, hanging, "the pause ends")
+    }
+
+    /// Once. A crawl bounces off both walls and comes back under the housing
+    /// several times in its few seconds, and stopping every time is a pet
+    /// that looks stuck to something.
+    func test_itHangsOnlyOnce() {
+        let world = world(startingAt: 380)
+        let state = CeilingState(durationProvider: { 60 }, hangProvider: { 0.5 })
+        state.enter()
+
+        // Long enough to cross the whole ceiling and come back.
+        world.run(state, seconds: 30)
+        let before = world.body.position.x
+        world.run(state, seconds: 0.5)
+
+        XCTAssertNotEqual(world.body.position.x, before, accuracy: 0.001, "moving, not stopped again")
+    }
+
+    /// A Mac with no notch has nothing to stop at, and the crawl is what it
+    /// always was.
+    func test_withoutAHousingItNeverStops() {
+        let world = world(startingAt: 380)
+        world.notch = nil
+        let state = CeilingState(durationProvider: { 60 }, hangProvider: { 5 })
+        state.enter()
+
+        world.run(state, seconds: 1)
+        let before = world.body.position.x
+        world.run(state, seconds: 0.2)
+
+        XCTAssertNotEqual(world.body.position.x, before, accuracy: 0.001)
     }
 }
