@@ -35,6 +35,10 @@ final class CeilingState: StateHandler {
     /// crawl has already had one -- see `hangSecondsRemaining`.
     private var hangRemaining: TimeInterval = 0
     private var hasHung = false
+    /// Whether the first frame has picked which way to set off -- see the
+    /// heading it chooses in `update`. `enter()` cannot: it is handed no
+    /// context, so it cannot see where the pet is or what is up there.
+    private var headingChosen = false
     private var oneShot = OneShotTransition()
 
     init(
@@ -50,6 +54,7 @@ final class CeilingState: StateHandler {
         elapsed = 0
         duration = durationProvider()
         direction = 1
+        headingChosen = false
         hangRemaining = 0
         hasHung = false
     }
@@ -60,7 +65,16 @@ final class CeilingState: StateHandler {
         context.body.isUpsideDown = true
 
         elapsed += dt
-        guard elapsed < duration else {
+        // A crawl with somewhere to be does not stop halfway there. Crossing
+        // to the housing from the wall the pet climbed takes about seven
+        // seconds at walking pace, against a crawl of three to eight -- so
+        // without this the pet usually ran out of time in open ceiling, and
+        // the one thing worth seeing up there almost never happened.
+        // Or is there now: the timer runs out during the hang more often
+        // than not, and a pause the pet is cut out of mid-way is a pause
+        // nobody sees.
+        let hasSomewhereToBe = hangRemaining > 0 || (!hasHung && context.notch != nil)
+        guard elapsed < duration || hasSomewhereToBe else {
             oneShot.fire(.fall, using: context.requestTransition)
             return
         }
@@ -76,6 +90,21 @@ final class CeilingState: StateHandler {
         // box's top edge is somewhere off this screen entirely, and a crawl
         // aimed at it takes the pet off the top of the screen it is on.
         let area = context.area(at: context.body.position)
+        // Set off toward the camera housing when there is one.
+        //
+        // Not for tidiness: a crawl lasts a few seconds and the ceiling is
+        // over a thousand points wide, so a pet that picks a direction
+        // without looking spends most crawls walking away from the only
+        // thing up there and stops before it turns round. It reaches the
+        // ceiling by climbing a wall, which means it always starts at one
+        // end -- so the housing is always the way it should be going.
+        if !headingChosen {
+            headingChosen = true
+            if let notch = context.notch {
+                direction = notch.rect.midX >= context.body.position.x ? 1 : -1
+            }
+        }
+
         // Under the camera housing, once per crawl, the pet stops and hangs
         // there for a moment.
         //

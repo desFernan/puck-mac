@@ -446,4 +446,66 @@ final class CeilingNotchHangTests: XCTestCase {
 
         XCTAssertNotEqual(world.body.position.x, before, accuracy: 0.001)
     }
+    /// A crawl that picks a direction without looking spends most of its few
+    /// seconds walking away from the only thing on the ceiling. It reaches
+    /// the ceiling by climbing a wall, so it always starts at one end and
+    /// the housing is always the way it should be going.
+    func test_theCrawlSetsOffTowardTheHousing() {
+        for start in [CGFloat(50), CGFloat(950)] {
+            let world = world(startingAt: start)
+            let state = CeilingState(durationProvider: { 60 }, hangProvider: { 10 })
+            state.enter()
+
+            world.run(state, seconds: 0.5)
+
+            let movedRight = world.body.position.x > start
+            XCTAssertEqual(
+                movedRight, notch.rect.midX > start,
+                "starting at \(start) it should head toward the housing at \(notch.rect.midX)"
+            )
+        }
+    }
+
+    /// And it does not stop before it gets there: crossing to the housing
+    /// takes about as long as the whole crawl is allowed to last, so a crawl
+    /// that ends on its own timer usually ends in open ceiling.
+    func test_theCrawlDoesNotEndBeforeItReachesTheHousing() {
+        let world = world(startingAt: 950)
+        // Far shorter than the crossing takes.
+        let state = CeilingState(durationProvider: { 0.5 }, hangProvider: { 10 })
+        state.enter()
+
+        world.run(state, seconds: 6)
+
+        XCTAssertTrue(
+            world.requestedTransitions.isEmpty,
+            "it has somewhere to be; got \(world.requestedTransitions)"
+        )
+        XCTAssertEqual(world.body.position.x, notch.rect.maxX, accuracy: 25, "and it got there")
+    }
+
+    /// Once it has hung, the timer is back in charge -- or the pet would
+    /// stay on the ceiling for good.
+    func test_afterHangingTheCrawlEndsNormally() {
+        let world = world(startingAt: 950)
+        let state = CeilingState(durationProvider: { 0.5 }, hangProvider: { 0.2 })
+        state.enter()
+
+        world.run(state, seconds: 12)
+
+        XCTAssertEqual(world.requestedTransitions.first, .fall)
+    }
+
+    /// With no housing there is nowhere to be, and the crawl is what it was.
+    func test_withoutAHousingTheTimerIsTheOnlyThingThatEndsIt() {
+        let world = world(startingAt: 500)
+        world.notch = nil
+        let state = CeilingState(durationProvider: { 0.5 }, hangProvider: { 10 })
+        state.enter()
+
+        world.run(state, seconds: 2)
+
+        XCTAssertEqual(world.requestedTransitions.first, .fall)
+    }
+
 }
