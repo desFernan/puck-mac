@@ -1,6 +1,15 @@
 #!/bin/sh
 # Builds Puck + PuckClient signed with your Apple Development
-# certificate and installs both into /Applications.
+# certificate and installs Puck.app into /Applications, with PuckClient
+# carried inside it.
+#
+# PuckClient lives at Puck.app/Contents/Library/LoginItems/PuckClient.app
+# rather than beside it. Two bundles in /Applications meant searching for
+# "Puck" offered two things to launch, one of which is a window the other one
+# opens for you. An app nested inside another is still registered with
+# LaunchServices -- CompanionAppLauncher looks it up by bundle id and finds it
+# either way -- but it is not offered as something to launch on its own, which
+# is the whole difference.
 #
 # Why not just run the Debug build out of DerivedData: macOS ties TCC grants
 # (Accessibility above all) to the code signature, and an *ad-hoc* signature
@@ -105,13 +114,43 @@ for app in Puck PuckClient; do
     fi
 done
 
+# The client goes inside the pet's bundle before either is installed, so what
+# lands in /Applications is one app with the other already in it.
+#
+# Nesting invalidates the outer seal -- Contents/Library/LoginItems is a
+# nested-code location, and Puck.app's signature has to cover what is in it --
+# so Puck.app is signed again afterwards. Same identity as the build used, so
+# the TCC grants the header is about are unaffected.
+HELPERS="$DERIVED/Build/Products/Release/Puck.app/Contents/Library/LoginItems"
+mkdir -p "$HELPERS"
+cp -R "$DERIVED/Build/Products/Release/PuckClient.app" "$HELPERS/"
+#
+# `--preserve-metadata` rather than passing the entitlements file again: Xcode
+# rewrites entitlements at build time (the team identifier is substituted into
+# them), so re-signing from the checked-in plist would hand the app a
+# different set than it was built with.
+SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+    | sed -n 's/.*"\(Apple Development: .*\)"/\1/p' | head -1)
+if [ -z "$SIGN_IDENTITY" ]; then
+    echo "error: no Apple Development identity to re-sign Puck.app with." >&2
+    exit 1
+fi
+if ! codesign --force --sign "$SIGN_IDENTITY" \
+    --preserve-metadata=entitlements,requirements,flags \
+    "$DERIVED/Build/Products/Release/Puck.app" 2>/dev/null
+then
+    echo "error: could not re-sign Puck.app after nesting PuckClient inside it." >&2
+    echo "       Nothing has been replaced; /Applications is untouched." >&2
+    exit 1
+fi
+
 # Updated in place, never deleted first. macOS drops an app's privacy grants
 # when the app is *removed*, so `rm -rf` followed by a fresh copy handed back
 # the microphone, speech and Accessibility prompts on every single install --
 # even though the signature (a real Apple Development identity, see the header)
 # has been stable the whole time. rsync overwrites what changed and deletes what
 # went away, leaving the bundle itself the same item it was.
-for app in Puck PuckClient; do
+for app in Puck; do
     built="$DERIVED/Build/Products/Release/$app.app"
     if [ -d "/Applications/$app.app" ]; then
         rsync -a --delete "$built/" "/Applications/$app.app/"
@@ -147,8 +186,21 @@ if [ -x "$LSREGISTER" ]; then
         | sort -u \
         | grep -v '^/Applications/' \
         | while IFS= read -r stale; do "$LSREGISTER" -u "$stale" 2>/dev/null || true; done
-    "$LSREGISTER" -f /Applications/Puck.app /Applications/PuckClient.app 2>/dev/null || true
+    # The nested client is named explicitly: registering the outer bundle
+    # does not always reach what is inside it, and CompanionAppLauncher can
+    # only launch what LaunchServices knows about.
+    "$LSREGISTER" -f /Applications/Puck.app \
+        /Applications/Puck.app/Contents/Library/LoginItems/PuckClient.app 2>/dev/null || true
+fi
+
+# An earlier version of this script installed the client beside the pet, and
+# a copy left there is a second "Puck" in every search -- and a second
+# candidate for LaunchServices to launch instead of the nested one.
+if [ -d /Applications/PuckClient.app ]; then
+    "$LSREGISTER" -u /Applications/PuckClient.app 2>/dev/null || true
+    rm -rf /Applications/PuckClient.app
+    echo "note: removed the old /Applications/PuckClient.app; it now lives inside Puck.app"
 fi
 
 open /Applications/Puck.app
-echo "installed: /Applications/Puck.app, /Applications/PuckClient.app"
+echo "installed: /Applications/Puck.app (with PuckClient.app inside it)"
