@@ -7,10 +7,10 @@
 >
 > 플랫폼: **macOS** (여기) · [Windows](https://github.com/desFernan/puck-windows) · [Linux](https://github.com/desFernan/puck-linux)
 
-### 💬 [디스코드 참여하기](https://discord.gg/ePBZVnwSYE)
+### 💬 [디스코드 참여하기](https://discord.gg/nGqtBGP857)
 
 버그 제보, 기능 요청, 빌드 관련 질문, 아니면 그냥 놀러 오고 싶어도 —
-[서포트 서버](https://discord.gg/ePBZVnwSYE)가 가장 빠른 연락 방법입니다. 놀러 오세요!
+[서포트 서버](https://discord.gg/nGqtBGP857)가 가장 빠른 연락 방법입니다. 놀러 오세요!
 
 AI 에이전트이기도 한 macOS 데스크톱 펫입니다. 두 개의 Swift 앱으로 구성돼 있어요:
 
@@ -160,4 +160,4 @@ Avatars/my-pet/
 ## 커뮤니티
 
 질문, 버그 제보, 기능 아이디어, 아니면 만든 커스텀 아바타 자랑하고 싶을 때 —
-**[디스코드](https://discord.gg/ePBZVnwSYE)**로 오세요.
+**[디스코드](https://discord.gg/nGqtBGP857)**로 오세요.
