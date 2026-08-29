@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  02_pet-app.md F3: "task_success SFX + 점프" (agent_done) and "detail.path
+//  F3: "task_success SFX + 점프" (agent_done) and "detail.path
 //  변경 시 짧은 점프" (code_editor) -- EventReaction.jump was decoded but
 //  never actually animated anything (found via spec cross-check).
 //

@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  tool_dispatch routing + per-call timeout, per protocol/01_protocol.md 3.1/4.
+//  tool_dispatch routing + per-call timeout, per protocol 3.1/4.
 //
 
 import XCTest

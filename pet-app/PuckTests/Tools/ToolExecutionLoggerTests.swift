@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  JSON Lines log formatting, per protocol/01_protocol.md section 7 -- the
+//  JSON Lines log formatting, per the protocol -- the
 //  shared log format the processes debug through.
 //
 

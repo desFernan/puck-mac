@@ -165,7 +165,7 @@ extension AppDelegate {
         bubbleWindow.closeAndYieldFocus()
     }
 
-    /// 02_pet-app.md F3: agent_done(ok=true) shows its summary in a "말풍선"
+    /// F3: agent_done(ok=true) shows its summary in a "말풍선"
     /// -- reuses TextInputBubbleView's read-only notice mode (its own doc
     /// comment already anticipated this exact use, found via spec
     /// cross-check), same pattern as showClientOfflineBubble.

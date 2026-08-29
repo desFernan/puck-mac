@@ -6,7 +6,7 @@
 //  Land state's StateHandler implementation
 //
 //  A brief landing beat so the non-looping land clip is legible, then Idle
-//  (plan/02_pet-app.md section 3: "Fall | 착지면 감지 | Land → Idle").
+//  ("Fall | 착지면 감지 | Land → Idle").
 //
 
 import Foundation

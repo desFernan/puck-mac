@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  JuggleBall state's StateHandler implementation (optional ball-toy
-//  interaction, 02_pet-app.md F12).
+//  interaction, F12).
 //
 //  2026-07-29: the pet plays with the toy overhead for a while, then throws
 //  it away and gets on with its day -- catching and re-throwing rather than

@@ -9,7 +9,7 @@
 //
 //  Only the timeouts are mirrored, not the whole registry: `timeout_sec` is
 //  the one registry field a tool_dispatch *receiver* needs but the wire does
-//  not carry (docs/socket.md -- the sender owns the real timeout, the
+//  not carry (the sender owns the real timeout, the
 //  receiver only needs a bound that is not tighter than the registry's).
 //  Executor/approval/params stay TS-only because no Swift-side consumer
 //  reads them.

@@ -12,7 +12,7 @@ import Foundation
 
 /// Drives and transitions the current StateHandler. On every state entry,
 /// AvatarPlayable.play and SFXTriggering.trigger are always called together
-/// from the same spot (enterCurrentState) — 02_pet-app.md F3's shared "enter()" requirement.
+/// from the same spot (enterCurrentState) — F3's shared "enter()" requirement.
 /// `@MainActor`, like the states it drives: the frame loop hops onto the main
 /// thread and everything below this line moves a character AppKit is drawing.
 @MainActor
@@ -78,7 +78,7 @@ final class CharacterController {
 
     /// Seconds since the current state was entered -- reset on every
     /// transition, fed to AvatarPlayable.updateBounce so the 2D bounce
-    /// motion (BouncePreset) knows where in its cycle to be (02_pet-app.md F2).
+    /// motion (BouncePreset) knows where in its cycle to be (F2).
     private var stateElapsedTime: TimeInterval = 0
 
     init(initialState: StateHandler, body: CharacterBody, sfxPlayer: SFXTriggering) {

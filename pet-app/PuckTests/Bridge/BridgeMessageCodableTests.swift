@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Verifies BridgeMessages Codable encoding/decoding against the example JSON
-//  in plan/01_protocol.md section 3.
+//  Verifies BridgeMessages Codable encoding/decoding against the protocol's
+//  own example JSON.
 //
 
 import XCTest
@@ -183,7 +183,7 @@ final class BridgeMessageCodableTests: XCTestCase {
         XCTAssertEqual(decoded, original)
     }
 
-    /// 2026-07-29 (plan/01_protocol.md 3.4): workspace_id/session_id default to
+    /// 2026-07-29: workspace_id/session_id default to
     /// "default" when a single-workspace/single-session caller omits them.
     func test_decodesUserInput_withWorkspaceSessionAndAttachments() throws {
         let json = #"""

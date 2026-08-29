@@ -19,7 +19,7 @@ protocol SFXTriggering: AnyObject {
     /// (silent if the manifest's sounds table has no match). `loop` mirrors
     /// AvatarPlayable.play(clip:loop:) — a looping trigger (e.g. "walk")
     /// keeps playing until a *different* loop key is triggered, at which
-    /// point F5 fades the old one out (02_pet-app.md F5: "루프 사운드(walk)는
+    /// point F5 fades the old one out ("루프 사운드(walk)는
     /// 상태 유지 중 반복, exit()에서 페이드아웃"). One-shot (loop: false)
     /// triggers (react_click, task_success, ...) never interrupt a loop.
     func trigger(_ key: String, loop: Bool)

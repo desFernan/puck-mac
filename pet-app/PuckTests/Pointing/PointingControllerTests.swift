@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Release-after-8s-or-on-click logic, per plan/02_pet-app.md F10 ("기본
+//  Release-after-8s-or-on-click logic, per F10 ("기본
 //  8초 후 또는 대상 클릭 감지 시 해제"), tested against a fake
 //  ClickDetectorProviding instead of a real global event monitor.
 //

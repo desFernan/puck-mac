@@ -9,7 +9,7 @@
 import Foundation
 
 /// A single FSM state. name/clipKey correspond to the state transition table
-/// in plan/02_pet-app.md section 3 and the avatar manifest's clips keys.
+/// and the avatar manifest's clips keys.
 /// On transition, CharacterController calls AvatarPlayable.play AND triggers
 /// SFX using clipKey (not name) -- the manifest's sounds table is keyed by
 /// the same lowercase clip names as clips, not the capitalized state name.

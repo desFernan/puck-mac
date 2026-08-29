@@ -145,9 +145,8 @@ extension AppDelegate {
     /// to click it.
     ///
     /// Pointing rather than clicking is not a shortcut -- macOS will not let
-    /// any app click a security dialog on the user's behalf, which
-    /// plan/02_pet-app.md F10 records as the hard limit of this whole
-    /// feature. Guiding *is* the interaction.
+    /// any app click a security dialog on the user's behalf -- the hard
+    /// limit of this whole feature. Guiding *is* the interaction.
     func guideThroughPermission(deniedFor tool: String) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }

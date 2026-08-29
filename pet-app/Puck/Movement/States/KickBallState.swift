@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  KickBall state's StateHandler implementation (optional ball-toy
-//  interaction, 02_pet-app.md F12).
+//  interaction, F12).
 //
 //  A short "header" reaction once the pet has arrived at the ball, then back
 //  to Idle -- mirrors ReactClickState's timer shape. `onEnter` is where

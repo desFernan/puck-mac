@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Hold-duration gating (plan/02_pet-app.md F7: "홀드 0.3초 미만 무시, 마이크
+//  Hold-duration gating (F7: "홀드 0.3초 미만 무시, 마이크
 //  점유는 홀드 구간 한정") and Listen state lifecycle, tested against a fake
 //  SpeechRecognitionServicing + an injected clock (no real mic/Speech
 //  framework needed).

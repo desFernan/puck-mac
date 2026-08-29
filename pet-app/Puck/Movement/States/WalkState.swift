@@ -6,7 +6,7 @@
 //  Walk state's StateHandler implementation.
 //
 //  Carries the pet to `target` at constant speed and hands back to Idle on
-//  arrival (plan/02_pet-app.md section 3). Whoever transitions into Walk sets
+//  arrival. Whoever transitions into Walk sets
 //  the target first — Idle's wander does so via IdleWanderDelegate.
 //
 //  A window standing in the path is walked up to and then climbed, rather

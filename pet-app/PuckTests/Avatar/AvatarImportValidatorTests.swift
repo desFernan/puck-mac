@@ -3,10 +3,10 @@
 //  Puck
 //
 //  owner: 강상우 (Sangwoo Kang)
-//  Validates the file-per-clip package layout from docs/avatar-spec.md:
+//  Validates the file-per-clip package layout:
 //  each clip's {name}.usdz must actually exist on disk (not just as a
 //  manifest key) and fit the per-file size budget. Mesh height/scale and
-//  loop pose-matching aren't checked here — see docs/avatar-spec.md for why.
+//  loop pose-matching aren't checked here — there is no fixture for it.
 //
 
 import XCTest

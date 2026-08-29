@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The pure motion arithmetic behind MoveTo/Walk. plan/02_pet-app.md F3: no
+//  The pure motion arithmetic behind MoveTo/Walk. F3: no
 //  physics engine -- MoveTo travels at a constant px/sec with an arrival
 //  radius, and only Fall accelerates.
 //  Positions are GlobalScreenSpace pixels (top-left origin, Y down).

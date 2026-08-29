@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Pure hit test: plan/02_pet-app.md F10 -- a global click monitor asks
+//  Pure hit test (F10) -- a global click monitor asks
 //  whether the click landed inside the target's frame.
 //
 

@@ -18,7 +18,7 @@ protocol PooledAudioNode: AnyObject {
 extension AVAudioPlayerNode: PooledAudioNode {}
 
 /// A fixed-size pool of nodes for concurrent one-shot/loop SFX playback
-/// (plan/02_pet-app.md F5: "PlayerNode 풀(4~8개)로 동시 재생"). Prefers an
+/// (F5: "PlayerNode 풀(4~8개)로 동시 재생"). Prefers an
 /// idle node; if every node is busy, falls back to round-robin reuse
 /// (cutting off whichever node has been playing longest) rather than
 /// dropping the new sound.

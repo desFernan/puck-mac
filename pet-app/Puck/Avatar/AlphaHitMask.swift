@@ -13,8 +13,8 @@
 //  wand that is mostly empty space either side of a thin stick -- so clicks
 //  land on it in places where nothing is drawn.
 //
-//  02_pet-app.md F1 always listed per-pixel hit testing as the refinement
-//  after the AABB version; this is it.
+//  F1 always listed per-pixel hit testing as the refinement after the AABB
+//  version; this is it.
 //
 //  Sampled coarsely on purpose. The mask exists to answer "did the user mean
 //  to click this?", where being a pixel out is meaningless and the memory and

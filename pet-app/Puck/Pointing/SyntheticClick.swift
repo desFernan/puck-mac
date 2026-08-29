@@ -5,7 +5,7 @@
 //  owner: 박해영 (Haeyoung Park)
 //  click_element: synthesizes CGEvent mouse down/up, detects not_supported_target
 //
-//  Design premise (plan/02_pet-app.md F10): clicking on behalf of the user
+//  Design premise (F10): clicking on behalf of the user
 //  on a system security dialog is not something WindowServer policy allows
 //  regardless of what this code does — guiding the user there via point_at
 //  is the actual limit of what's supported. Classifying "is this target a

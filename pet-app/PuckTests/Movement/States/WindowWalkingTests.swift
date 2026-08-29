@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The window half of the transition table (plan/02_pet-app.md section 3):
+//  The window half of the transition table:
 //  Walk -> Climb at a window edge, Climb -> WalkOnTop at the top, WalkOnTop ->
 //  Fall when the supporting window goes away.
 //

@@ -15,7 +15,7 @@ extension AppDelegate {
     // MARK: - Pet interaction (F1/F3)
 
     /// Clicking the pet makes it react; dragging carries it and dropping it
-    /// lets it fall (plan/02_pet-app.md section 3). Gesture coordinates are
+    /// lets it fall. Gesture coordinates are
     /// AppKit global (bottom-left origin); the FSM works in overlay-local
     /// pixels (top-left origin), so they are converted on the way in.
     func handlePetGesture(_ gesture: PetGesture) {

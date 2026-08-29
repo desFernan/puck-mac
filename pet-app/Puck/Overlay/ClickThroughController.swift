@@ -6,7 +6,7 @@
 //  Toggles ignoresMouseEvents based on the manifest hitbox AABB
 //
 //  Precise alpha-pixel hit testing is a later-priority improvement
-//  (plan/02_pet-app.md F1) — this is the AABB version.
+//  (F1) — this is the AABB version.
 
 import AppKit
 import CoreGraphics

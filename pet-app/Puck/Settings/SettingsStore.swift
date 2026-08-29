@@ -115,7 +115,7 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: Keys.notchPanelEnabled) }
     }
 
-    /// "포커스 창 위로 안 올라감" wander option (02_pet-app.md F3).
+    /// "포커스 창 위로 안 올라감" wander option (F3).
     var avoidClimbingFocusedWindow: Bool {
         get { defaults.object(forKey: Keys.avoidClimbingFocusedWindow) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.avoidClimbingFocusedWindow) }

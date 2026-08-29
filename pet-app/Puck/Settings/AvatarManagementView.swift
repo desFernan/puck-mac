@@ -14,8 +14,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct AvatarManagementView: View {
-    /// The emotion keys always shown, matching the canonical example in
-    /// plan/01_protocol.md section 6 -- plus whatever custom keys the
+    /// The emotion keys always shown, matching the protocol's canonical
+    /// example -- plus whatever custom keys the
     /// manifest already has (loaded in onAppear) or the user adds below.
     private static let defaultEmotionKeys = ["happy", "thinking", "sad"]
 
@@ -103,8 +103,7 @@ struct AvatarManagementView: View {
                         .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
                 }
                 // The avatar package format needs to be explained to end
-                // users too -- condensed
-                // from docs/avatar-spec.md, which is a repo-only doc an
+                // users too -- condensed from the internal spec, which an
                 // end user importing a package would never see otherwise.
                 Text(text(.avatarPackageFormatExplanation))
                     .font(.footnote)

@@ -10,7 +10,7 @@ import XCTest
 @testable import Puck
 
 final class AvatarManifestParsingTests: XCTestCase {
-    // Same structure as the example in protocol/01_protocol.md section 6 (copy of Puck/Resources/Avatars/dummy/manifest.json)
+    // Same structure as the protocol's own example (copy of Puck/Resources/Avatars/dummy/manifest.json)
     private let dummyManifestJSON = """
     {
       "schema_version": 1,

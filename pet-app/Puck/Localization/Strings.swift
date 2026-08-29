@@ -48,8 +48,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     case avatarSelectButton
     case avatarReloadButton, avatarReloadedFormat
     /// The avatar package format needs to be explained to end users too --
-    /// condensed from
-    /// docs/avatar-spec.md for end users, not the full creator-facing spec.
+    /// condensed for them, not the full creator-facing spec.
     case avatarPackageFormatExplanation
     case sizeHeader
     case emotionsHeader, emotionsExplanation, mappedLabel, notMappedLabel

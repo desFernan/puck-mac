@@ -116,7 +116,7 @@ final class BridgeMessageRouterTests: XCTestCase {
         wait(for: [replied], timeout: 2)
     }
 
-    /// 02_pet-app.md F3: "detail.path 변경 시 짧은 점프" -- EventRouter itself
+    /// F3: "detail.path 변경 시 짧은 점프" -- EventRouter itself
     /// is a pure function with no session state, so BridgeMessageRouter (an
     /// already-stateful class) is where the "previous path" has to live
     /// across calls.

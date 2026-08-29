@@ -5,9 +5,8 @@
 //  owner: 박해영 (Haeyoung Park)
 //  Where the agent's API key and model name come from.
 //
-//  Never the source tree's *tracked* files: plan/04_ai-module.md section 3.1
-//  says the key is injected and the module stores none of it, and a key in a
-//  committed file is a key in git history. `.env` is already in .gitignore,
+//  Never the source tree's *tracked* files: the key is injected and nothing
+//  here stores it, and a key in a committed file is a key in git history. `.env` is already in .gitignore,
 //  which is what makes it a safe place to put one.
 //
 //  Looked up in this order, first hit wins:

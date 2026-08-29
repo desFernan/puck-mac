@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  A workspace (project folder or pure-chat) shown in the sidebar's
-//  workspace switcher (plan/02_pet-app.md F13, plan/01_protocol.md 3.4).
+//  workspace switcher (F13).
 //
 
 import Foundation

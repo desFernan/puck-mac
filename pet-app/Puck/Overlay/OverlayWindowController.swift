@@ -5,7 +5,7 @@
 //  owner: 강상우 (Sangwoo Kang)
 //  Creates/positions the overlay window, rebuilding on display changes
 //
-//  TODO(perf, plan/02_pet-app.md F1): downshift frame rate 60->15 after 30s
+//  TODO(perf, F1): downshift frame rate 60->15 after 30s
 //  idle. Needs the FSM wired in (P2+) to know when nothing is moving.
 
 import AppKit
@@ -27,7 +27,7 @@ import AppKit
 /// The frame comes from ScreenManager's `appKitBounds` (real AppKit screen
 /// coordinates), NOT the normalized Y-down space -- that one is for
 /// movement/FSM logic only; actual window placement needs AppKit's own
-/// bottom-left-origin coordinates (plan/02_pet-app.md F3: every movement rule
+/// bottom-left-origin coordinates (F3: every movement rule
 /// works in pixels, and the transform happens only at render time).
 /// `@MainActor`: an NSWindow and the layer tree the pet is drawn into. The
 /// frame loop hops here before touching either.

@@ -28,7 +28,7 @@ enum SFXDecisionMaker {
 }
 
 /// AVAudioEngine-backed SFXTriggering implementation. Real audio I/O is not
-/// unit tested (no fixture .wav files exist yet — see docs/avatar-spec.md);
+/// unit tested (no fixture .wav files exist yet);
 /// SFXDecisionMaker and PlayerNodePool carry the tested logic, this class is
 /// the thin, trusted execution layer over them.
 final class SFXPlayer: SFXTriggering {

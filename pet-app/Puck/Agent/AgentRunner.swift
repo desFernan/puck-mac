@@ -3,20 +3,20 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The tool-use loop -- plan/04_ai-module.md section 3.2, in Swift.
+//  The tool-use loop, in Swift.
 //
 //  "날씨 앱 켜줘" reaches here as `run`, the model answers with launch_app,
 //  PetToolDispatcher puts that on bridge.sock, pet-app launches it and walks
 //  the pet over.
 //
-//  ## Where this deviates from the plan, and why
+//  ## Where this deviates from the original design, and why
 //
-//  plan/04_ai-module.md puts this loop in `ai-module` -- a TypeScript module
-//  on the Claude API, injected into `workspace` (Electron). Three things
+//  The design put this loop in `ai-module` -- a TypeScript module on the
+//  Claude API, injected into `workspace` (Electron). Three things
 //  about that are no longer true on the ground: workspace and ai-module are
 //  both empty repos, the chat client became a Swift app, and the key the team
 //  has is OpenAI's. Rewriting the loop in TS later is a real possibility, so
-//  everything that *is* contract is kept where the plan put it -- the tool
+//  everything that *is* contract is kept where the design put it -- the tool
 //  registry in protocol, the wire format in BridgeMessages, approval before
 //  dispatch -- and only the loop itself is local. What a TS port would have
 //  to redo is this file and GPTClient, not the contract around them.
@@ -125,8 +125,8 @@ final class AgentRunner {
     private let logger: ToolExecutionLogging?
     private let toolSpecs: [GPTToolSpec]
 
-    /// Conversation memory, one stack per chat. Per plan/04_ai-module.md 3.4
-    /// this is in-memory only -- persistence is explicitly後순위.
+    /// Conversation memory, one stack per chat. In-memory only by design --
+    /// persistence is explicitly後순위.
     ///
     /// Was a single stack shared by every chat this app ever opened, because
     /// there is one AgentRunner for the whole process and nothing ever cleared
@@ -446,8 +446,8 @@ final class AgentRunner {
 
         // The one tool that never crosses the socket and never shows up as a
         // tool call in the transcript: it only moves where the rest of this
-        // run is addressed (01_protocol.md section 4, 04_ai-module.md 3.7 --
-        // "결과는 onSessionCreated 콜백 → session_create 이벤트로만 통지").
+        // run is addressed ("결과는 onSessionCreated 콜백 → session_create
+        // 이벤트로만 통지").
         // Emitting tool_call/tool_result for it would put plumbing in the
         // chat and make the pet react to a session switch as if it were work.
         if call.name == Self.openTaskSessionToolName, let openTaskSession {
@@ -549,7 +549,7 @@ final class AgentRunner {
             guard await approve(summary, callId) else {
                 // Refusal is the model's to hear about, not an error to abort
                 // on -- it should say so and offer something else. The code
-                // never crosses the socket (docs/socket.md).
+                // never crosses the socket.
                 let denied = DispatchedToolResult(ok: false, data: nil, error: "denied_by_user", detail: nil)
                 reportEvents(callId: callId, result: denied, to: key)
                 return denied            }
@@ -633,8 +633,7 @@ final class AgentRunner {
 
     /// What the model actually reads back. Errors keep their protocol code so
     /// the model can distinguish "not connected" from "you asked for a tool
-    /// that doesn't exist" and say something useful about it
-    /// (plan/04_ai-module.md 3.2).
+    /// that doesn't exist" and say something useful about it.
     static func toolResultText(ok: Bool, data: JSONValue?, error: String?, detail: String?) -> String {
         if ok {
             guard let data, let encoded = data.jsonText else { return "ok" }

@@ -6,8 +6,8 @@
 //  AppDelegate loads the avatar from ~/Library/Application Support/Puck/
 //  Avatars/dummy, but nothing ever put it there — only the user-driven import
 //  in AvatarManagementView copies anything. On a fresh clone the app launched
-//  with no avatar at all, which is exactly what plan/02_pet-app.md's "클론 즉시
-//  실행 보장" rules out. The bundled package is seeded on first run instead.
+//  with no avatar at all, which is exactly what "클론 즉시 실행 보장" rules
+//  out. The bundled package is seeded on first run instead.
 //
 
 import XCTest

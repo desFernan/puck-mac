@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  Coordinate-space normalization (AppKit bottom-left origin <-> top-left,
-//  Y-down normalized space) per plan/02_pet-app.md section 3. Also covers a
+//  Y-down normalized space). Also covers a
 //  code-review finding on commit 57615a8 (#10): an empty screen list must not
 //  silently produce bogus (sign-flipped) coordinates.
 //

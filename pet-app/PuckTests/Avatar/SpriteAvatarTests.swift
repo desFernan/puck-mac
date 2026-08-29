@@ -233,7 +233,7 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
     }
 
-    // MARK: - triggerJump (02_pet-app.md F3: agent_done / code_editor path change)
+    // MARK: - triggerJump (F3: agent_done / code_editor path change)
 
     func test_triggerJump_offsetsPositionUpwardMidway() throws {
         try writePNG(named: "idle", color: .red)

@@ -5,7 +5,7 @@
 //  owner: 박해영 (Haeyoung Park)
 //  Fall state's StateHandler implementation.
 //
-//  The only state with acceleration (plan/02_pet-app.md F3: "물리엔진 없음 …
+//  The only state with acceleration (F3: "물리엔진 없음 …
 //  Fall만 낙하 가속도"). The surface comes from StateContext.landingY, which
 //  F4's LandingSurfaceResolver answers with a window top edge or the floor.
 //

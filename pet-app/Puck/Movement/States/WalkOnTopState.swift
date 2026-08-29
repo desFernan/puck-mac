@@ -7,8 +7,8 @@
 //
 //  Strolls along a window's top edge until the window stops being there —
 //  closed, minimized, or simply walked off the end of. Both are the same
-//  situation: nothing underfoot (plan/02_pet-app.md section 3 hands WalkOnTop
-//  to Fall when the supporting window goes away or is minimized).
+//  situation: nothing underfoot (the transition table hands WalkOnTop to
+//  Fall when the supporting window goes away or is minimized).
 //
 //  Reuses the "walk" clip; the manifest has no dedicated one.
 

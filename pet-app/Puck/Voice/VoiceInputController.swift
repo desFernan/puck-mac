@@ -19,7 +19,7 @@ protocol SpeechRecognitionServicing: AnyObject {
 }
 
 /// Owns the PTT key event and the recording lifecycle together (deliberate
-/// single-owner design per plan/02_pet-app.md F7). Holds shorter than
+/// single-owner design, F7). Holds shorter than
 /// `minimumHoldDuration` still occupy the mic for their (brief) duration —
 /// "마이크 점유는 홀드 구간 한정" — but their eventual final transcription is
 /// discarded rather than submitted, treating them as an accidental tap.

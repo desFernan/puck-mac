@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The `petAppProxy` executor of plan/04_ai-module.md section 3.1, in Swift:
+//  The `petAppProxy` tool executor, in Swift:
 //  turns one tool call into a tool_dispatch on bridge.sock and waits for the
 //  tool_result carrying the same id (protocol 3.1).
 //
@@ -11,7 +11,7 @@
 //  own, so correlation is this type's whole job: it keeps a table of
 //  in-flight ids and hands each reply back to the continuation waiting on it.
 //
-//  Timeouts are the *sender's* to enforce (docs/socket.md), and the bound
+//  Timeouts are the *sender's* to enforce, and the bound
 //  comes from ToolTimeouts rather than a constant here -- pet-app's executor
 //  runs its own defensive timer, and two hardcoded numbers drift.
 //
@@ -53,7 +53,7 @@ final class PetToolDispatcher: @unchecked Sendable {
 
     /// Feed every tool_result the socket delivers in here. Ids that aren't
     /// waiting (a late reply after a timeout, a reply to someone else) are
-    /// dropped -- docs/socket.md requires exactly that rather than an error.
+    /// dropped -- the protocol requires exactly that rather than an error.
     func handle(_ result: ToolResult) {
         lock.lock()
         let continuation = pending.removeValue(forKey: result.id)
@@ -83,7 +83,7 @@ final class PetToolDispatcher: @unchecked Sendable {
         guard ToolRegistry.tool(named: tool) != nil else {
             // The registry and the model's tool list are built from the same
             // data, so this means they've drifted -- worth its own code
-            // (docs/socket.md) rather than looking like an execution failure.
+            // rather than looking like an execution failure.
             return DispatchedToolResult(ok: false, data: nil, error: "unknown_tool", detail: tool)
         }
 

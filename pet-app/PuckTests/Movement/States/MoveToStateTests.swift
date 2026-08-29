@@ -3,8 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  "임의 | 도구/이벤트 목표좌표 | MoveTo → Point 또는 Idle"
-//  (plan/02_pet-app.md section 3).
+//  "임의 | 도구/이벤트 목표좌표 | MoveTo → Point 또는 Idle".
 //
 //  Unlike Walk, MoveTo is a directed move ordered by a tool or a socket
 //  event, so it does not climb windows it meets on the way — it goes where it

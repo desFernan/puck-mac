@@ -6,7 +6,7 @@
 //  MoveTo state's StateHandler implementation
 //
 //  A directed move ordered by a tool or a socket event ("임의 | 도구/이벤트
-//  목표좌표 | MoveTo → Point 또는 Idle", plan/02_pet-app.md section 3).
+//  목표좌표 | MoveTo → Point 또는 Idle").
 //
 //  Unlike Walk it deliberately ignores windows in the way: the pet was sent
 //  somewhere specific, and stopping to climb something on the route would

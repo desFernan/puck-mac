@@ -20,7 +20,7 @@ enum WorkspaceFileServiceDefaults {
 
 /// Skipped at every directory level, both in tree listing and (once wired,
 /// see WorkspaceFileWatcher) file watching. Not `.gitignore`-aware, matching
-/// file-service.ts's own deliberate choice -- see docs/file-tree-performance.md.
+/// file-service.ts's own deliberate choice.
 let workspaceFileServiceDefaultIgnores: Set<String> = [
     ".git", "node_modules", "dist", "dist-main", "release", ".next", "build",
     "target", ".venv", "venv", "__pycache__", ".pytest_cache", ".cache",

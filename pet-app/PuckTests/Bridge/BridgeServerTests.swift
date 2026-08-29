@@ -5,7 +5,7 @@
 //  owner: 박해영 (Haeyoung Park)
 //  End-to-end test over a real Unix domain socket (no mocks): starts a
 //  BridgeServer on a temp path, connects a bare NWConnection client, and
-//  verifies messages flow both ways. protocol/01_protocol.md section 2.
+//  verifies messages flow both ways.
 //
 
 import XCTest

@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Fall -> Land -> Idle, the tail of the transition table in
-//  plan/02_pet-app.md section 3. Fall is the only state with acceleration.
+//  Fall -> Land -> Idle, the tail of the transition table. Fall is the only
+//  state with acceleration.
 //
 
 import XCTest

@@ -13,7 +13,7 @@
 //  (same convention as WalkOnTop/MoveTo reusing "walk", per StateHandler's
 //  clipKey doc).
 //
-//  Not yet implemented: 02_pet-app.md F3 also calls for "창이 뜨는 쪽으로
+//  Not yet implemented: F3 also calls for "창이 뜨는 쪽으로
 //  살짝 도킹 이동" (a short move toward the client window's dock position) --
 //  deferred until F13's real window (which knows where it opens) exists.
 //  Wandering already stops simply by not being IdleState, same as

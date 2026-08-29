@@ -3,9 +3,9 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Landing-surface resolution accounting for Z-order/overlap, per
-//  plan/02_pet-app.md section 3 F4: at the character's x, only the segments
-//  of a window's top edge that are actually visible count.
+//  Landing-surface resolution accounting for Z-order/overlap, per F4: at the
+//  character's x, only the segments of a window's top edge that are actually
+//  visible count.
 //
 
 import XCTest

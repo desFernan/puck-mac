@@ -83,8 +83,8 @@ struct EventReaction: Equatable {
 }
 
 enum EventRouter {
-    /// Maps a protocol 3.2 event to a reaction, per the table in
-    /// 02_pet-app.md section 3 F3 ("소켓 이벤트 -> 반응 매핑").
+    /// Maps a protocol 3.2 event to a reaction, per the F3 table
+    /// ("소켓 이벤트 -> 반응 매핑").
     ///
     /// - Parameter previousCodeEditorPath: the `detail.path` from the most
     ///   recent code_editor tool_call, if any -- kept here as an explicit

@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  The "Claude Desktop"-style client window (plan/02_pet-app.md F13).
+//  The "Claude Desktop"-style client window (F13).
 //
 //  Chat rebuild (2026-08-13): sidebar, top bar and transcript moved into
 //  ClientChatWebView (React/Tailwind/shadcn). Undone 2026-08-15: they are

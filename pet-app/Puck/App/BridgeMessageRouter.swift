@@ -25,7 +25,7 @@ final class BridgeMessageRouter {
     /// EventRouter.reaction(for:) is a pure function with no session state of
     /// its own (per its header) -- this is the one place that lives, so a
     /// code_editor tool_call can detect its detail.path *changing* across
-    /// calls (02_pet-app.md F3: "detail.path 변경 시 짧은 점프"). Read/written
+    /// calls (F3: "detail.path 변경 시 짧은 점프"). Read/written
     /// only from `handle`, which always runs on main via dispatchToMain.
     private var lastCodeEditorPath: String?
     /// Which chat `lastCodeEditorPath` belongs to. A path from another

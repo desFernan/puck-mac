@@ -7,7 +7,7 @@
 //
 //  The FSM (Movement/CharacterController) only knows this protocol — it has no
 //  idea whether USDZAvatar/VideoAvatar/SpriteAvatar is actually playing
-//  (02_pet-app.md F2).
+//  (F2).
 
 import CoreGraphics
 import Foundation
@@ -23,8 +23,8 @@ protocol AvatarPlayable: AnyObject {
     func setScreenPosition(_ position: CGPoint)
     func setFacing(_ facing: AvatarFacing)
 
-    /// Per-frame procedural "bounce" motion (2026-07-29 2D switch, 02_pet-app.md
-    /// F2) -- `clip`/`elapsed` describe how long the current clip has been
+    /// Per-frame procedural "bounce" motion (2026-07-29 2D switch, F2) --
+    /// `clip`/`elapsed` describe how long the current clip has been
     /// playing, `intensity` is the manifest's bounce_intensity. Default is a
     /// no-op: usdz/video avatars have no use for this, only SpriteAvatar acts on it.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double)
@@ -45,7 +45,7 @@ protocol AvatarPlayable: AnyObject {
     /// avatars have no use for this, only SpriteAvatar acts on it.
     func setUpsideDown(_ isUpsideDown: Bool)
 
-    /// A short visual hop (02_pet-app.md F3: agent_done, code_editor
+    /// A short visual hop (F3: agent_done, code_editor
     /// detail.path changes) -- JumpFlourish, purely a render-time overlay
     /// like bounce/tint, never touching the FSM's actual position. Default
     /// is a no-op -- usdz/video avatars have no use for this, only

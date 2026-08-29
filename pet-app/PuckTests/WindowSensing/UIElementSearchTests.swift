@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  The traversal half of F4 level 2, tested against a fake tree so it needs
-//  no live app and no Accessibility permission. plan/02_pet-app.md F4:
+//  no live app and no Accessibility permission. F4:
 //  "AXUIElementCreateApplication(pid) 트리 DFS (깊이 제한 + 타임아웃 필수)".
 //
 

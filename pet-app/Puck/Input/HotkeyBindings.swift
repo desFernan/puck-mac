@@ -24,9 +24,9 @@ struct HotkeyBinding: Equatable {
     }
 }
 
-/// The three configurable hotkeys from plan/02_pet-app.md F6. Conflict
-/// checking exists because these are user-remappable — the plan explicitly
-/// calls for "충돌 검사" (conflict checking) in the key-capture UI.
+/// The three configurable hotkeys (F6). Conflict checking exists because
+/// these are user-remappable — "충돌 검사" (conflict checking) is required in
+/// the key-capture UI.
 struct HotkeyBindings: Equatable {
     var pushToTalk: HotkeyBinding
     var textInput: HotkeyBinding

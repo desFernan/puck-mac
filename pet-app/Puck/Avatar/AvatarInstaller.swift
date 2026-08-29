@@ -8,8 +8,8 @@
 //  AvatarLoader reads from ~/Library/Application Support/Puck/Avatars/
 //  {name}/, but the only thing writing there was AvatarManagementView's
 //  user-driven import — so a fresh clone launched with no avatar and the pet
-//  never appeared. plan/02_pet-app.md requires the bundled dummy to make the
-//  app run immediately after cloning.
+//  never appeared. The bundled dummy is what makes the app run immediately
+//  after cloning.
 //
 
 import Foundation

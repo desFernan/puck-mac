@@ -21,9 +21,9 @@ extension AppDelegate {
             guard let self, let characterController = self.characterController else { return }
             self.stateBeforeListen = characterController.currentState
             characterController.transition(to: self.states.listen)
-            // F7: listen_start is an event-name sound key (plan/01_protocol.md
-            // section 6), separate from the state's own "listen" clip key that
-            // the shared enter() path triggers.
+            // F7: listen_start is an event-name sound key, separate from the
+            // state's own "listen" clip key that the shared enter() path
+            // triggers.
             self.sfxPlayer?.trigger("listen_start", loop: false)
         }
         voiceController.onListenEnd = { [weak self] in

@@ -9,7 +9,7 @@
 //  be interrupted into this) -- NOT via MoveTo(editor window): the protocol's
 //  code_editor detail only ever carries a file path ({"path": "src/main.ts"}),
 //  never window coordinates, so there is nothing for F4 to walk the pet
-//  toward (02_pet-app.md F3 corrected to match, found via spec cross-check).
+//  toward (F3 corrected to match, found via spec cross-check).
 //
 //  The typing SFX loop needs nothing state-specific -- it already gets it for
 //  free from CharacterController.enterCurrentState's generic

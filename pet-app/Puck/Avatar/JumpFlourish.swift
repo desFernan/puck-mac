@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  A short vertical hop -- 02_pet-app.md F3 calls for one on agent_done and
-//  on a code_editor detail.path change, but EventReaction.jump was decoded
+//  A short vertical hop -- F3 calls for one on agent_done and on a
+//  code_editor detail.path change, but EventReaction.jump was decoded
 //  and never actually animated anything (found via spec cross-check).
 //
 //  Purely visual, like BouncePreset/FlipAnimation: computed from elapsed time

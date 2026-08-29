@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Pure physics for the ball-toy interaction (02_pet-app.md F12, optional,
+//  Pure physics for the ball-toy interaction (F12, optional,
 //  lowest priority). The drop reuses MovementSolver.fallStep's free-fall
 //  arithmetic directly rather than reimplementing it; the kicked-away fling
 //  is the one bit of new motion this file adds.

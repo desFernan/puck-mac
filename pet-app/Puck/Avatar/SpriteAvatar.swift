@@ -156,7 +156,7 @@ final class SpriteAvatar: AvatarPlayable {
         spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset + currentJumpOffset)
     }
 
-    /// A short visual hop -- 02_pet-app.md F3 (agent_done, code_editor
+    /// A short visual hop -- F3 (agent_done, code_editor
     /// detail.path changes). Purely a render-time offset on top of whatever
     /// the FSM's real `position` is, recomputed every frame via updateBounce
     /// (already called unconditionally each frame) rather than baked into

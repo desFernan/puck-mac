@@ -409,8 +409,8 @@ final class AgentHost {
     }
 
     /// The agent decided this turn is real work and wants it out of the
-    /// casual session (protocol 3.4 `session_create(origin=agent)`,
-    /// 04_ai-module.md 3.7). Two things happen, in this order:
+    /// casual session (protocol 3.4 `session_create(origin=agent)`).
+    /// Two things happen, in this order:
     ///
     /// 1. The session is announced. Like every other event this app produces,
     ///    it is broadcast rather than applied locally -- pet-app relays

@@ -5,7 +5,7 @@
 //  owner: 박해영 (Haeyoung Park)
 //  Pure motion arithmetic for MoveTo/Walk/Fall.
 //
-//  plan/02_pet-app.md F3: "물리엔진 없음. MoveTo 등속(px/sec) + 도착 반경,
+//  F3: "물리엔진 없음. MoveTo 등속(px/sec) + 도착 반경,
 //  Fall만 낙하 가속도". Kept free of any entity/state so the arithmetic is
 //  testable on its own — the states below it only decide *when* to call this.
 //

@@ -3,7 +3,7 @@
 //  Puck
 //
 //  owner: 강상우 (Sangwoo Kang)
-//  Verifies the declared window configuration from plan/02_pet-app.md F1.
+//  Verifies the declared window configuration (F1).
 //  Never orders the window on screen, so it doesn't visibly flash during tests.
 //
 

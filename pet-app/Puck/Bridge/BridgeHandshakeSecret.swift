@@ -17,8 +17,7 @@
 //  container at all), and a step that anything else has to take deliberately
 //  rather than by opening a socket whose path is public. The wall -- verifying
 //  the peer's code signature, which needs the peer's pid and therefore a
-//  socket layer that exposes one -- is its own piece of work; see
-//  docs/tasks.md.
+//  socket layer that exposes one -- is its own piece of work.
 //
 
 import Foundation

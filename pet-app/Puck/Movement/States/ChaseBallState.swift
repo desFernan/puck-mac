@@ -4,10 +4,10 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  ChaseBall state's StateHandler implementation (optional ball-toy
-//  interaction, 02_pet-app.md F12).
+//  interaction, F12).
 //
 //  "Idle/Walk 한정 | 공 던지기(F12) | ChaseBall → JuggleBall → KickBall → Idle"
-//  (plan/02_pet-app.md section 3; JuggleBall added 2026-07-29). Mirrors
+//  (JuggleBall added 2026-07-29). Mirrors
 //  MoveToState almost exactly --
 //  ignores windows in the way for the same reason MoveTo does: the pet is
 //  headed somewhere specific (the ball), not wandering.

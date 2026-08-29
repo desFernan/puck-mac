@@ -7,7 +7,7 @@
 //  BridgeServer (which pet-app hosts), this is the client side: it dials
 //  out, announces role .gui (protocol 3.7) once ready, and reconnects with
 //  the same exponential backoff (1s -> 2s -> 4s, capped at 30s) documented
-//  for workspace's own client behavior (docs/socket.md).
+//  for workspace's own client behavior.
 //
 
 import Foundation

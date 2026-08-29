@@ -6,7 +6,7 @@
 //  Climb state's StateHandler implementation.
 //
 //  Rides a window's side up to its top edge, then walks along it
-//  (plan/02_pet-app.md section 3: "Climb | 창 상단 도달 | WalkOnTop").
+//  ("Climb | 창 상단 도달 | WalkOnTop").
 //
 
 import CoreGraphics

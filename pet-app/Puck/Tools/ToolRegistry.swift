@@ -14,7 +14,7 @@
 //  forbids, so it lands here instead.
 //
 //  What is deliberately NOT here: each tool's `description` text. That is
-//  owned by ai-module (docs/tools.md notes), because it is prompt-tuning
+//  owned by ai-module, because it is prompt-tuning
 //  material rather than contract -- it changes without the wire changing.
 //  The Swift agent keeps its descriptions next to its prompt for the same
 //  reason.

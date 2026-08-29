@@ -6,14 +6,15 @@
 //  A thin OpenAI Chat Completions client with tool calling.
 //
 //  The pet needs to drive the screen -- launching apps, reacting to what's
-//  open -- via a chat brain with tool calling. plan/04_ai-module.md specifies
-//  this brain as a TypeScript module against the Claude API, hosted by workspace -- but
+//  open -- via a chat brain with tool calling. The original design specified
+//  this brain as a TypeScript module against the Claude API, hosted by
+//  workspace -- but
 //  workspace and ai-module are both still empty repos, the chat client is
 //  Swift now, and the key the team has is an OpenAI one. So the loop lives
 //  here for the moment; see AgentRunner's header for what that costs.
 //
-//  No SDK, same reasoning as plan/04_ai-module.md section 4 gives for the
-//  Claude client: a tool-use loop needs three request fields and reads two
+//  No SDK, for the same reason the Claude client skips one: a tool-use
+//  loop needs three request fields and reads two
 //  response fields, and a dependency for that is a dependency to keep
 //  updated. Non-streaming for a first pass -- the pet reacts to tool calls,
 //  not to tokens, so streaming buys nothing until the chat view wants a

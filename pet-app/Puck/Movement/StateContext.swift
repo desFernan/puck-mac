@@ -6,8 +6,8 @@
 //  What a state can see and do during one frame.
 //
 //  States used to receive nothing but `dt`, so they could neither move the
-//  character nor hand control to another state — the transition table in
-//  plan/02_pet-app.md section 3 had no way to express itself in code. This
+//  character nor hand control to another state — the transition table had no
+//  way to express itself in code. This
 //  passes the character and the world it moves through, plus the one way a
 //  state asks to be replaced.
 //

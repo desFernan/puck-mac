@@ -6,8 +6,8 @@
 //  ReactDrag state's StateHandler implementation.
 //
 //  The pet hangs off the cursor while being dragged and drops when let go
-//  (plan/02_pet-app.md section 3: a drag puts it in ReactDrag, following the
-//  cursor, and releasing hands it to Fall).
+//  (a drag puts it in ReactDrag, following the cursor, and releasing hands
+//  it to Fall).
 //
 //  While held, the pet is **not moving** — it is being carried. So this state
 //  runs no locomotion at all: no easing, no speed, no MovementSolver. The pet

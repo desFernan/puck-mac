@@ -19,7 +19,7 @@ import Foundation
 
 final class CharacterBody {
     /// pet-app's own default bounce intensity when manifest.bounce_intensity
-    /// is absent (2026-07-29 2D switch, 02_pet-app.md F2).
+    /// is absent (2026-07-29 2D switch, F2).
     static let defaultBounceIntensity = 0.6
 
     private let avatar: AvatarPlayable
@@ -47,7 +47,7 @@ final class CharacterBody {
     /// so every other route into Fall is unaffected.
     ///
     /// Deliberately NOT a live velocity the FSM integrates every frame -- the
-    /// states are kinematic by design ("물리엔진 없음", plan/02_pet-app.md F3)
+    /// states are kinematic by design ("물리엔진 없음", F3)
     /// and only Fall does anything with acceleration.
     var launchVelocity: CGPoint = .zero
 
@@ -83,7 +83,7 @@ final class CharacterBody {
     }
 
     /// A short visual hop -- EventRouter's agent_done/code_editor
-    /// path-change reactions (02_pet-app.md F3). Forwarded straight through,
+    /// path-change reactions (F3). Forwarded straight through,
     /// same as every other avatar-facing call here.
     func triggerJump() {
         avatar.triggerJump()

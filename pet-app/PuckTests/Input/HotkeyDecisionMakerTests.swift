@@ -3,9 +3,9 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Pure decision logic for GlobalHotkeyManager, including the case plan/
-//  02_pet-app.md explicitly calls for by listing flagsChanged alongside
-//  keyDown/keyUp: releasing the modifier (Option) before the key (Space)
+//  Pure decision logic for GlobalHotkeyManager, including the case F6
+//  explicitly calls for by listing flagsChanged alongside keyDown/keyUp:
+//  releasing the modifier (Option) before the key (Space)
 //  during PTT hold must still end the hold.
 //
 

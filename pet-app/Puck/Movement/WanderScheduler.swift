@@ -31,7 +31,7 @@ final class WanderScheduler {
 
     /// How long Idle waits before drawing its next Outcome.
     ///
-    /// 02_pet-app.md F3 specified `8...30`, and both ends of that were wrong
+    /// F3 specified `8...30`, and both ends of that were wrong
     /// in practice, in opposite directions:
     ///
     /// - 30s at the top read as broken rather than calm. Measured, the pet

@@ -4,10 +4,10 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  Glue between BallPhysics (pure math) and the CALayer it's drawn on
-//  (02_pet-app.md F12, optional ball-toy interaction).
+//  (F12, optional ball-toy interaction).
 //
 //  The toy is a pet-app-bundled decoration, not a user-customizable avatar
-//  asset (plan/02_pet-app.md F12). It started as a plain drawn circle so no
+//  asset (F12). It started as a plain drawn circle so no
 //  art was needed; it is now a pumpkin, which ships in the app bundle
 //  rather than in an avatar package for exactly that reason -- swapping
 //  avatars must not take the toy away.

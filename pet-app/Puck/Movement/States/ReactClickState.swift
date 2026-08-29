@@ -6,7 +6,7 @@
 //  ReactClick state's StateHandler implementation.
 //
 //  A short reaction to being clicked, then back to whatever the pet was doing
-//  ("임의 | 캐릭터 클릭 | ReactClick → Idle", plan/02_pet-app.md section 3).
+//  ("임의 | 캐릭터 클릭 | ReactClick → Idle").
 //  Also reused as the failure reaction for tool_result(ok=false) — see
 //  EventRouter.
 //

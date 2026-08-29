@@ -131,8 +131,8 @@ struct UserInput: Equatable {
 }
 
 /// Who created a session: user via the sidebar's "new chat", or agent when it branched
-/// a casual conversation into a task session on its own judgement (protocol 4,
-/// plan/04_ai-module.md 3.7).
+/// a casual conversation into a task session on its own judgement
+/// (protocol 4).
 enum SessionOrigin: String, Codable {
     case user
     case agent

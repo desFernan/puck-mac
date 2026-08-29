@@ -6,7 +6,7 @@
 //  Source of truth for the client window's sidebar: workspaces, each
 //  workspace's chat sessions, and which one is active. Fed by PuckClient's
 //  BridgeSocketClient for incoming state and UserInputSender for outgoing
-//  requests (plan/02_pet-app.md F13).
+//  requests (F13).
 //
 
 import Foundation
@@ -292,7 +292,7 @@ final class ClientWindowStore: ObservableObject {
     ///   the source session locally and it would otherwise vanish with that
     ///   session, leaving the task session open with nothing in it
     /// - the source chat is closed, *unless* it is the workspace's casual
-    ///   session: 02_pet-app.md F13 has `session_id: "default"` always
+    ///   session: F13 has `session_id: "default"` always
     ///   present, and closing it would also throw away conversation that has
     ///   nothing to do with this task
     ///

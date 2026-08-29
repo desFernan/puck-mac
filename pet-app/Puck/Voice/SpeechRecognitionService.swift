@@ -35,8 +35,8 @@ final class SpeechRecognitionService: SpeechRecognitionServicing {
     /// its late result instead of misdelivering it into the new session.
     private var generation = 0
 
-    /// Defaults to the system locale (ko-KR on a Korean system), per
-    /// plan/02_pet-app.md F7 ("언어: 시스템 로케일(ko-KR) 기본, 설정 변경").
+    /// Defaults to the system locale (ko-KR on a Korean system), per F7
+    /// ("언어: 시스템 로케일(ko-KR) 기본, 설정 변경").
     init(locale: Locale = .current) {
         recognizer = SFSpeechRecognizer(locale: locale)
     }

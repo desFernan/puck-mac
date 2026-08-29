@@ -5,7 +5,7 @@
 //  owner: 박해영 (Haeyoung Park)
 //  ClientWindowStore is the sidebar/session-list source of truth: workspace
 //  switching, per-workspace session lists, and routing incoming chat events
-//  to the right session (plan/02_pet-app.md F13, plan/01_protocol.md 3.4/3.5).
+//  to the right session (F13).
 //
 
 import Combine
@@ -47,7 +47,7 @@ final class ClientWindowStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions(in: "default").first?.origin, .user)
     }
 
-    /// plan/02_pet-app.md F13: "워크스페이스마다 session_id: default인 일상
+    /// F13: "워크스페이스마다 session_id: default인 일상
     /// 대화 세션이 항상 존재" -- a newly created workspace gets its own
     /// casual session automatically, without a separate session_create.
     func test_workspaceCreate_appendsTheWorkspaceAndSeedsItsOwnCasualSession() {
@@ -153,7 +153,7 @@ final class ClientWindowStoreTests: XCTestCase {
                        "the user's own message moves across -- otherwise the task session opens empty")
     }
 
-    /// The casual session is the one exception: 02_pet-app.md F13 keeps
+    /// The casual session is the one exception: F13 keeps
     /// `session_id: "default"` always present, and it holds conversation that
     /// has nothing to do with the task.
     func test_moveTurnToTaskSession_keepsTheCasualSession() {

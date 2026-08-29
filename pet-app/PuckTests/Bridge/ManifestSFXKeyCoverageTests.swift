@@ -4,14 +4,14 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  Every SFX key EventRouter.reaction(for:) can produce must have a matching
-//  entry in the manifest's sounds table (plan/01_protocol.md section 6) —
+//  entry in the manifest's sounds table —
 //  F5's rule is that an unmapped key is silent, so a schema gap means a
 //  spec-required sound silently never plays. The original review finding
 //  here (commit 57615a8 item #7) was exactly that: "await_approval" was
 //  emitted but undefined in the schema; the schema has since been fixed at
-//  the source (plan repo commit 8957026), closing the gap this test tracked.
+//  the source, closing the gap this test tracked.
 //  knownMissingSFXKeys stays as the mechanism for any future gap that's
-//  blocked on a cross-team schema change (01_protocol.md section 8): the
+//  blocked on a cross-team schema change: the
 //  first test fails on an unexplained gap, the second fails if an entry in
 //  the list goes stale.
 //

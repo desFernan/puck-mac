@@ -6,11 +6,11 @@
 //  Import-menu validator: checks manifest schema + clip existence, reports missing items
 //
 //  Checks manifest schema/required-clip-keys (via AvatarLoader) plus the
-//  file-per-clip layout from docs/avatar-spec.md: each clip's {name}.png
+//  file-per-clip package layout: each clip's {name}.png
 //  (sprites, 2026-07-29's primary type) or {name}.usdz (legacy) must actually
 //  exist in the package directory and fit the size budget. Does NOT check
 //  image dimensions or usdz mesh height/scale/loop pose-matching — that needs
-//  a real fixture to verify against, and isn't wired up yet (see docs/avatar-spec.md).
+//  a real fixture to verify against, and isn't wired up yet.
 
 import Foundation
 

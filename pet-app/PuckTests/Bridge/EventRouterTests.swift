@@ -3,8 +3,8 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  Verifies the event -> reaction mapping table in
-//  plan/02_pet-app.md section 3 F3 ("소켓 이벤트 -> 반응 매핑").
+//  Verifies the event -> reaction mapping table (F3, "소켓 이벤트 -> 반응
+//  매핑").
 //
 
 import XCTest
@@ -21,8 +21,8 @@ final class EventRouterTests: XCTestCase {
         XCTAssertEqual(reaction, EventReaction(stateTransition: .type))
     }
 
-    // MARK: - code_editor detail.path change -> jump (02_pet-app.md F3:
-    // "detail.path 변경 시 짧은 점프") -- decoded via EventReaction.jump but
+    // MARK: - code_editor detail.path change -> jump (F3: "detail.path
+    // 변경 시 짧은 점프") -- decoded via EventReaction.jump but
     // never actually checked for a change until now (found via spec
     // cross-check).
 

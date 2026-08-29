@@ -4,7 +4,7 @@
 //
 //  owner: 박해영 (Haeyoung Park)
 //  Procedural squash-and-stretch "bounce" motion for 2D sprite avatars
-//  (02_pet-app.md F2, 2026-07-29 2D switch).
+//  (F2, 2026-07-29 2D switch).
 //
 //  A static illustration ships no animation frames, so instead of playing
 //  back baked motion, pet-app computes a small scale transform every frame
