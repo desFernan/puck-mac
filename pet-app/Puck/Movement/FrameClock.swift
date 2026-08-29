@@ -81,11 +81,23 @@ final class FrameClock {
 
     /// Changing the rate restarts the timer but keeps the ticker running, so
     /// the frame spanning the change reports its real elapsed time.
+    ///
+    /// Rescheduled on the next turn of the run loop rather than here. This is
+    /// called from inside the firing timer's own callback -- the tick decides
+    /// the next rate -- and replacing a timer while the run loop is part-way
+    /// through its own timer list left the replacement in a state it never
+    /// recovered from: still valid, with a fire date already in the past, and
+    /// never serviced again. The pet stopped dead a few seconds after launch,
+    /// stayed on screen because AppKit owns the window, and could not be
+    /// walked or dragged. Nothing logged, because nothing had failed.
     func setFramesPerSecond(_ fps: Double) {
         guard fps > 0, fps != framesPerSecond else { return }
         framesPerSecond = fps
-        if timer != nil {
-            schedule()
+        guard timer != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            // Still wanted, and still running: a stop() in between must win.
+            guard let self, self.timer != nil else { return }
+            self.schedule()
         }
     }
 
