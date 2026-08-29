@@ -80,7 +80,12 @@ enum MediaRemoteReader {
         let artist: String
         let album: String
         let playing: Bool
+        /// Where the playhead was when the player last said anything about
+        /// it -- which is not the same as where it is now. See `position`.
         let elapsed: TimeInterval
+        /// When it said it. Nil for a player that reports no clock.
+        let measuredAt: Date?
+        let rate: Double
         let duration: TimeInterval
         let bundleIdentifier: String
         let artwork: Data?
@@ -93,12 +98,52 @@ enum MediaRemoteReader {
             album = root["album"] as? String ?? ""
             playing = root["playing"] as? Bool ?? false
             elapsed = root["elapsedTime"] as? Double ?? 0
+            measuredAt = (root["timestamp"] as? String).flatMap(Self.date)
+            rate = root["playbackRate"] as? Double ?? 1
             duration = root["duration"] as? Double ?? 0
             bundleIdentifier = root["bundleIdentifier"] as? String ?? ""
             artwork = (root["artworkData"] as? String).flatMap { Data(base64Encoded: $0) }
         }
 
-        func nowPlaying() -> NowPlaying? {
+        /// Where the playhead actually is.
+        ///
+        /// A player reports its position once, when something changes, and
+        /// then says nothing until something changes again -- a browser
+        /// playing a video sends one message at the moment it starts and
+        /// leaves `elapsedTime` at whatever it was. Asking again a minute
+        /// later gets the same number and the same timestamp, which is why
+        /// the progress bar sat still through a whole song.
+        ///
+        /// So the answer is the reported position plus however long ago it
+        /// was reported, at whatever speed it is running. A paused player is
+        /// already where it says it is.
+        func position(now: Date = Date()) -> TimeInterval {
+            guard playing, let measuredAt else { return max(0, elapsed) }
+            let since = now.timeIntervalSince(measuredAt)
+            // A clock that reads backwards is a machine whose time changed
+            // under us, not a track playing in reverse.
+            let advanced = elapsed + max(0, since) * rate
+            // Never past the end: a stream that overruns its stated length
+            // should sit at the end rather than draw a bar past full.
+            guard duration > 0 else { return max(0, advanced) }
+            return min(max(0, advanced), duration)
+        }
+
+        static func date(_ text: String) -> Date? {
+            // Two formatters because the adapter sends whole seconds for some
+            // players and fractional for others, and one parser rejects the
+            // shape it was not built for.
+            for options in [[ISO8601DateFormatter.Options.withInternetDateTime,
+                             .withFractionalSeconds],
+                            [.withInternetDateTime]] {
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = ISO8601DateFormatter.Options(options)
+                if let date = formatter.date(from: text) { return date }
+            }
+            return nil
+        }
+
+        func nowPlaying(now: Date = Date()) -> NowPlaying? {
             // A payload with no title is a player that is registered but idle
             // -- a browser tab that once played something, most often. There
             // is nothing to show for it.
@@ -108,7 +153,7 @@ enum MediaRemoteReader {
                 artist: artist,
                 album: album,
                 isPlaying: playing,
-                position: elapsed,
+                position: position(now: now),
                 duration: duration,
                 source: .system(bundleIdentifier: bundleIdentifier, name: Self.appName(bundleIdentifier))
             )
