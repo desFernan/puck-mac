@@ -20,6 +20,10 @@
 //  everywhere, and the bottom of the notch under the notch. Everything that
 //  asks "how high can the pet go here" asks it that way now.
 //
+//  Only a real one. A display without a camera housing does not get given a
+//  drawn stand-in: the pet would duck around something that is not there, and
+//  a panel hung over the middle of a live menu bar takes clicks meant for it.
+//
 //  Pure, so a notch can be tested on a machine that has none -- which is most
 //  of them, and was this one.
 //
@@ -30,13 +34,6 @@ struct ScreenNotch: Equatable {
     /// The notch in the same space the pet's areas are in: top-left origin,
     /// Y down, rebased onto the overlay window.
     let rect: CGRect
-
-    /// Whether this display has no camera housing and is being given one.
-    ///
-    /// A real notch is a piece of black plastic and needs nothing drawn over
-    /// it; a given one is drawn, or the pet ducks around nothing and stops
-    /// under nothing, which is worse than not having the feature.
-    var isVirtual = false
 
     /// How far the pet's world is allowed to reach at `x`.
     ///
@@ -63,54 +60,6 @@ struct ScreenNotch: Equatable {
         let right = position.x + visualBounds.maxX
         return head >= ceiling(atX: left, areaTop: areaTop)
             && head >= ceiling(atX: right, areaTop: areaTop)
-    }
-
-    /// How wide a display with no housing is given one.
-    ///
-    /// A MacBook's own is about this: the width is a property of the camera
-    /// and the sensors beside it, not of the screen, so a wider monitor gets
-    /// the same bar rather than a proportionally enormous one.
-    static let virtualWidth: CGFloat = 185
-
-    /// A housing for a display that has none, in AppKit's own coordinates.
-    ///
-    /// Centred at the top, because that is where the real one is and where
-    /// anything calling itself a notch belongs.
-    ///
-    /// As deep as the menu bar, which is the relationship a real one has:
-    /// on a notched Mac the menu bar is exactly as tall as the housing, and
-    /// that is the whole reason a pet only meets it once a fullscreen Space
-    /// takes the menu bar away. Giving a fixed depth instead would make a
-    /// given housing hang a little into the pet's world at all times on a
-    /// screen whose menu bar happens to be shallower -- a permanent two-point
-    /// dip in the ceiling that nothing explains.
-    ///
-    /// The menu bar is also what makes measuring it fail in the one Space
-    /// where it matters. In a fullscreen Space the bar is gone and
-    /// `visibleFrame` reaches the top of the display, so the measurement is
-    /// zero -- and a housing that returns nil there is a housing that
-    /// disappears at exactly the moment the pet's ceiling first reaches it.
-    /// `menuBarDepth` is the height to fall back on, measured while the bar
-    /// was there; the larger of the two wins, so a measurable bar still sets
-    /// the depth and a hidden one no longer takes the housing away with it.
-    ///
-    /// - Parameters:
-    ///   - visibleFrame: the screen's, whose top edge is the menu bar's
-    ///     bottom -- or the top of the screen in a fullscreen Space.
-    ///   - menuBarDepth: how deep the menu bar is when it is showing.
-    static func virtualAppKitRect(
-        inScreenFrame frame: CGRect,
-        visibleFrame: CGRect,
-        menuBarDepth: CGFloat
-    ) -> CGRect? {
-        let depth = max(frame.maxY - visibleFrame.maxY, menuBarDepth)
-        guard depth > 0, frame.width > virtualWidth else { return nil }
-        return CGRect(
-            x: frame.midX - virtualWidth / 2,
-            y: frame.maxY - depth,
-            width: virtualWidth,
-            height: depth
-        )
     }
 
     /// The notch on `screen`, in AppKit's own coordinates, or nil when there

@@ -68,40 +68,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// monitor plugged or unplugged, a fullscreen Space. Reading it per frame
     /// instead meant `NSScreen.screens` thirty times a second for a value
     /// that changes when the hardware does.
-    /// How deep the menu bar is, for a display that has to be given a housing
-    /// in a Space where the bar is not there to measure.
-    ///
-    /// The status bar's thickness rather than a constant: it is the same
-    /// number AppKit lays the menu bar out against, so it tracks a display
-    /// scale or an OS that changes it.
-    static var menuBarDepth: CGFloat { NSStatusBar.system.thickness }
-
     var screenNotches: [ScreenNotch] {
         guard let window = overlayWindow, let space = screenManager?.current else { return [] }
         let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
         return NSScreen.screens.compactMap { screen in
-            // The real one where there is one; otherwise this display is
-            // given a housing of its own -- see ScreenNotch.virtualAppKitRect
-            // for why it is worth giving. A display that has one already gets
-            // nothing painted over it, because it is already a piece of black
-            // plastic.
-            let real = ScreenNotch.appKitRect(
+            // Real housings only. A display that has none is left alone:
+            // a drawn stand-in is something the pet ducks around and stops
+            // under while the user sees nothing there.
+            let appKit = ScreenNotch.appKitRect(
                 inScreenFrame: screen.frame,
                 auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
                 auxiliaryTopRight: screen.auxiliaryTopRightArea
             )
-            // A given housing only exists where it is drawn, and the panel
-            // that draws it is one window on the main screen. Handing one to
-            // a second display made the pet duck around nothing there and
-            // stop under nothing -- the failure `isVirtual` was named for.
-            // A real one needs no such care: the plastic is on the display
-            // whether or not anything of ours is.
-            let mayBeGivenOne = screen == NSScreen.main
-            let appKit = real ?? (mayBeGivenOne ? ScreenNotch.virtualAppKitRect(
-                inScreenFrame: screen.frame,
-                visibleFrame: screen.visibleFrame,
-                menuBarDepth: Self.menuBarDepth
-            ) : nil)
             guard let appKit else { return nil }
             // The same rebasing screenWorkAreas does: into Quartz's top-left
             // space, then onto the overlay window's own origin.
@@ -112,8 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
                     y: topLeft.y - origin.y,
                     width: appKit.width,
                     height: appKit.height
-                ),
-                isVirtual: real == nil
+                )
             )
         }
     }

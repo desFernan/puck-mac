@@ -243,105 +243,40 @@ final class ScreenNotchPerDisplayTests: XCTestCase {
     }
 }
 
-/// A display with no camera housing is given one -- the thing boring.notch
-/// does, and the reason the feature is worth having on a monitor at all.
-final class VirtualScreenNotchTests: XCTestCase {
-    /// An external monitor: no housing, and a 30pt menu bar.
-    private let monitor = CGRect(x: 0, y: 0, width: 3440, height: 1440)
-    private var visible: CGRect { CGRect(x: 0, y: 0, width: 3440, height: 1410) }
-
-    func test_itIsCentredAtTheTop() throws {
-        let notch = try XCTUnwrap(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible, menuBarDepth: 0)
-        )
-
-        XCTAssertEqual(notch.midX, monitor.midX, accuracy: 0.5, "where a real one is")
-        XCTAssertEqual(notch.maxY, monitor.maxY, "hanging from the top edge")
-        XCTAssertEqual(notch.width, ScreenNotch.virtualWidth)
-    }
-
-    /// As deep as the menu bar, which is the relationship a real housing has.
-    ///
-    /// A fixed depth instead would hang into the pet's world at all times on
-    /// a screen whose menu bar is shallower -- on this monitor a 32pt housing
-    /// against a 30pt menu bar is a permanent two-point dip in the ceiling
-    /// that nothing explains.
-    func test_itIsAsDeepAsTheMenuBar() throws {
-        let notch = try XCTUnwrap(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible, menuBarDepth: 0)
-        )
-
-        XCTAssertEqual(notch.height, 30)
-
-        let housing = ScreenNotch(rect: CGRect(x: 0, y: 0, width: 185, height: 30), isVirtual: true)
-        XCTAssertEqual(
-            housing.ceiling(atX: 90, areaTop: 30), 30,
-            "so with the menu bar there it changes nothing, exactly like a real one"
-        )
-        XCTAssertEqual(
-            housing.ceiling(atX: 90, areaTop: 0), 30,
-            "and in a fullscreen Space it is what stops the pet"
-        )
-    }
-
-    /// The width is a property of the camera, not of the screen: a wider
-    /// monitor gets the same bar rather than a proportionally enormous one.
-    func test_aWiderScreenGetsTheSameBar() throws {
-        let wide = try XCTUnwrap(ScreenNotch.virtualAppKitRect(
-            inScreenFrame: CGRect(x: 0, y: 0, width: 5120, height: 1440),
-            visibleFrame: CGRect(x: 0, y: 0, width: 5120, height: 1410),
-            menuBarDepth: 0
-        ))
-
-        XCTAssertEqual(wide.width, ScreenNotch.virtualWidth)
-    }
-
-    /// The one Space the given housing is for is the one it used to vanish
-    /// in. Fullscreen takes the menu bar away, `visibleFrame` reaches the top
-    /// of the display, and measuring the bar returns zero -- so the housing
-    /// disappeared at exactly the moment the pet's ceiling first reached it.
-    func test_theGivenHousingSurvivesAFullscreenSpace() throws {
-        let fullscreen = try XCTUnwrap(
-            ScreenNotch.virtualAppKitRect(
-                inScreenFrame: monitor,
-                // Fullscreen: the bar is gone, so this is the whole screen.
-                visibleFrame: monitor,
-                menuBarDepth: 30
-            ),
-            "the housing has to still be there when the ceiling reaches it"
-        )
-
-        XCTAssertEqual(fullscreen.height, 30, "as deep as the bar was")
-        XCTAssertEqual(fullscreen.maxY, monitor.maxY, "still hanging from the top edge")
-    }
-
-    /// A measurable bar still sets the depth: the fallback is a floor, not a
-    /// replacement, so a shallower-than-usual bar is not padded out into a
-    /// permanent dip in the ceiling.
-    func test_aMeasuredBarWinsOverTheFallback() throws {
-        let measured = try XCTUnwrap(ScreenNotch.virtualAppKitRect(
-            inScreenFrame: monitor,
-            visibleFrame: visible,
-            menuBarDepth: 12
-        ))
-
-        XCTAssertEqual(measured.height, monitor.maxY - visible.maxY)
-    }
-
-    /// Nothing to hang it from, or nowhere to put it.
-    func test_thereHasToBeRoomForIt() {
+/// A display with no camera housing does not get given one.
+///
+/// It was given one for a while -- 185 points of drawn bar in the middle of
+/// the menu bar, so a monitor could have the panel too. What that cost was
+/// paid by everything else: the pet ducked around a housing the user could
+/// not see on any display the panel was not drawn on, and the shut panel sat
+/// over live menu bar and took clicks meant for the app's own menus.
+final class NoVirtualNotchTests: XCTestCase {
+    /// An external monitor: two strips is what a notch looks like to AppKit,
+    /// and a screen without one reports neither.
+    func test_aScreenWithNoAuxiliaryAreasHasNoNotch() {
         XCTAssertNil(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: monitor, menuBarDepth: 0),
-            "no menu bar and nothing to fall back on means no depth to give it"
-        )
-        XCTAssertNil(
-            ScreenNotch.virtualAppKitRect(
-                inScreenFrame: CGRect(x: 0, y: 0, width: 120, height: 400),
-                visibleFrame: CGRect(x: 0, y: 0, width: 120, height: 370),
-                menuBarDepth: 24
+            ScreenNotch.appKitRect(
+                inScreenFrame: CGRect(x: 0, y: 0, width: 3440, height: 1440),
+                auxiliaryTopLeft: nil,
+                auxiliaryTopRight: nil
             ),
-            "a screen narrower than the bar would be all housing"
+            "a monitor has no camera housing, and must not be given one"
         )
+    }
+
+    /// One strip and not the other is not a notch either -- an arrangement
+    /// nobody anticipated must produce nothing rather than a guess.
+    func test_oneAuxiliaryAreaAloneIsNotANotch() {
+        let strip = CGRect(x: 0, y: 1410, width: 600, height: 30)
+        XCTAssertNil(ScreenNotch.appKitRect(
+            inScreenFrame: CGRect(x: 0, y: 0, width: 3440, height: 1440),
+            auxiliaryTopLeft: strip,
+            auxiliaryTopRight: nil
+        ))
+        XCTAssertNil(ScreenNotch.appKitRect(
+            inScreenFrame: CGRect(x: 0, y: 0, width: 3440, height: 1440),
+            auxiliaryTopLeft: nil,
+            auxiliaryTopRight: strip
+        ))
     }
 }
-

@@ -436,15 +436,11 @@ extension AppDelegate {
         // SettingsStore.isNotchPanelEnabled.
         guard settingsStore.isNotchPanelEnabled else {
             controller.notches = []
-            notchPanelController.present(notchAppKitRect: nil, isVirtual: false)
+            notchPanelController.present(notchAppKitRect: nil)
             return
         }
         controller.notches = screenNotches
-        let panel = panelNotch
-        notchPanelController.present(
-            notchAppKitRect: panel?.rect,
-            isVirtual: panel?.isVirtual ?? false
-        )
+        notchPanelController.present(notchAppKitRect: panelNotchAppKitRect)
     }
 
     /// Where the panel goes, in AppKit's own coordinates.
@@ -454,23 +450,21 @@ extension AppDelegate {
     /// belongs on the screen the pointer is usually on. A machine with two
     /// notched displays gets it on one of them; the pet still ducks around
     /// both, because that is a different question with a different answer.
-    /// Whether that housing is one this display already has, which decides
-    /// what the shut panel is allowed to take the pointer over -- see
-    /// NotchPanelController.activeRect.
-    private var panelNotch: (rect: CGRect, isVirtual: Bool)? {
+    /// Where the panel goes, in AppKit's own coordinates.
+    ///
+    /// The main screen's housing, and only if it has one: the panel is one
+    /// window, and the notch is somewhere you point at rather than somewhere
+    /// the pet has to be, so it belongs on the screen the pointer is usually
+    /// on. A machine with two notched displays gets it on one of them; the pet
+    /// still ducks around both, because that is a different question with a
+    /// different answer. A display with no housing gets no panel at all.
+    private var panelNotchAppKitRect: CGRect? {
         guard let screen = NSScreen.main else { return nil }
-        let real = ScreenNotch.appKitRect(
+        return ScreenNotch.appKitRect(
             inScreenFrame: screen.frame,
             auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
             auxiliaryTopRight: screen.auxiliaryTopRightArea
         )
-        if let real { return (real, false) }
-        guard let given = ScreenNotch.virtualAppKitRect(
-            inScreenFrame: screen.frame,
-            visibleFrame: screen.visibleFrame,
-            menuBarDepth: AppDelegate.menuBarDepth
-        ) else { return nil }
-        return (given, true)
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

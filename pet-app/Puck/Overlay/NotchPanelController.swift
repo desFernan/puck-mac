@@ -25,12 +25,6 @@ final class NotchPanelController {
     private var hosting: NSHostingView<NotchShell<NotchPanelView>>?
     private var notch: CGRect = .zero
     private var isOpen = false
-    /// Whether the notch this is drawn around is one the display already has.
-    ///
-    /// A real one is camera housing: nothing under it to click, so the shut
-    /// panel may take the pointer there. A given one is drawn over live menu
-    /// bar -- see `activeRect`.
-    private var isVirtual = false
 
     /// What is playing. Owned here rather than by the view so it survives the
     /// view being rebuilt on every open and close, and so it can be polling
@@ -48,10 +42,9 @@ final class NotchPanelController {
     ///
     /// Called wherever the screens are measured, so an unplugged monitor or a
     /// resolution change moves it without anything else having to remember.
-    func present(notchAppKitRect: CGRect?, isVirtual: Bool) {
+    func present(notchAppKitRect: CGRect?) {
         guard let notchAppKitRect else { return stop() }
         notch = notchAppKitRect
-        self.isVirtual = isVirtual
 
         let panel = window ?? makeWindow()
         panel.setFrame(NotchPanelGeometry.windowFrame(notch: notchAppKitRect), display: true)
@@ -156,23 +149,13 @@ final class NotchPanelController {
         if window?.isKeyWindow == true { window?.resignKey() }
     }
 
-    /// What the pointer may *click* through to this window, in the window's
-    /// own coordinates. AppKit's Y grows upward, so it hangs from the top.
+    /// The drawn shape, in the window's own coordinates. AppKit's Y grows
+    /// upward, so both hang from the window's top edge.
     ///
-    /// Empty while a given notch is shut, and only then. This window sits at
-    /// `.statusBar`, above the menu bar, so whatever it claims it takes: over
-    /// a real notch that is camera housing and there was never anything to
-    /// click, but a given one is drawn over 185 points of live menu bar in
-    /// the middle of the screen. An app with enough menus to reach there --
-    /// Xcode's Source Control and Window, on a laptop display -- had them
-    /// swallowed by a panel that was not even open.
-    ///
-    /// Hovering is unaffected: NotchHoverView's tracking area is the whole
-    /// window and is deliberately not gated on this, so the panel still opens
-    /// when the pointer arrives. Open, it takes the pointer either way --
-    /// by then the user is pointing at a panel rather than at the menu bar.
+    /// Shut, that is the notch alone -- which is camera housing, with nothing
+    /// underneath it to click. The panel is only ever drawn around a real one,
+    /// so this never covers live menu bar.
     private func activeRect(isOpen: Bool) -> CGRect {
-        guard isOpen || !isVirtual else { return .zero }
         let size = window?.frame.size ?? .zero
         let width = isOpen ? NotchPanelGeometry.openWidth : notch.width
         let height = isOpen ? NotchPanelGeometry.openHeight : notch.height
