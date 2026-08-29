@@ -23,6 +23,17 @@ AI 에이전트이기도 한 macOS 데스크톱 펫입니다. 두 개의 Swift �
 둘은 로컬 소켓 브리지로 통신합니다. 에이전트 코어(채팅, 도구, 승인, 세션)는
 `pet-app/Puck/Agent`에 있습니다.
 
+## 설치
+
+[Releases](https://github.com/desFernan/puck-mac/releases)에서
+`Puck-<version>.dmg`를 받아 두 앱을 응용 프로그램 폴더에 넣으세요. macOS 14
+이상이 필요합니다.
+
+Developer ID가 아닌 ad-hoc 서명이라 첫 실행은 "확인되지 않은 개발자"로 거부됩니다.
+앱을 우클릭 → **열기** → **열기**를 앱마다 한 번씩 해 주세요. 그다음 Puck이 손쉬운
+사용(Accessibility) 권한을 요청하고, 마이크·음성 인식·화면 기록은 해당 기능을 쓸 때
+요청합니다.
+
 ## 빌드
 
 ```sh
