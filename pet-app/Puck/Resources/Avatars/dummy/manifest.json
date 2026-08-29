@@ -5,8 +5,8 @@
   "scale": 1.0,
   "bounce_intensity": 0.6,
   "hitbox": {
-    "width": 168,
-    "height": 172
+    "width": 130,
+    "height": 133
   },
   "clips": {
     "idle": "starry-eyed",

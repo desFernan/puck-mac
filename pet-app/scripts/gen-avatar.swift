@@ -229,8 +229,8 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
     case .stand:
         for s in [-1.0, 1.0] as [CGFloat] { fill(c, ellipse(cx + 30 * s, footY, 20, 13), bodyLo) }
     case .walk:
-        fill(c, ellipse(cx - 58, footY + 10, 21, 13), bodyLo)
-        fill(c, ellipse(cx + 48, footY - 3, 21, 13), bodyLo)
+        fill(c, ellipse(cx - 46, footY + 4, 20, 12), bodyLo)
+        fill(c, ellipse(cx + 40, footY + 2, 20, 12), bodyLo)
     case .kick:
         fill(c, ellipse(cx - 34, footY, 20, 13), bodyLo)
         let leg = CGPath(roundedRect: CGRect(x: cx + 20, y: base + p.ry * 0.42, width: 112, height: 30),
@@ -238,12 +238,12 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
         fill(c, leg, bodyLo); stroke(c, leg, 6)
     case .up:
         for s in [-1.0, 1.0] as [CGFloat] {
-            fill(c, ellipse(cx + (p.rx * 0.86) * s, base + p.ry * 1.6, 17, 22), bodyLo)
+            fill(c, ellipse(cx + (p.rx * 0.72) * s, base + p.ry * 1.55, 15, 19), bodyLo)
         }
         for s in [-1.0, 1.0] as [CGFloat] { fill(c, ellipse(cx + 28 * s, footY, 19, 12), bodyLo) }
     case .grip:
         for s in [-1.0, 1.0] as [CGFloat] {
-            fill(c, ellipse(cx + (p.rx * 0.9) * s, base + p.ry * 1.45, 16, 20), bodyLo)
+            fill(c, ellipse(cx + (p.rx * 0.74) * s, base + p.ry * 1.4, 14, 18), bodyLo)
         }
         for s in [-1.0, 1.0] as [CGFloat] { fill(c, ellipse(cx + 26 * s, footY + 2, 18, 12), bodyLo) }
     case .none:
@@ -266,15 +266,17 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
     drawFace(c, cx, base + p.ry * 1.12, p)
     c.restoreGState()  // lean
 
+    // Over the head rather than beside it: idle fills the frame, so anything
+    // drawn outside the body is drawn outside the canvas.
     for i in 0..<(measuringFit ? 0 : p.drops) {
-        fill(c, teardrop(cx + p.rx * 0.92 + CGFloat(i) * 16,
-                         base + p.ry * 1.5 - CGFloat(i) * 22, 13), tear)
+        fill(c, teardrop(cx + p.rx * 0.62 + CGFloat(i) * 14,
+                         base + p.ry * 1.62 - CGFloat(i) * 20, 12), tear)
     }
     if p.wind, !measuringFit {
         for (i, y) in [0.4, 0.85, 1.3].enumerated() {
             let len: CGFloat = 34 - CGFloat(i) * 6
             for s in [-1.0, 1.0] as [CGFloat] {
-                let x = cx + (p.rx + 30) * s
+                let x = cx + p.rx * 0.82 * s
                 stroke(c, line(x, base + p.ry * CGFloat(y), x, base + p.ry * CGFloat(y) + len),
                        6, rgb(0x9A, 0x92, 0xC0, 0.75))
             }
@@ -282,27 +284,27 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
     }
     if p.dust, !measuringFit {
         for s in [-1.0, 1.0] as [CGFloat] {
-            fill(c, ellipse(cx + (p.rx + 22) * s, base + 12, 15, 11), rgb(0x9A, 0x92, 0xC0, 0.6))
-            fill(c, ellipse(cx + (p.rx + 44) * s, base + 26, 9, 7), rgb(0x9A, 0x92, 0xC0, 0.42))
+            fill(c, ellipse(cx + p.rx * 0.72 * s, base + 10, 14, 10), rgb(0x9A, 0x92, 0xC0, 0.6))
+            fill(c, ellipse(cx + p.rx * 0.96 * s, base + 24, 9, 7), rgb(0x9A, 0x92, 0xC0, 0.42))
         }
     }
     if p.bubbles, !measuringFit {
         for (i, r) in [7.0, 10.0, 14.0].enumerated() {
-            let b = ellipse(cx + p.rx * 0.75 + CGFloat(i) * 22,
-                            base + p.ry * 1.7 + CGFloat(i) * 24, CGFloat(r), CGFloat(r))
+            let b = ellipse(cx + p.rx * 0.5 + CGFloat(i) * 16,
+                            base + p.ry * 1.5 + CGFloat(i) * 17, CGFloat(r), CGFloat(r))
             fill(c, b, rgb(0xFF, 0xFF, 0xFF, 0.85)); stroke(c, b, 4)
         }
     }
     if p.notes, !measuringFit {
-        for (i, dy) in [0.0, 34.0].enumerated() {
-            let x = cx + p.rx * 0.9 + CGFloat(i) * 30, y = base + p.ry * 1.75 + dy
-            fill(c, ellipse(x, y, 11, 8), ink)
-            stroke(c, line(x + 10, y + 2, x + 10, y + 36), 5)
+        for (i, dy) in [0.0, 26.0].enumerated() {
+            let x = cx + p.rx * 0.42 + CGFloat(i) * 22, y = base + p.ry * 1.24 + dy
+            fill(c, ellipse(x, y, 10, 7), ink)
+            stroke(c, line(x + 9, y + 2, x + 9, y + 30), 5)
         }
     }
     if p.spark, !measuringFit {
-        fill(c, star(cx, base + p.ry * 2.35, 26, 10), rgb(0xFF, 0xD9, 0x6B))
-        stroke(c, star(cx, base + p.ry * 2.35, 26, 10), 6)
+        fill(c, star(cx, base + p.ry * 1.95, 24, 9), rgb(0xFF, 0xD9, 0x6B))
+        stroke(c, star(cx, base + p.ry * 1.95, 24, 9), 6)
     }
     c.restoreGState()  // fit
 }
@@ -369,65 +371,98 @@ let pack: [(String, Pose)] = [
     ("starry-eyed",  Pose(eyes: .sparkle, mouth: .smile, blush: 0.6)),
     ("beaming",      Pose(eyes: .arc, mouth: .grin, blush: 0.7)),
     ("sunny",        Pose(eyes: .arc, mouth: .grin, blush: 0.8, spark: true)),
-    ("giddy",        Pose(lift: 12, eyes: .sparkle, mouth: .open, limbs: .up, blush: 0.7)),
+    ("giddy",        Pose(eyes: .sparkle, mouth: .open, limbs: .up, blush: 0.7)),
     ("giggly",       Pose(eyes: .closed, mouth: .open, blush: 0.75)),
-    ("thrilled",     Pose(lift: 10, eyes: .sparkle, mouth: .wide, limbs: .up, blush: 0.7)),
+    ("thrilled",     Pose(eyes: .sparkle, mouth: .wide, limbs: .up, blush: 0.7)),
     ("cheeky",       Pose(eyes: .wink, mouth: .grin, blush: 0.8)),
     ("smitten",      Pose(eyes: .heart, mouth: .smile, blush: 0.95)),
     ("bashful",      Pose(rx: 84, ry: 72, eyes: .closed, mouth: .tiny, blush: 1.0)),
-    ("serene",       Pose(rx: 90, ry: 70, eyes: .closed, mouth: .smile, blush: 0.45)),
-    ("phew",         Pose(rx: 90, ry: 70, eyes: .closed, mouth: .smile, blush: 0.4, drops: 1)),
-    ("humming",      Pose(lean: -6, eyes: .closed, mouth: .tiny, limbs: .walk, notes: true)),
-    ("melting",      Pose(rx: 104, ry: 44, eyes: .closed, mouth: .smile, limbs: .none, blush: 0.85)),
+    ("serene",       Pose(rx: 88, ry: 70, eyes: .closed, mouth: .smile, blush: 0.45)),
+    ("phew",         Pose(rx: 88, ry: 70, eyes: .closed, mouth: .smile, blush: 0.4, drops: 1)),
+    ("humming",      Pose(lean: -2, eyes: .closed, mouth: .tiny, limbs: .walk, notes: true)),
+    ("melting",      Pose(rx: 88, ry: 44, eyes: .closed, mouth: .smile, limbs: .none, blush: 0.85)),
     ("all-ears",     Pose(eyes: .dot, mouth: .tiny, limbs: .up, blush: 0.5)),
     ("pondering",    Pose(eyes: .narrow, mouth: .flat, blush: 0.35, bubbles: true)),
     ("in-the-zone",  Pose(eyes: .narrow, mouth: .flat, blush: 0.3)),
-    ("determined",   Pose(rx: 84, ry: 78, eyes: .angry, mouth: .flat, limbs: .grip, blush: 0.4)),
-    ("eureka",       Pose(lift: 8, eyes: .sparkle, mouth: .open, limbs: .up, blush: 0.5, spark: true)),
-    ("startled",     Pose(rx: 80, ry: 82, lift: 10, eyes: .wide, mouth: .wide, limbs: .up,
+    ("determined",   Pose(rx: 84, ry: 76, eyes: .angry, mouth: .flat, limbs: .grip, blush: 0.4)),
+    ("eureka",       Pose(eyes: .sparkle, mouth: .open, limbs: .up, blush: 0.5, spark: true)),
+    ("startled",     Pose(rx: 80, ry: 76, eyes: .wide, mouth: .wide, limbs: .up,
                           blush: 0.3, drops: 1)),
     ("agape",        Pose(eyes: .wide, mouth: .wide, blush: 0.35)),
-    ("yikes",        Pose(lean: -7, eyes: .wide, mouth: .open, limbs: .up, blush: 0.3, drops: 2)),
-    ("spooked",      Pose(rx: 82, ry: 80, eyes: .wide, mouth: .wide, limbs: .up, blush: 0.15,
+    ("yikes",        Pose(lean: -2, eyes: .wide, mouth: .open, limbs: .up, blush: 0.3, drops: 2)),
+    ("spooked",      Pose(rx: 82, ry: 76, eyes: .wide, mouth: .wide, limbs: .up, blush: 0.15,
                           wind: true)),
     ("flustered",    Pose(eyes: .swirl, mouth: .wavy, limbs: .up, blush: 0.9, drops: 2)),
-    ("dazed",        Pose(rx: 94, ry: 66, eyes: .swirl, mouth: .tiny, blush: 0.5, dust: true)),
+    ("dazed",        Pose(rx: 88, ry: 66, eyes: .swirl, mouth: .tiny, blush: 0.5, dust: true)),
     ("fretting",     Pose(eyes: .worried, mouth: .wavy, blush: 0.5, drops: 1)),
     ("welling-up",   Pose(eyes: .teary, mouth: .wavy, blush: 0.65)),
     ("sobbing",      Pose(rx: 86, ry: 72, eyes: .closed, mouth: .wide, blush: 0.7, tears: true)),
-    ("grumpy",       Pose(rx: 92, ry: 70, eyes: .angry, mouth: .wavy, blush: 0.4)),
+    ("grumpy",       Pose(rx: 88, ry: 70, eyes: .angry, mouth: .wavy, blush: 0.4)),
 ]
 
 let out = URL(fileURLWithPath: CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ".")
 let AW = 1200, AH = 1224
-let PAD: CGFloat = 40
 
-// One scale for the whole pack, measured from the poses themselves, so the
-// ground line holds and the pet does not resize between expressions.
+// One scale for the whole pack, taken from the pose the pet spends its life
+// in rather than from the union of all of them.
+//
+// Measured over the union, the widest pose sets the scale and the ordinary
+// one is left filling 79% of its frame -- and since the app fits the whole
+// PNG into a layer sized from the manifest hitbox, a character at 79% is a
+// pet at 79%, smaller than the hand-drawn pack this replaced and smaller to
+// aim at. The pack it replaced filled 96%, and the manifest hitbox is
+// calibrated against that.
+//
+// So idle fills the frame, and the poses that are deliberately wider or
+// flatter than it -- a puddle, a landing squash -- are checked afterwards
+// and must still fit. That is a design constraint on the pose table, which
+// is where it belongs, rather than a tax on every other drawing.
+let PAD: CGFloat = 34
+/// How far the feet sit above the bottom of the canvas -- see `fitShift`.
+let groundMargin: CGFloat = 6
 do {
     measuringFit = true
     defer { measuringFit = false }
     let pw = 900, ph = 900
-    var minX = pw, minY = ph, maxX = 0, maxY = 0
-    for (name, pose) in pack {
-        let img = render(pw, ph) { drawPet($0, CGFloat(pw), CGFloat(ph), pose) }
-        guard let b = alphaBounds(img) else { fatalError("\(name) drew nothing") }
-        minX = min(minX, b.minX); minY = min(minY, b.minY)
-        maxX = max(maxX, b.maxX); maxY = max(maxY, b.maxY)
-    }
+    let reference = pack.first { $0.0 == "starry-eyed" }!.1
+    let img = render(pw, ph) { drawPet($0, CGFloat(pw), CGFloat(ph), reference) }
+    guard let b = alphaBounds(img) else { fatalError("the reference pose drew nothing") }
     let cx = CGFloat(pw) / 2, ground: CGFloat = 12
-    let half = max(cx - CGFloat(minX), CGFloat(maxX) - cx)
-    let above = CGFloat(maxY) - ground, below = ground - CGFloat(minY)
+    let half = max(cx - CGFloat(b.minX), CGFloat(b.maxX) - cx)
+    let above = CGFloat(b.maxY) - ground, below = ground - CGFloat(b.minY)
     fitScale = min((CGFloat(AW) / 2 - PAD) / half, (CGFloat(AH) - PAD * 2) / (above + below))
-    fitShift = PAD - (ground - below * fitScale)
-    print(String(format: "fit: scale %.3f shift %.1f", fitScale, fitShift))
+    // Sat on the bottom of the frame, not floated in the middle of it.
+    //
+    // The app puts the layer so the pet's ground point is the layer's bottom
+    // edge, and fits the whole PNG into that layer -- so empty rows under the
+    // feet are a gap between where the pet is drawn and where the app thinks
+    // it is standing. The hand-drawn pack it replaces leaves six pixels; this
+    // leaves the same, and the padding the poses need goes above instead.
+    fitShift = groundMargin - (ground - below * fitScale)
+    print(String(format: "fit: scale %.3f shift %.1f (from starry-eyed)", fitScale, fitShift))
 }
 
+var clipped: [String] = []
 for (name, pose) in pack {
     let img = render(AW, AH) { drawPet($0, CGFloat(AW), CGFloat(AH), pose) }
     precondition(img.width == AW && img.height == AH, "\(name): wrong size")
-    precondition(alphaBounds(img) != nil, "\(name): blank")
+    guard let bounds = alphaBounds(img) else { fatalError("\(name): blank") }
+    // Clipped art is worse than small art: a puddle with its edge sheared off
+    // reads as a bug. If this fires, the pose is too wide or too tall for the
+    // frame idle sets -- narrow it in the table above.
+    // A margin rather than the edge itself: art that reaches the last column
+    // has almost certainly been cut off at it.
+    let margin = 2
+    if bounds.minX < margin || bounds.maxX > AW - 1 - margin
+        || bounds.minY < margin || bounds.maxY > AH - 1 - margin {
+        clipped.append("\(name): x \(bounds.minX)...\(bounds.maxX) y \(bounds.minY)...\(bounds.maxY)")
+    }
     write(img, out.appendingPathComponent("avatar/\(name).png"))
+}
+
+if !clipped.isEmpty {
+    print("clipped by the frame idle sets — narrow these in the pose table:")
+    clipped.forEach { print("  \($0)") }
 }
 
 // MARK: toys
