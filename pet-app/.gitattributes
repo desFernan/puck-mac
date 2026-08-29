@@ -1,8 +1,12 @@
-# Avatar/sound binary assets are tracked with Git LFS (02_pet-app.md "협업 규칙" / collaboration rules)
-*.wav filter=lfs diff=lfs merge=lfs -text
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-*.m4a filter=lfs diff=lfs merge=lfs -text
-
-# Avatar sprite art: same rule as the other binaries above. The dummy pack
-# alone is ~19MB of PNG, which does not belong in git history directly.
-*.png filter=lfs diff=lfs merge=lfs -text
+# Binary assets are committed directly. They were Git LFS for a while, when
+# the dummy avatar pack alone was ~19MB of PNG; the pack is generated art now
+# and the whole of it is about 3MB, which is a size git holds without help.
+#
+# Dropping LFS also dropped what came with it: a pre-push hook that refused to
+# push without git-lfs installed, a checkout that handed actool pointer text
+# and took the build down with it, and a second place where old asset versions
+# lived on after the history had been rewritten.
+*.png binary
+*.wav binary
+*.mp3 binary
+*.m4a binary
