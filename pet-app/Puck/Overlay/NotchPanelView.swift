@@ -26,6 +26,9 @@ struct NotchPanelView: View {
 
     /// Which toys are out, so the tiles can show it. Passed in rather than
     /// read here: the toy box is the truth and it lives in the app delegate.
+    /// Whether the panel is open. The shell draws this view in both states,
+    /// so it is the only thing that tells the view an open has happened.
+    let isOpen: Bool
     let toysOut: Set<String>
     /// Puts a toy out or takes it away, and answers with what is out now.
     let onToggleToy: (Toy) -> Set<String>
@@ -40,14 +43,20 @@ struct NotchPanelView: View {
 
     init(
         music: NowPlayingStore,
+        isOpen: Bool,
         toysOut: Set<String>,
         onToggleToy: @escaping (Toy) -> Set<String>,
         onSubmit: @escaping (String) -> Void
     ) {
         self.music = music
+        self.isOpen = isOpen
         self.toysOut = toysOut
         self.onToggleToy = onToggleToy
         self.onSubmit = onSubmit
+        // A seed and only a seed. The controller swaps the hosting view's
+        // root view rather than rebuilding the hierarchy, so SwiftUI keeps
+        // the `@State` it already has and throws this away on every open
+        // after the first -- which is why `out` is also synced below.
         _out = State(initialValue: toysOut)
     }
 
@@ -63,6 +72,16 @@ struct NotchPanelView: View {
         .padding(.top, NotchPanelGeometry.topInset)
         .padding(.bottom, NotchPanelGeometry.bottomInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // The toys can change while the panel is shut -- the status item's
+        // panel puts them out too, and so does the pet kicking one away. The
+        // controller asks again on every open, but the answer landed in a
+        // property while the tiles were reading surviving `@State`: a tile
+        // could show un-selected for a toy that was out, and clicking it then
+        // took the toy away while the tile lit up.
+        .onChange(of: toysOut) { _, fresh in out = fresh }
+        // Focus follows the open, not the appear. `onAppear` fires once, for
+        // the shut panel, and the window cannot become key then anyway.
+        .onChange(of: isOpen) { _, open in isPromptFocused = open }
     }
 
     // MARK: - What is playing
@@ -313,9 +332,11 @@ struct NotchPanelView: View {
         .frame(height: 30)
         .background { Capsule().fill(NotchStyle.surface) }
         .overlay { Capsule().strokeBorder(NotchStyle.border, lineWidth: 1) }
-        // Focused when the panel appears: the pointer is already here, and a
+        // Focus is driven from `isOpen` in `body` rather than from here: this
+        // field is built while the panel is still shut, so `onAppear` fired
+        // against a window that could not yet become key and the focus went
+        // nowhere. The pointer is already here by the time it opens, and a
         // field you have to click first is a field you may as well not have.
-        .onAppear { isPromptFocused = true }
     }
 
     private var canSend: Bool { !trimmed.isEmpty }

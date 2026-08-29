@@ -20,7 +20,6 @@ extension AppDelegate {
     /// the window list), which is bootstrap knowledge, not state knowledge.
     func idleStateDidRequestWander(_ outcome: WanderScheduler.Outcome) {
         guard let controller = characterController else { return }
-        AppLogger.shared.log(.error, "WX draw=\(outcome) pace=\(states.idle.pace) home=\(desktopRoamableAreas != nil)")
         let atHome = desktopRoamableAreas != nil
         let outcome = Self.wanderOutcome(
             outcome,
@@ -83,7 +82,6 @@ extension AppDelegate {
                 // nothing to climb either time -- so the ceiling crawl, and
                 // everything up there, was drawn and thrown away.
                 pendingCeilingClimb = true
-                AppLogger.shared.log(.error, "WX no wall at \(body.position) outline=\(body.visualBounds) area=\(ceilingArea)")
                 states.walk.target = WindowSupport.nearestClimbTarget(
                     from: body.position,
                     in: ceilingWindows,
@@ -91,11 +89,9 @@ extension AppDelegate {
                     avatarHeight: avatarHitboxSize.height,
                     excluding: unclimbableWindowIDs(in: ceilingWindows)
                 ) ?? Self.nearestScreenEdge(from: body.position, visualBounds: body.visualBounds, in: ceilingArea)
-                AppLogger.shared.log(.error, "WX walking to \(String(describing: states.walk.target))")
                 controller.transition(to: .walk)
                 return
             }
-            AppLogger.shared.log(.error, "WX wall underfoot -> climbing now")
             controller.transition(to: .climbToCeiling)
         case .playWithToy:
             // Before this draw, play could only ever start at the moment a toy
@@ -178,7 +174,6 @@ extension AppDelegate {
         let alreadyClimbing = controller.currentState === states.climb
         guard arrived || alreadyClimbing else { return }
         pendingCeilingClimb = false
-        AppLogger.shared.log(.error, "WX arrived state=\(controller.currentState.name) at \(String(describing: characterBody?.position))")
 
         // Asked again here rather than trusted from the draw: the walk takes
         // a moment, and a window it was aimed at can be closed or moved
@@ -193,10 +188,8 @@ extension AppDelegate {
             area: petArea(controller),
             excluding: unclimbableWindowIDs(in: windows)
         ) else {
-            AppLogger.shared.log(.error, "WX arrived but no wall")
             return
         }
-        AppLogger.shared.log(.error, "WX CLIMBING")
         controller.transition(to: .climbToCeiling)
     }
 

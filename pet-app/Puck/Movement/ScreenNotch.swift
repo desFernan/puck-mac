@@ -85,10 +85,25 @@ struct ScreenNotch: Equatable {
     /// screen whose menu bar happens to be shallower -- a permanent two-point
     /// dip in the ceiling that nothing explains.
     ///
-    /// - Parameter visibleFrame: the screen's, whose top edge is the menu
-    ///   bar's bottom.
-    static func virtualAppKitRect(inScreenFrame frame: CGRect, visibleFrame: CGRect) -> CGRect? {
-        let depth = frame.maxY - visibleFrame.maxY
+    /// The menu bar is also what makes measuring it fail in the one Space
+    /// where it matters. In a fullscreen Space the bar is gone and
+    /// `visibleFrame` reaches the top of the display, so the measurement is
+    /// zero -- and a housing that returns nil there is a housing that
+    /// disappears at exactly the moment the pet's ceiling first reaches it.
+    /// `menuBarDepth` is the height to fall back on, measured while the bar
+    /// was there; the larger of the two wins, so a measurable bar still sets
+    /// the depth and a hidden one no longer takes the housing away with it.
+    ///
+    /// - Parameters:
+    ///   - visibleFrame: the screen's, whose top edge is the menu bar's
+    ///     bottom -- or the top of the screen in a fullscreen Space.
+    ///   - menuBarDepth: how deep the menu bar is when it is showing.
+    static func virtualAppKitRect(
+        inScreenFrame frame: CGRect,
+        visibleFrame: CGRect,
+        menuBarDepth: CGFloat
+    ) -> CGRect? {
+        let depth = max(frame.maxY - visibleFrame.maxY, menuBarDepth)
         guard depth > 0, frame.width > virtualWidth else { return nil }
         return CGRect(
             x: frame.midX - virtualWidth / 2,

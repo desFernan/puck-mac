@@ -436,11 +436,15 @@ extension AppDelegate {
         // SettingsStore.isNotchPanelEnabled.
         guard settingsStore.isNotchPanelEnabled else {
             controller.notches = []
-            notchPanelController.present(notchAppKitRect: nil)
+            notchPanelController.present(notchAppKitRect: nil, isVirtual: false)
             return
         }
         controller.notches = screenNotches
-        notchPanelController.present(notchAppKitRect: panelNotchAppKitRect)
+        let panel = panelNotch
+        notchPanelController.present(
+            notchAppKitRect: panel?.rect,
+            isVirtual: panel?.isVirtual ?? false
+        )
     }
 
     /// Where the panel goes, in AppKit's own coordinates.
@@ -450,17 +454,23 @@ extension AppDelegate {
     /// belongs on the screen the pointer is usually on. A machine with two
     /// notched displays gets it on one of them; the pet still ducks around
     /// both, because that is a different question with a different answer.
-    private var panelNotchAppKitRect: CGRect? {
+    /// Whether that housing is one this display already has, which decides
+    /// what the shut panel is allowed to take the pointer over -- see
+    /// NotchPanelController.activeRect.
+    private var panelNotch: (rect: CGRect, isVirtual: Bool)? {
         guard let screen = NSScreen.main else { return nil }
         let real = ScreenNotch.appKitRect(
             inScreenFrame: screen.frame,
             auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
             auxiliaryTopRight: screen.auxiliaryTopRightArea
         )
-        return real ?? ScreenNotch.virtualAppKitRect(
+        if let real { return (real, false) }
+        guard let given = ScreenNotch.virtualAppKitRect(
             inScreenFrame: screen.frame,
-            visibleFrame: screen.visibleFrame
-        )
+            visibleFrame: screen.visibleFrame,
+            menuBarDepth: AppDelegate.menuBarDepth
+        ) else { return nil }
+        return (given, true)
     }
 
     /// F4's window list rebased from global Quartz coordinates into the

@@ -118,18 +118,39 @@ struct SettingsView: View {
         Strings.text(key, language: localization.language)
     }
 
+    /// Which half of the split this instance draws.
+    ///
+    /// The split used to live in `body` alone, and the caller had to guess
+    /// which callbacks that implied. It guessed wrong once -- the window drew
+    /// the toy tiles, the visibility row and Quit with every callback nil, so
+    /// they rendered as live controls and did nothing. One list, tested.
+    enum SectionGroup: Equatable {
+        /// Avatar and toys: what the pet is doing now, and needs callbacks.
+        case live
+        /// Sound, movement, language: set once and left.
+        case setOnce
+        /// Open chat, hide, quit -- and the row that opens the window.
+        case actions
+    }
+
+    var sections: [SectionGroup] {
+        showsOnlyLiveControls ? [.live, .actions] : [.setOnce]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.5)
             ScrollView {
                 VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
-                    // What the pet is doing right now, and only that. Sound,
-                    // movement and the app's own settings moved to a window
-                    // -- see `showsOnlyLiveControls`.
-                    avatarSection
-                    toySection
-                    if !showsOnlyLiveControls {
+                    // One half or the other, never both: the live sections are
+                    // driven by callbacks only the panel supplies, so drawing
+                    // them in the window gave it controls that did nothing.
+                    if sections.contains(.live) {
+                        avatarSection
+                        toySection
+                    }
+                    if sections.contains(.setOnce) {
                         soundSection
                         movementSection
                         generalSection
@@ -137,8 +158,10 @@ struct SettingsView: View {
                 }
                 .padding(ClientTheme.Metrics.spacingMedium)
             }
-            Divider().opacity(0.5)
-            actionSection
+            if sections.contains(.actions) {
+                Divider().opacity(0.5)
+                actionSection
+            }
         }
         .frame(
             width: MenuBarController.panelSize.width,
@@ -356,10 +379,10 @@ struct SettingsView: View {
             SettingsActionRow(label: text(.menuOpenClient), systemImage: "bubble.left.and.bubble.right") {
                 onOpenClient?()
             }
-            if showsOnlyLiveControls {
-                SettingsActionRow(label: text(.menuSettings), systemImage: "gearshape") {
-                    onOpenSettings?()
-                }
+            // Unconditional: `sections` already keeps this whole section out
+            // of the window, and a window does not offer to open itself.
+            SettingsActionRow(label: text(.menuSettings), systemImage: "gearshape") {
+                onOpenSettings?()
             }
             SettingsActionRow(
                 label: text(isCharacterHidden ? .menuShow : .menuHide),

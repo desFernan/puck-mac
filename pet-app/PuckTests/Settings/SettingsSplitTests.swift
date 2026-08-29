@@ -29,6 +29,26 @@ final class SettingsSplitTests: XCTestCase {
         XCTAssertFalse(window.showsOnlyLiveControls)
     }
 
+    /// The live sections are driven by callbacks only the panel supplies, so
+    /// the window must not draw them. It did once: the toy tiles, the
+    /// hide/show row and Quit rendered in the window with every callback nil,
+    /// so they looked live and did nothing -- Quit above all.
+    func test_theWindowDrawsNoControlItCannotDrive() {
+        let window = SettingsView(store: store(), showsOnlyLiveControls: false)
+
+        XCTAssertEqual(window.sections, [.setOnce])
+        XCTAssertFalse(window.sections.contains(.live), "the window has no toy or avatar callbacks")
+        XCTAssertFalse(window.sections.contains(.actions), "the window has no quit callback")
+    }
+
+    /// And the panel draws only what it can drive -- the set-once controls
+    /// were what made it a scrolling form in the first place.
+    func test_thePanelDrawsTheLiveControlsAndTheActions() {
+        let panel = SettingsView(store: store(), showsOnlyLiveControls: true)
+
+        XCTAssertEqual(panel.sections, [.live, .actions])
+    }
+
     /// The one the panel offers and the window does not: a window is not
     /// going to offer to open itself.
     func test_theWindowDoesNotOfferToOpenItself() {

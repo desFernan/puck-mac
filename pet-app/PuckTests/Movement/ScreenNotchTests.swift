@@ -252,7 +252,7 @@ final class VirtualScreenNotchTests: XCTestCase {
 
     func test_itIsCentredAtTheTop() throws {
         let notch = try XCTUnwrap(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible)
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible, menuBarDepth: 0)
         )
 
         XCTAssertEqual(notch.midX, monitor.midX, accuracy: 0.5, "where a real one is")
@@ -268,7 +268,7 @@ final class VirtualScreenNotchTests: XCTestCase {
     /// that nothing explains.
     func test_itIsAsDeepAsTheMenuBar() throws {
         let notch = try XCTUnwrap(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible)
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: visible, menuBarDepth: 0)
         )
 
         XCTAssertEqual(notch.height, 30)
@@ -289,22 +289,56 @@ final class VirtualScreenNotchTests: XCTestCase {
     func test_aWiderScreenGetsTheSameBar() throws {
         let wide = try XCTUnwrap(ScreenNotch.virtualAppKitRect(
             inScreenFrame: CGRect(x: 0, y: 0, width: 5120, height: 1440),
-            visibleFrame: CGRect(x: 0, y: 0, width: 5120, height: 1410)
+            visibleFrame: CGRect(x: 0, y: 0, width: 5120, height: 1410),
+            menuBarDepth: 0
         ))
 
         XCTAssertEqual(wide.width, ScreenNotch.virtualWidth)
     }
 
+    /// The one Space the given housing is for is the one it used to vanish
+    /// in. Fullscreen takes the menu bar away, `visibleFrame` reaches the top
+    /// of the display, and measuring the bar returns zero -- so the housing
+    /// disappeared at exactly the moment the pet's ceiling first reached it.
+    func test_theGivenHousingSurvivesAFullscreenSpace() throws {
+        let fullscreen = try XCTUnwrap(
+            ScreenNotch.virtualAppKitRect(
+                inScreenFrame: monitor,
+                // Fullscreen: the bar is gone, so this is the whole screen.
+                visibleFrame: monitor,
+                menuBarDepth: 30
+            ),
+            "the housing has to still be there when the ceiling reaches it"
+        )
+
+        XCTAssertEqual(fullscreen.height, 30, "as deep as the bar was")
+        XCTAssertEqual(fullscreen.maxY, monitor.maxY, "still hanging from the top edge")
+    }
+
+    /// A measurable bar still sets the depth: the fallback is a floor, not a
+    /// replacement, so a shallower-than-usual bar is not padded out into a
+    /// permanent dip in the ceiling.
+    func test_aMeasuredBarWinsOverTheFallback() throws {
+        let measured = try XCTUnwrap(ScreenNotch.virtualAppKitRect(
+            inScreenFrame: monitor,
+            visibleFrame: visible,
+            menuBarDepth: 12
+        ))
+
+        XCTAssertEqual(measured.height, monitor.maxY - visible.maxY)
+    }
+
     /// Nothing to hang it from, or nowhere to put it.
     func test_thereHasToBeRoomForIt() {
         XCTAssertNil(
-            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: monitor),
-            "no menu bar means no depth to give it"
+            ScreenNotch.virtualAppKitRect(inScreenFrame: monitor, visibleFrame: monitor, menuBarDepth: 0),
+            "no menu bar and nothing to fall back on means no depth to give it"
         )
         XCTAssertNil(
             ScreenNotch.virtualAppKitRect(
                 inScreenFrame: CGRect(x: 0, y: 0, width: 120, height: 400),
-                visibleFrame: CGRect(x: 0, y: 0, width: 120, height: 370)
+                visibleFrame: CGRect(x: 0, y: 0, width: 120, height: 370),
+                menuBarDepth: 24
             ),
             "a screen narrower than the bar would be all housing"
         )
