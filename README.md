@@ -27,12 +27,13 @@ approvals, sessions) lives in `pet-app/Puck/Agent`.
 ## Install
 
 Download `Puck-<version>.dmg` from
-[Releases](https://github.com/desFernan/puck-mac/releases) and drag both apps
-into Applications. macOS 14 or newer.
+[Releases](https://github.com/desFernan/puck-mac/releases) and drag Puck into
+Applications. macOS 14 or newer. The chat window rides inside the app and
+comes up with it; there is nothing else to move.
 
 The image is signed ad-hoc rather than with a Developer ID, so the first launch
 is refused as coming from an unidentified developer: right-click the app →
-**Open** → **Open**, once per app. Puck then asks for Accessibility, and for
+**Open** → **Open**. Puck then asks for Accessibility, and for
 the microphone, speech recognition and screen recording as you use the features
 that need them.
 

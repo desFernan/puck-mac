@@ -4,7 +4,10 @@
 #
 # The two apps are one product: they speak a private protocol to each other
 # over bridge.sock and neither is useful alone, so they ship together in one
-# image rather than as two downloads that can drift apart.
+# image rather than as two downloads that can drift apart. PuckClient rides
+# inside Puck.app, as it does when install.sh puts them there -- two bundles
+# in /Applications meant searching for "Puck" offered two things to launch,
+# one of which is a window the other one opens for you.
 #
 # Nothing here touches /Applications or the running pair -- that is
 # install.sh's job. This only writes build/Puck-<version>.dmg.
@@ -107,10 +110,31 @@ for app in Puck PuckClient; do
             exit 1
         fi
     done
-    cp -R "$built" "$STAGE/"
 done
 
-# Drag-to-install: the window shows both apps and the folder they go in.
+# The client goes inside the pet's bundle, not beside it. Nesting invalidates
+# the outer seal -- Contents/Library/LoginItems is a nested-code location --
+# so Puck.app is signed again afterwards, with whatever this run is signing
+# with. Checked once more after that: a broken signature in a download is a
+# "damaged app" dialog for whoever opens it, and there is no rebuilding out of
+# a read-only image.
+HELPERS="$PRODUCTS/Puck.app/Contents/Library/LoginItems"
+mkdir -p "$HELPERS"
+cp -R "$PRODUCTS/PuckClient.app" "$HELPERS/"
+if ! codesign --force --sign "$SIGN_IDENTITY" \
+    --preserve-metadata=entitlements,requirements,flags \
+    "$PRODUCTS/Puck.app" 2>/dev/null
+then
+    echo "error: could not re-sign Puck.app after nesting PuckClient inside it." >&2
+    exit 1
+fi
+if ! codesign --verify --strict --deep "$PRODUCTS/Puck.app" 2>/dev/null; then
+    echo "error: Puck.app is not correctly signed after nesting PuckClient." >&2
+    exit 1
+fi
+cp -R "$PRODUCTS/Puck.app" "$STAGE/"
+
+# Drag-to-install: the window shows the app and the folder it goes in.
 ln -s /Applications "$STAGE/Applications"
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
