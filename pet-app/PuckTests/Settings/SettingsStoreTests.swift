@@ -185,4 +185,30 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.hotkeyBindings, bindings)
     }
+
+    /// The notch panel ships on. It was off while it was being built, and a
+    /// switch that stayed off after the work was done is a feature nobody
+    /// finds.
+    func test_notchPanel_defaultsToOn() {
+        XCTAssertTrue(SettingsStore(defaults: defaults).isNotchPanelEnabled)
+    }
+
+    /// Switching it off has to survive a relaunch. A default read through
+    /// `bool(forKey:)` cannot tell "off" from "never set", so an off switch
+    /// would come back on by itself -- which is the trap that comes with
+    /// defaulting a flag to true.
+    func test_notchPanel_stayingOffSurvivesARelaunch() {
+        let store = SettingsStore(defaults: defaults)
+        store.isNotchPanelEnabled = false
+
+        XCTAssertFalse(SettingsStore(defaults: defaults).isNotchPanelEnabled)
+    }
+
+    func test_notchPanel_roundTrips() {
+        let store = SettingsStore(defaults: defaults)
+        store.isNotchPanelEnabled = false
+        store.isNotchPanelEnabled = true
+
+        XCTAssertTrue(SettingsStore(defaults: defaults).isNotchPanelEnabled)
+    }
 }

@@ -99,13 +99,19 @@ final class SettingsStore {
 
     /// Whether the notch panel is shown at all.
     ///
-    /// Off unless somebody turns it on. It puts a window over the menu bar
-    /// that takes the pointer where it is drawn, and it gives a display
-    /// without a camera housing one -- neither is something to do to a person
-    /// who installed a desktop pet and has not asked for it. It is on in the
-    /// builds it is being worked on in, and the switch is in Settings.
+    /// On. It was off while it was being built, because a window over the
+    /// menu bar that takes the pointer where it is drawn -- and a notch given
+    /// to a display that has no camera housing -- is not something to do to
+    /// somebody who installed a desktop pet and did not ask for it. It now
+    /// does something worth having found: what the whole machine is playing,
+    /// a browser tab included, in the one place on screen that is always in
+    /// reach.
+    ///
+    /// Read through `object(forKey:)` rather than `bool(forKey:)`: the latter
+    /// cannot tell "switched off" from "never touched", so turning it off
+    /// would have been undone by its own default on the next launch.
     var isNotchPanelEnabled: Bool {
-        get { defaults.object(forKey: Keys.notchPanelEnabled) as? Bool ?? false }
+        get { defaults.object(forKey: Keys.notchPanelEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.notchPanelEnabled) }
     }
 
