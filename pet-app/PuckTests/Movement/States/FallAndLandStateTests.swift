@@ -286,3 +286,81 @@ final class LandStateTests: XCTestCase {
         XCTAssertEqual(world.requestedTransitions, [.idle])
     }
 }
+
+/// The throw's sideways half, which is the part nothing was holding onto.
+///
+/// `ScreenBounds.bounceHorizontally` has its own tests, but nothing checked
+/// that Fall actually uses it -- or that the launch velocity a release hands
+/// over reaches it at all. Both are easy to break silently: the pet keeps
+/// falling either way, it just stops travelling, or sails off the side.
+@MainActor
+final class FallThrowTests: XCTestCase {
+    /// A pet let go mid-flick keeps the speed it was let go with.
+    func test_theThrowCarriesThePetSideways() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 0))
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: 600, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.2)
+
+        XCTAssertGreaterThan(world.body.position.x, 560, "the throw's sideways speed was dropped")
+    }
+
+    /// And rebounds off the side of the screen rather than sailing through it.
+    /// The wall is where the pet's *outline* meets the edge, so a throw at the
+    /// right wall turns around while the artwork is still on screen.
+    func test_theThrownPetBouncesOffTheWall() {
+        let world = TestStateWorld(position: CGPoint(x: 900, y: 0))
+        world.landingY = 10_000
+        // 1000 wide, and the outline reaches 50 either side of the position.
+        world.body.launchVelocity = CGPoint(x: 2000, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.4)
+
+        let rightLimit = world.roamableArea.maxX - world.visualBounds.maxX
+        XCTAssertLessThanOrEqual(
+            world.body.position.x, rightLimit + 0.5,
+            "the pet went through the right wall instead of bouncing off it"
+        )
+        XCTAssertLessThan(
+            world.body.position.x, 900,
+            "it should have come back the other way, not stuck to the wall"
+        )
+    }
+
+    /// The same on the way out to the left.
+    func test_theThrownPetBouncesOffTheLeftWall() {
+        let world = TestStateWorld(position: CGPoint(x: 100, y: 0))
+        world.landingY = 10_000
+        world.body.launchVelocity = CGPoint(x: -2000, y: 0)
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.4)
+
+        let leftLimit = world.roamableArea.minX - world.visualBounds.minX
+        XCTAssertGreaterThanOrEqual(
+            world.body.position.x, leftLimit - 0.5,
+            "the pet went through the left wall"
+        )
+        XCTAssertGreaterThan(world.body.position.x, 100, "it should have come back the other way")
+    }
+
+    /// A pet let go of without moving the cursor drops straight down, which is
+    /// what it always did before throwing existed.
+    func test_aStillReleaseIsAPlainDrop() {
+        let world = TestStateWorld(position: CGPoint(x: 500, y: 0))
+        world.landingY = 10_000
+        let state = FallState()
+        state.enter()
+
+        world.run(state, seconds: 0.3)
+
+        XCTAssertEqual(world.body.position.x, 500, accuracy: 0.001)
+        XCTAssertGreaterThan(world.body.position.y, 0)
+    }
+}

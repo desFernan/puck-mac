@@ -33,7 +33,13 @@ enum Limbs { case stand, walk, up, grip, kick, none }
 
 struct Pose {
     var rx: CGFloat = 88
-    var ry: CGFloat = 74
+    /// Taller than wide, so the character's own proportions match the canvas
+    /// it is drawn on and it fills both dimensions. A squatter body fills the
+    /// width and leaves a band of empty rows top and bottom -- and since the
+    /// app derives the pet's outline from the artwork, those empty rows are a
+    /// shorter pet: every clearance measured off `visualBounds` (petting,
+    /// ceilings, ball collisions, the bounce off a wall) shrinks with it.
+    var ry: CGFloat = 77
     var lift: CGFloat = 0
     var lean: CGFloat = 0
     var eyes: Eyes = .arc
@@ -417,7 +423,7 @@ let AW = 1200, AH = 1224
 // flatter than it -- a puddle, a landing squash -- are checked afterwards
 // and must still fit. That is a design constraint on the pose table, which
 // is where it belongs, rather than a tax on every other drawing.
-let PAD: CGFloat = 34
+let PAD: CGFloat = 16
 /// How far the feet sit above the bottom of the canvas -- see `fitShift`.
 let groundMargin: CGFloat = 6
 do {
