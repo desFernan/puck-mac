@@ -33,10 +33,19 @@ final class NowPlayingStore: ObservableObject {
         MusicApps.artwork(for: track.source).flatMap(NSImage.init(data:))
     }
 
-    /// How often the music app is asked. A second is enough for a progress
-    /// bar and a lyric line to look live, and asking an app over Automation
-    /// is a few milliseconds each time.
+    /// How often the player is asked, while the panel is open. A second is
+    /// enough for a progress bar and a lyric line to look live.
     static let interval: TimeInterval = 1
+
+    /// And while it is shut. The shut notch shows a thumbnail and whether
+    /// anything is playing -- neither of which changes between songs -- so
+    /// asking every second for it would be paying an open panel's price all
+    /// day for something nobody is reading.
+    static let idleInterval: TimeInterval = 4
+
+    /// Which of the two is running, so a change of pace restarts the timer
+    /// rather than being noticed on the next tick or not at all.
+    private var currentInterval: TimeInterval?
 
     private var timer: Timer?
     private var lyricsTask: Task<Void, Never>?
@@ -56,10 +65,12 @@ final class NowPlayingStore: ObservableObject {
         return lyrics.line(at: track.position)?.text
     }
 
-    func start() {
-        guard timer == nil else { return }
+    func start(every seconds: TimeInterval = NowPlayingStore.interval) {
+        guard currentInterval != seconds else { return }
+        self.timer?.invalidate()
+        currentInterval = seconds
         refresh()
-        let timer = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: seconds, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
         // `.common`, so the panel keeps counting while a menu is open or the
@@ -71,6 +82,7 @@ final class NowPlayingStore: ObservableObject {
     func stop() {
         timer?.invalidate()
         timer = nil
+        currentInterval = nil
         lyricsTask?.cancel()
         lyricsTask = nil
         artworkTask?.cancel()

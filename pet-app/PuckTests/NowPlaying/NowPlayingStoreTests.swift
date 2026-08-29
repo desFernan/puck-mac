@@ -110,4 +110,28 @@ final class NowPlayingStoreTests: XCTestCase {
         private(set) var value = 0
         func bump() { value += 1 }
     }
+
+    /// The shut notch shows what is playing too, so the store keeps running
+    /// when the panel closes -- but slowly. Asking every second all day for a
+    /// thumbnail nobody is reading is an open panel's price for a shut one.
+    func test_theIdlePaceIsSlowerThanTheOpenOne() {
+        XCTAssertGreaterThan(NowPlayingStore.idleInterval, NowPlayingStore.interval)
+    }
+
+    /// Changing pace has to restart the timer. Left to itself the guard that
+    /// stops a second timer being made would have kept the old speed, so
+    /// opening the panel would not have made it any more current.
+    func test_changingPaceTakesEffect() async {
+        let store = NowPlayingStore()
+        let asked = Counter()
+        store.read = { Task { await asked.bump() }; return (self.track("한 곡"), nil) }
+
+        store.start(every: 10)
+        await settle(store)
+        store.start(every: 0.1)
+        await settle(store, seconds: 0.45)
+
+        let count = await asked.value
+        XCTAssertGreaterThan(count, 2, "the faster timer never took over")
+    }
 }

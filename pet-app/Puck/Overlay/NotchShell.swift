@@ -39,9 +39,24 @@ import SwiftUI
 struct NotchShell<Content: View>: View {
     let isOpen: Bool
     /// The closed size: the real notch's, or the given one's on a display
-    /// that has none.
+    /// that has none. Wider than the hardware while the wings are out -- see
+    /// NotchPanelGeometry.shutRect.
     let notchSize: CGSize
+    /// What is drawn while it is shut, if anything.
+    let shut: AnyView?
     @ViewBuilder let content: () -> Content
+
+    init(
+        isOpen: Bool,
+        notchSize: CGSize,
+        shut: AnyView? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.isOpen = isOpen
+        self.notchSize = notchSize
+        self.shut = shut
+        self.content = content
+    }
 
     /// A closed notch's bottom corners, as a fraction of its depth.
     static var closedCornerFraction: CGFloat { 0.34 }
@@ -129,6 +144,18 @@ struct NotchShell<Content: View>: View {
                         )
                         .opacity(isOpen ? 1 : 0)
                         .allowsHitTesting(isOpen)
+                }
+                // The shut state's own contents, faded the other way. Not
+                // hit-tested: the whole shut shape is one target, and a
+                // thumbnail that swallowed the click would be a button that
+                // does nothing.
+                .overlay {
+                    if let shut {
+                        shut
+                            .frame(width: size.width, height: size.height)
+                            .opacity(isOpen ? 0 : 1)
+                            .allowsHitTesting(false)
+                    }
                 }
                 // Outside the overlay, so the clip follows the shape at the
                 // size it is now rather than the size it will be: clipped

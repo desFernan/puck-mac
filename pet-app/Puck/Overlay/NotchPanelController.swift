@@ -16,20 +16,27 @@
 //
 
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
 final class NotchPanelController {
     private var window: NSPanel?
     private var hoverView: NotchHoverView?
-    private var hosting: NSHostingView<NotchShell<NotchPanelView>>?
+    private var hosting: NSHostingView<NotchPanelRoot>?
+    /// The hardware notch, and the shape drawn around it -- which is wider
+    /// while something is playing. The drawn one is what the pointer is
+    /// measured against, so the wings are targets rather than decoration.
     private var notch: CGRect = .zero
+    private var shutNotch: CGRect { NotchPanelGeometry.shutRect(notch: notch, isLive: isLive) }
+    private var isLive: Bool { music.track != nil }
     private var isOpen = false
 
     /// What is playing. Owned here rather than by the view so it survives the
     /// view being rebuilt on every open and close, and so it can be polling
     /// only while somebody is looking at it.
     private let music = NowPlayingStore()
+    private var liveness: AnyCancellable?
 
     /// Which toys are out. Asked at the moment the panel opens, because it
     /// can change while it is shut -- the status item's panel puts toys out
@@ -55,7 +62,8 @@ final class NotchPanelController {
         isOpen = false
         hosting?.rootView = shell(isOpen: false)
         hoverView?.activeRect = activeRect(isOpen: false)
-        music.stop()
+        music.start(every: NowPlayingStore.idleInterval)
+        watchLiveness()
         // Shut means shut, including the half of it setOpen would have done.
         // A Space switch or a display change lands here while the panel is
         // open, and leaving `wantsKey` set left a panel drawn closed that
@@ -69,7 +77,23 @@ final class NotchPanelController {
         hoverView = nil
         hosting = nil
         isOpen = false
+        liveness?.cancel()
+        liveness = nil
         music.stop()
+    }
+
+    /// The wings appear when a song starts, and nobody is pointing at
+    /// anything when that happens. SwiftUI redraws itself, but what the
+    /// pointer can touch is AppKit's and has to be told.
+    private func watchLiveness() {
+        liveness?.cancel()
+        liveness = music.$track
+            .map { $0 != nil }
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                guard let self, !self.isOpen else { return }
+                self.hoverView?.activeRect = self.activeRect(isOpen: false)
+            }
     }
 
     private func makeWindow() -> NSPanel {
@@ -95,7 +119,7 @@ final class NotchPanelController {
             guard let self else { return }
             guard let cursor else { return self.setOpen(false) }
             self.setOpen(NotchPanelGeometry.shouldBeOpen(
-                cursor: cursor, notch: self.notch, isOpen: self.isOpen
+                cursor: cursor, notch: self.shutNotch, isOpen: self.isOpen
             ))
         }
         panel.contentView = hover
@@ -130,16 +154,11 @@ final class NotchPanelController {
         // whole panel once it is open, so moving down into it does not
         // immediately close it again.
         hoverView?.activeRect = activeRect(isOpen: open)
-        // Asking a music app what it is playing costs a few milliseconds
-        // over Automation, so it is asked only while the panel is open --
-        // once a second forever for a panel nobody is looking at is a cost
-        // nobody agreed to.
-        if open {
-            music.start()
-        } else {
-            music.stop()
-            resignKeyhood()
-        }
+        // Kept running either way, because the shut notch shows what is
+        // playing too -- but slowly, since a thumbnail and whether anything
+        // is playing do not change between one second and the next.
+        music.start(every: open ? NowPlayingStore.interval : NowPlayingStore.idleInterval)
+        if !open { resignKeyhood() }
     }
 
     /// Gives the caret back. Both halves, because `wantsKey` left set is a
@@ -149,38 +168,40 @@ final class NotchPanelController {
         if window?.isKeyWindow == true { window?.resignKey() }
     }
 
-    /// The drawn shape, in the window's own coordinates. AppKit's Y grows
-    /// upward, so both hang from the window's top edge.
+    /// What the pointer can *click*, in the window's own coordinates.
+    /// AppKit's Y grows upward, so it hangs from the window's top edge.
     ///
-    /// Shut, that is the notch alone -- which is camera housing, with nothing
-    /// underneath it to click. The panel is only ever drawn around a real one,
-    /// so this never covers live menu bar.
+    /// Nothing at all while shut. On a display with no camera housing the
+    /// panel draws its own notch, and that sits over live menu bar in the
+    /// middle of the screen -- a status-bar-level window there swallows the
+    /// clicks meant for whatever app owns those menus, which is what got the
+    /// drawn notch taken out once already.
+    ///
+    /// Giving it up costs nothing, because the shut state has nothing to
+    /// press: hovering is read from a tracking area, and a tracking area
+    /// reports the pointer whether or not the view accepts clicks. So the
+    /// panel still opens when you point at it, and the menu bar underneath
+    /// keeps working until it does.
     private func activeRect(isOpen: Bool) -> CGRect {
+        guard isOpen else { return .zero }
         let size = window?.frame.size ?? .zero
-        let width = isOpen ? NotchPanelGeometry.openWidth : notch.width
-        let height = isOpen ? NotchPanelGeometry.openHeight : notch.height
         return CGRect(
-            x: (size.width - width) / 2,
-            y: size.height - height,
-            width: width,
-            height: height
+            x: (size.width - NotchPanelGeometry.openWidth) / 2,
+            y: size.height - NotchPanelGeometry.openHeight,
+            width: NotchPanelGeometry.openWidth,
+            height: NotchPanelGeometry.openHeight
         )
     }
 
-    private func shell(isOpen: Bool) -> NotchShell<NotchPanelView> {
-        NotchShell(isOpen: isOpen, notchSize: notch.size) {
-            NotchPanelView(
-                music: self.music,
-                // Passed in as well as gating the shell: the content is built
-                // in both states so the field keeps what was typed across an
-                // open and shut, which means `onAppear` fires once, while
-                // shut, and never again. The view needs to be told.
-                isOpen: isOpen,
-                toysOut: self.toysOut?() ?? [],
-                onToggleToy: { [weak self] toy in self?.onToggleToy?(toy) ?? [] },
-                onSubmit: { [weak self] text in self?.onSubmit?(text) }
-            )
-        }
+    private func shell(isOpen: Bool) -> NotchPanelRoot {
+        NotchPanelRoot(
+            music: music,
+            isOpen: isOpen,
+            notch: notch.size,
+            toysOut: toysOut?() ?? [],
+            onToggleToy: { [weak self] toy in self?.onToggleToy?(toy) ?? [] },
+            onSubmit: { [weak self] text in self?.onSubmit?(text) }
+        )
     }
 }
 

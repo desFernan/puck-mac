@@ -127,4 +127,36 @@ final class NotchPanelGeometryTests: XCTestCase {
             cursor: CGPoint(x: notch.midX, y: notch.midY), notch: notch, isOpen: false
         ))
     }
+
+    // MARK: - The shut shape
+
+    private var aNotch: CGRect { CGRect(x: 1628, y: 1400, width: 185, height: 34) }
+
+    /// With nothing playing the shut notch is exactly the notch. A shape that
+    /// sat wider than the hardware all day would read as a bug in the screen.
+    func testNothingPlayingLeavesTheNotchAlone() {
+        XCTAssertEqual(NotchPanelGeometry.shutRect(notch: aNotch, isLive: false), aNotch)
+    }
+
+    /// Playing, it reaches out to both sides by the same amount, so its
+    /// midpoint does not move: the open panel is centred on it, and a notch
+    /// that slid sideways as a song started would drag the panel with it.
+    func testTheWingsGrowWithoutMovingTheMiddle() {
+        let live = NotchPanelGeometry.shutRect(notch: aNotch, isLive: true)
+
+        XCTAssertEqual(live.midX, aNotch.midX, accuracy: 0.001)
+        XCTAssertEqual(live.width, aNotch.width + NotchPanelGeometry.wingWidth * 2)
+        XCTAssertEqual(live.height, aNotch.height, "the wings reach sideways, not down")
+    }
+
+    /// Pointing at the album art has to open the panel. Measured against the
+    /// notch alone, the wings would be decoration drawn on top of a smaller
+    /// target, and half of what you can see would not answer.
+    func testPointingAtAWingOpensThePanel() {
+        let live = NotchPanelGeometry.shutRect(notch: aNotch, isLive: true)
+        let onTheArt = CGPoint(x: aNotch.minX - NotchPanelGeometry.wingWidth / 2, y: aNotch.midY)
+
+        XCTAssertFalse(aNotch.contains(onTheArt), "the point has to be off the notch itself")
+        XCTAssertTrue(NotchPanelGeometry.shouldBeOpen(cursor: onTheArt, notch: live, isOpen: false))
+    }
 }

@@ -49,6 +49,25 @@ enum NotchPanelGeometry {
     static let openHeight: CGFloat =
         topInset + musicBandHeight + bandGap + 1 + bandGap + actionBandHeight + bottomInset
 
+    /// How far the shut notch reaches out to each side while something is
+    /// playing.
+    ///
+    /// Enough for a thumbnail you can recognise an album by and a few bars
+    /// beside it, and no more: this sits in the menu bar all day, and a shut
+    /// notch that has grown into a widget is a thing to resent rather than
+    /// glance at.
+    static let wingWidth: CGFloat = 30
+
+    /// The shut shape: the notch alone, or the notch with its wings out.
+    ///
+    /// Grown symmetrically, so the midpoint does not move -- the open panel
+    /// is centred on it, and a notch that shifted sideways as a song started
+    /// would take the panel with it.
+    static func shutRect(notch: CGRect, isLive: Bool) -> CGRect {
+        guard isLive else { return notch }
+        return notch.insetBy(dx: -wingWidth, dy: 0)
+    }
+
     /// How wide it opens to. Wider than the notch by a good margin, so the
     /// thing that appears reads as a panel coming out of the notch rather
     /// than as the notch itself growing downward.
@@ -78,6 +97,9 @@ enum NotchPanelGeometry {
     }
 
     /// Whether the cursor is close enough to the closed notch to open it.
+    /// `notch` here is the shape as drawn, wings included -- see `shutRect`.
+    /// Pointing at the album art has to open the panel, or the wings are
+    /// decoration sitting on top of a smaller target nobody can see.
     static func isArriving(_ cursor: CGPoint, notch: CGRect) -> Bool {
         notch.insetBy(dx: -approachSlack, dy: -approachSlack).contains(cursor)
     }

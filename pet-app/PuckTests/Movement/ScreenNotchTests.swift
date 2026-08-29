@@ -279,4 +279,79 @@ final class NoVirtualNotchTests: XCTestCase {
             auxiliaryTopRight: strip
         ))
     }
+
+    // MARK: - The panel's notch, which is not the pet's
+
+    private let ultrawide = CGRect(x: 0, y: 0, width: 3440, height: 1440)
+
+    /// A display with no camera housing gets a drawn one, so the panel is
+    /// available on a monitor. This is panel-only on purpose: `appKitRect`,
+    /// which is what the pet is given, still answers nil for the same screen.
+    func testADisplayWithNoHousingStillGetsAPanelNotch() {
+        let drawn = ScreenNotch.panelAppKitRect(
+            onScreenFrame: ultrawide,
+            visibleFrame: ultrawide.insetBy(dx: 0, dy: 0).offsetBy(dx: 0, dy: -37)
+                .divided(atDistance: 1403, from: .minYEdge).slice,
+            auxiliaryTopLeft: nil,
+            auxiliaryTopRight: nil
+        )
+
+        XCTAssertNotNil(drawn)
+        XCTAssertEqual(drawn?.width, ScreenNotch.drawnWidth)
+        XCTAssertEqual(drawn?.midX ?? 0, ultrawide.midX, accuracy: 0.001)
+        XCTAssertEqual(drawn?.maxY ?? 0, ultrawide.maxY, accuracy: 0.001,
+                       "it has to sit in the menu bar, not below it")
+    }
+
+    /// The pet must not be given the drawn one. It was taken out once because
+    /// the pet ducked around a housing that was not there and stopped under
+    /// it on displays the panel was not even on.
+    func testThePetIsNotGivenADrawnNotch() {
+        XCTAssertNil(ScreenNotch.appKitRect(
+            inScreenFrame: ultrawide,
+            auxiliaryTopLeft: nil,
+            auxiliaryTopRight: nil
+        ))
+    }
+
+    /// A real housing wins: a MacBook must get its own notch, not a drawn one
+    /// centred on the screen.
+    func testARealHousingIsUsedWhenThereIsOne() {
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let left = CGRect(x: 0, y: 945, width: 640, height: 37)
+        let right = CGRect(x: 872, y: 945, width: 640, height: 37)
+
+        let panel = ScreenNotch.panelAppKitRect(
+            onScreenFrame: frame,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 945),
+            auxiliaryTopLeft: left,
+            auxiliaryTopRight: right
+        )
+
+        XCTAssertEqual(panel?.minX, 640)
+        XCTAssertEqual(panel?.width, 232, "the gap between the two strips, not the drawn width")
+    }
+
+    /// With no menu bar to sit in -- a fullscreen Space -- there is nowhere
+    /// to draw one, and a notch hanging into the desktop is worse than none.
+    func testNoMenuBarMeansNoDrawnNotch() {
+        XCTAssertNil(ScreenNotch.panelAppKitRect(
+            onScreenFrame: ultrawide,
+            visibleFrame: ultrawide,
+            auxiliaryTopLeft: nil,
+            auxiliaryTopRight: nil
+        ))
+    }
+
+    /// And nowhere to put one on a display narrower than the notch itself.
+    func testAScreenTooNarrowForANotchGetsNone() {
+        let tiny = CGRect(x: 0, y: 0, width: 120, height: 400)
+
+        XCTAssertNil(ScreenNotch.panelAppKitRect(
+            onScreenFrame: tiny,
+            visibleFrame: CGRect(x: 0, y: 0, width: 120, height: 380),
+            auxiliaryTopLeft: nil,
+            auxiliaryTopRight: nil
+        ))
+    }
 }

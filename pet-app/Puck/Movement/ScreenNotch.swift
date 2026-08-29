@@ -20,9 +20,10 @@
 //  everywhere, and the bottom of the notch under the notch. Everything that
 //  asks "how high can the pet go here" asks it that way now.
 //
-//  Only a real one. A display without a camera housing does not get given a
-//  drawn stand-in: the pet would duck around something that is not there, and
-//  a panel hung over the middle of a live menu bar takes clicks meant for it.
+//  Only a real one, as far as the pet is concerned. A display without a
+//  camera housing must not make the pet duck around something nobody can see.
+//  The panel is a separate question -- see `panelAppKitRect(onScreenFrame:)`
+//  -- and the two are deliberately not the same rectangle.
 //
 //  Pure, so a notch can be tested on a machine that has none -- which is most
 //  of them, and was this one.
@@ -91,5 +92,52 @@ struct ScreenNotch: Equatable {
         let height = frame.maxY - bottom
         guard height > 0 else { return nil }
         return CGRect(x: left.maxX, y: bottom, width: width, height: height)
+    }
+
+    /// How wide a notch to draw on a display that has none.
+    ///
+    /// A MacBook's is around 185 points across. Matching it is what makes the
+    /// panel read as the same object on an external display rather than as a
+    /// black tab somebody stuck to the top of the screen.
+    static let drawnWidth: CGFloat = 185
+
+    /// Where the panel's notch goes on `frame`: the real housing if there is
+    /// one, a drawn one in the menu bar if there is not.
+    ///
+    /// This is for the panel and nothing else. The pet is given real housings
+    /// only, because a pet ducking around a shape that exists in one window's
+    /// imagination is a pet stopping in the middle of nothing.
+    ///
+    /// The drawn one is exactly as deep as the menu bar, so it fills that
+    /// strip rather than hanging below it into the desktop. It does cover the
+    /// middle of a live menu bar, which is why the shut panel takes no clicks
+    /// at all -- see NotchPanelController.activeRect.
+    ///
+    /// - Parameters:
+    ///   - frame: the screen's full frame.
+    ///   - visibleFrame: the same screen's, with the menu bar taken off.
+    static func panelAppKitRect(
+        onScreenFrame frame: CGRect,
+        visibleFrame: CGRect,
+        auxiliaryTopLeft: CGRect?,
+        auxiliaryTopRight: CGRect?
+    ) -> CGRect? {
+        if let real = appKitRect(
+            inScreenFrame: frame,
+            auxiliaryTopLeft: auxiliaryTopLeft,
+            auxiliaryTopRight: auxiliaryTopRight
+        ) {
+            return real
+        }
+        let depth = frame.maxY - visibleFrame.maxY
+        // No menu bar to sit in -- a fullscreen Space, or a screen reported
+        // in some state we did not expect -- is no place to draw one.
+        guard depth > 0, frame.width > drawnWidth else { return nil }
+        return CGRect(
+            x: frame.midX - drawnWidth / 2,
+            y: frame.maxY - depth,
+            width: drawnWidth,
+            height: depth
+        )
     }
 }

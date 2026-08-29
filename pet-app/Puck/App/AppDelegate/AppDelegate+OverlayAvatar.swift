@@ -445,23 +445,17 @@ extension AppDelegate {
 
     /// Where the panel goes, in AppKit's own coordinates.
     ///
-    /// The main screen's housing: the panel is one window, and the notch is
-    /// somewhere you point at rather than somewhere the pet has to be, so it
-    /// belongs on the screen the pointer is usually on. A machine with two
-    /// notched displays gets it on one of them; the pet still ducks around
-    /// both, because that is a different question with a different answer.
-    /// Where the panel goes, in AppKit's own coordinates.
-    ///
-    /// The main screen's housing, and only if it has one: the panel is one
-    /// window, and the notch is somewhere you point at rather than somewhere
-    /// the pet has to be, so it belongs on the screen the pointer is usually
-    /// on. A machine with two notched displays gets it on one of them; the pet
-    /// still ducks around both, because that is a different question with a
-    /// different answer. A display with no housing gets no panel at all.
+    /// The main screen's, real or drawn: the panel is one window, and the
+    /// notch is somewhere you point at rather than somewhere the pet has to
+    /// be, so it belongs on the screen the pointer is usually on. A machine
+    /// with two notched displays gets it on one of them; the pet still ducks
+    /// around both, because that is a different question with a different
+    /// answer -- and it ducks around real housings only.
     private var panelNotchAppKitRect: CGRect? {
         guard let screen = NSScreen.main else { return nil }
-        return ScreenNotch.appKitRect(
-            inScreenFrame: screen.frame,
+        return ScreenNotch.panelAppKitRect(
+            onScreenFrame: screen.frame,
+            visibleFrame: screen.visibleFrame,
             auxiliaryTopLeft: screen.auxiliaryTopLeftArea,
             auxiliaryTopRight: screen.auxiliaryTopRightArea
         )
