@@ -12,6 +12,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# acp-claude.mjs is not in the repository -- see .gitignore for why -- so a
+# fresh clone builds it once here. Needs npm and the network, and only the
+# first time or after the pinned versions change.
+if [ ! -f Puck/Resources/acp-claude.mjs ]; then
+    echo "note: building the ACP bundles (once per clone)"
+    scripts/vendor-acp.sh
+fi
+
 # Before anything is built: a file added to a folder PuckClient sources one
 # file at a time is absent from that app and nothing else notices. Checked
 # first because it reads only project.yml and the tree, and a build that is

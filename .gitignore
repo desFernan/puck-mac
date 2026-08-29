@@ -33,3 +33,14 @@ pet-app/design.md
 graphify-out/
 
 CLAUDE.md
+
+# Built by pet-app/scripts/vendor-acp.sh, not committed.
+#
+# The bundle esbuild produces inlines @anthropic-ai/claude-agent-sdk, which is
+# not open source -- "© Anthropic PBC. All rights reserved. Use is subject to
+# the Legal Agreements" -- so committing it made this repository redistribute
+# Anthropic's own code, minified and renamed by the bundler on the way in.
+#
+# Building it here instead keeps that between npm and whoever builds Puck.
+# acp-codex.mjs stays committed: what it inlines is Apache-2.0.
+pet-app/Puck/Resources/acp-claude.mjs

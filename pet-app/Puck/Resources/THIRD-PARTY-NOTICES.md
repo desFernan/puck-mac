@@ -19,18 +19,23 @@ package.json` change.
 | `vscode-jsonrpc` | 9.0.2 | MIT |
 | `zod` | 4.4.3 | MIT |
 
-## Unresolved: `@anthropic-ai/claude-agent-sdk`
+## `@anthropic-ai/claude-agent-sdk`
 
-Its package declares `SEE LICENSE IN README.md`, and that README reads:
+Not open source. Its package declares `SEE LICENSE IN README.md`, and that
+README reads:
 
 > © Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements
 > outlined here: https://code.claude.com/docs/en/legal-and-compliance.
 
-That is a proprietary grant, not an open source license, and esbuild inlines
-`@anthropic-ai/claude-agent-sdk/sdk.mjs` into the committed `acp-claude.mjs`.
-Whether those terms allow redistributing it inside this app has not been
-established. Until it is, treat this as an open question rather than a
-resolved attribution.
+esbuild inlines it into `acp-claude.mjs`, so that file is **not committed** --
+`vendor-acp.sh` builds it locally, and .gitignore says why. Nothing here
+redistributes it.
+
+Puck also does not ship or modify the Claude Code binary: `AcpAgentProcess`
+points the shim at whatever the user installed themselves, through the
+`CLAUDE_CODE_EXECUTABLE` variable the shim already reads, and the user
+authenticates with their own credentials. Those are the conditions the terms
+above set out.
 
 ## License texts
 

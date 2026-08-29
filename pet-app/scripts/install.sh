@@ -42,6 +42,15 @@ fi
 export DEVELOPMENT_TEAM
 echo "note: signing with team ${DEVELOPMENT_TEAM}"
 
+
+# acp-claude.mjs is not in the repository -- see .gitignore for why -- so a
+# fresh clone builds it once here. Needs npm and the network, and only the
+# first time or after the pinned versions change.
+if [ ! -f Puck/Resources/acp-claude.mjs ]; then
+    echo "note: building the ACP bundles (once per clone)"
+    scripts/vendor-acp.sh
+fi
+
 xcodegen generate
 
 DERIVED=$(mktemp -d)
