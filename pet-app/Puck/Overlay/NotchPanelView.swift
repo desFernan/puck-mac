@@ -35,6 +35,7 @@ struct NotchPanelView: View {
     @State private var out: Set<String> = []
     @State private var prompt = ""
     @State private var hoveredToy: String?
+    @State private var hoveredControl: String?
     @FocusState private var isPromptFocused: Bool
 
     init(
@@ -53,7 +54,9 @@ struct NotchPanelView: View {
     var body: some View {
         VStack(spacing: NotchPanelGeometry.bandGap) {
             musicBand
-            Divider().overlay(.white.opacity(0.10))
+            Rectangle()
+                .fill(NotchStyle.border)
+                .frame(height: 1)
             actionBand
         }
         .padding(.horizontal, 18)
@@ -85,42 +88,51 @@ struct NotchPanelView: View {
     private var cover: some View {
         // One shape whatever is inside it, so the row does not reflow the
         // moment a cover finishes loading.
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(.white.opacity(0.07))
-            .frame(width: 62, height: 62)
+        let shape = RoundedRectangle(cornerRadius: NotchStyle.radiusMedium, style: .continuous)
+        let side = NotchPanelGeometry.musicBandHeight
+        return shape
+            .fill(NotchStyle.surface)
+            .frame(width: side, height: side)
             .overlay {
                 if let artwork = music.artwork {
                     Image(nsImage: artwork)
                         .resizable()
                         .scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        // Sized before it is clipped, not after. Filling a
+                        // square with a picture that is not square makes the
+                        // image itself larger than the square, and a clip
+                        // shape applied to the image follows the image --
+                        // so a wide cover spilled out over the title beside
+                        // it. The frame is what the clip has to match.
+                        .frame(width: side, height: side)
+                        .clipShape(shape)
                 } else {
                     Image(systemName: "music.note")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(NotchStyle.subtleForeground)
                 }
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(.white.opacity(0.10), lineWidth: 1)
-            }
-            .animation(.easeOut(duration: 0.18), value: music.artwork)
+            .overlay { shape.strokeBorder(NotchStyle.border, lineWidth: 1) }
+            .animation(NotchStyle.stateChange, value: music.artwork)
     }
 
     private func trackDetails(_ track: NowPlaying) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(track.title)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .tracking(-0.2)
+                .foregroundStyle(NotchStyle.foreground)
                 .lineLimit(1)
             // The lyric takes the artist's line when there is one: the second
             // line is the only spare one, and a word being sung is worth more
             // than a name already under the cover art.
             Text(music.currentLyric ?? track.artist)
                 .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(music.currentLyric == nil ? 0.55 : 0.85))
+                .foregroundStyle(
+                    music.currentLyric == nil ? NotchStyle.mutedForeground : NotchStyle.foreground.opacity(0.85)
+                )
                 .lineLimit(1)
-                .animation(.easeOut(duration: 0.2), value: music.currentLyric)
+                .animation(NotchStyle.stateChange, value: music.currentLyric)
             Spacer(minLength: 0)
             // A browser gives a name and nothing else, so there is no
             // playhead to draw. An empty bar under a playing track reads as
@@ -128,7 +140,7 @@ struct NotchPanelView: View {
             if track.source.reportsPosition {
                 progress(track)
             } else {
-                sourceLabel(track)
+                sourceName(track)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -138,20 +150,26 @@ struct NotchPanelView: View {
         VStack(spacing: 4) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.12))
+                    Capsule().fill(NotchStyle.track)
                     Capsule()
-                        .fill(.white.opacity(0.85))
+                        .fill(NotchStyle.foreground.opacity(0.85))
                         .frame(width: max(2, geometry.size.width * track.progress))
                 }
             }
             .frame(height: 3)
-            HStack {
+            HStack(spacing: 6) {
                 Text(TrackTime.text(track.position))
+                if track.source.isWorthNaming {
+                    // The system route finds whatever is playing, so which
+                    // app that is stops being obvious.
+                    Text(track.source.applicationName)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
                 Text(TrackTime.text(track.duration))
             }
             .font(.system(size: 9, weight: .medium).monospacedDigit())
-            .foregroundStyle(.white.opacity(0.40))
+            .foregroundStyle(NotchStyle.subtleForeground)
         }
         // Moves with the clock rather than in steps, so a bar read once a
         // second still looks like it is running.
@@ -161,10 +179,10 @@ struct NotchPanelView: View {
     /// Where it is coming from, in place of the progress bar. Worth saying:
     /// a title lifted from a tab is easier to trust once you can see it came
     /// from the browser.
-    private func sourceLabel(_ track: NowPlaying) -> some View {
+    private func sourceName(_ track: NowPlaying) -> some View {
         Text(track.source.applicationName)
             .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(.white.opacity(0.40))
+            .foregroundStyle(NotchStyle.subtleForeground)
     }
 
     private func transport(_ track: NowPlaying) -> some View {
@@ -182,14 +200,25 @@ struct NotchPanelView: View {
         size: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let isHovered = hoveredControl == symbol
+        return Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
+                // Full white under the pointer: three flat glyphs in a row
+                // give no sign which one is about to be pressed, and a
+                // transport that does not answer the pointer reads as an
+                // illustration of a transport.
+                .foregroundStyle(isHovered ? NotchStyle.foreground : NotchStyle.foreground.opacity(0.75))
                 .frame(width: 30, height: 30)
+                .background {
+                    RoundedRectangle(cornerRadius: NotchStyle.radiusSmall, style: .continuous)
+                        .fill(isHovered ? NotchStyle.surfaceHovered : .clear)
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hoveredControl = $0 ? symbol : nil }
+        .animation(NotchStyle.hover, value: isHovered)
         .accessibilityLabel(symbol)
     }
 
@@ -198,7 +227,7 @@ struct NotchPanelView: View {
         // music stops.
         Text(Strings.text(.notchNothingPlaying))
             .font(.system(size: 12))
-            .foregroundStyle(.white.opacity(0.40))
+            .foregroundStyle(NotchStyle.mutedForeground)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -236,25 +265,25 @@ struct NotchPanelView: View {
                 // A toy whose artwork is missing is still one that can be put
                 // out; an empty tile is a button nobody can aim at.
                 Image(systemName: "circle.dashed").resizable().scaledToFit()
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(NotchStyle.mutedForeground)
             }
         }
         .frame(width: 20, height: 20)
         .padding(7)
         .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: NotchStyle.radiusSmall, style: .continuous)
                 // Three states worth telling apart, and only three: out,
                 // about to be touched, and neither.
-                .fill(.white.opacity(isOut ? 0.20 : (isHovered ? 0.11 : 0.06)))
+                .fill(isOut ? NotchStyle.surfaceActive : (isHovered ? NotchStyle.surfaceHovered : NotchStyle.surface))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(.white.opacity(isOut ? 0.28 : 0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: NotchStyle.radiusSmall, style: .continuous)
+                .strokeBorder(isOut ? NotchStyle.borderActive : NotchStyle.border, lineWidth: 1)
         }
         // A toy going out or coming back is the tile's own news, so it is
         // worth a beat rather than a jump.
-        .animation(.easeOut(duration: 0.14), value: isOut)
-        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .animation(NotchStyle.stateChange, value: isOut)
+        .animation(NotchStyle.hover, value: isHovered)
     }
 
     private var promptField: some View {
@@ -262,28 +291,28 @@ struct NotchPanelView: View {
             TextField(Strings.text(.bubblePlaceholder), text: $prompt)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
-                .foregroundStyle(.white)
+                .foregroundStyle(NotchStyle.foreground)
                 .focused($isPromptFocused)
                 .onSubmit(send)
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(canSend ? .black : .white.opacity(0.35))
+                    .foregroundStyle(canSend ? .black : NotchStyle.subtleForeground)
                     .frame(width: 20, height: 20)
                     .background {
-                        Circle().fill(canSend ? .white : .white.opacity(0.10))
+                        Circle().fill(canSend ? NotchStyle.foreground : NotchStyle.surface)
                     }
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
-            .animation(.easeOut(duration: 0.12), value: canSend)
+            .animation(NotchStyle.hover, value: canSend)
             .accessibilityLabel(Strings.text(.bubblePlaceholder))
         }
         .padding(.leading, 12)
         .padding(.trailing, 5)
         .frame(height: 30)
-        .background { Capsule().fill(.white.opacity(0.08)) }
-        .overlay { Capsule().strokeBorder(.white.opacity(0.10), lineWidth: 1) }
+        .background { Capsule().fill(NotchStyle.surface) }
+        .overlay { Capsule().strokeBorder(NotchStyle.border, lineWidth: 1) }
         // Focused when the panel appears: the pointer is already here, and a
         // field you have to click first is a field you may as well not have.
         .onAppear { isPromptFocused = true }

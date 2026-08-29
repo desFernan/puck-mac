@@ -21,10 +21,17 @@
 //  bowl for a bottom, and keeping the radius fixed makes an open panel look
 //  like a slab. It is interpolated between the two.
 //
-//  It is not flat black. Real black on an OLED-ish dark desktop is a hole;
-//  what sells it is that the top edge picks up a little light from the bezel
-//  and the body falls away below it, so the thing has a surface. The same
-//  reading the island's glass gets in PetTankView, at a tenth the strength.
+//  Closed, it is not flat black. Real black on an OLED-ish dark desktop is a
+//  hole; what sells a closed notch is that its top edge picks up a little
+//  light from the bezel and the body falls away below it, so the thing has a
+//  surface. The same reading the island's glass gets in PetTankView, at a
+//  tenth the strength.
+//
+//  Open, that light comes off. It is there to make a small dark shape read as
+//  part of the machine, and on a panel five times the depth the same gradient
+//  is just a bright streak across the top of a window -- the very thing that
+//  makes a panel look like a box drawn on the screen rather than something
+//  the screen opened up.
 //
 
 import SwiftUI
@@ -50,6 +57,13 @@ struct NotchShell<Content: View>: View {
     }
     /// An open panel's, in points.
     static var openCornerRadius: CGFloat { 22 }
+
+    /// How strongly the top edge catches the bezel's light.
+    ///
+    /// Only while closed. Scaled off as it opens rather than switched, so the
+    /// light leaves with the shape it belonged to instead of blinking out
+    /// part way through.
+    static func topLightOpacity(isOpen: Bool) -> CGFloat { isOpen ? 0 : 1 }
 
     private var size: CGSize {
         isOpen
@@ -89,13 +103,15 @@ struct NotchShell<Content: View>: View {
                             endPoint: .bottom
                         )
                     )
+                    .opacity(Self.topLightOpacity(isOpen: isOpen))
                 }
-                // The lit rim itself, and the thickness under it. Only worth
-                // drawing once it is open -- on a 30pt closed notch the two
-                // lines are the whole shape.
                 .overlay {
+                    // The rim, which stays: it is what gives the open panel
+                    // an edge rather than letting it bleed into the desktop.
+                    // Only worth drawing once open -- on a 30pt closed notch
+                    // the two lines are the whole shape.
                     shape
-                        .strokeBorder(.white.opacity(isOpen ? 0.10 : 0), lineWidth: 1)
+                        .strokeBorder(isOpen ? NotchStyle.border : .clear, lineWidth: 1)
                 }
                 .frame(width: size.width, height: size.height)
                 // Hung from the top edge, which is the one that does not

@@ -50,7 +50,12 @@ final class NotchPanelController {
         panel.setFrame(NotchPanelGeometry.windowFrame(notch: notchAppKitRect), display: true)
         panel.orderFrontRegardless()
         window = panel
-        setOpen(false)
+        // Reasserted rather than left to setOpen: the panel may already have
+        // been shut, and the notch it is shut around has just changed size.
+        isOpen = false
+        hosting?.rootView = shell(isOpen: false)
+        hoverView?.activeRect = activeRect(isOpen: false)
+        music.stop()
     }
 
     func stop() {
@@ -81,7 +86,13 @@ final class NotchPanelController {
 
         let hover = NotchHoverView(frame: .zero)
         hover.autoresizingMask = [.width, .height]
-        hover.onHoverChanged = { [weak self] isInside in self?.setOpen(isInside) }
+        hover.onPointerMoved = { [weak self] cursor in
+            guard let self else { return }
+            guard let cursor else { return self.setOpen(false) }
+            self.setOpen(NotchPanelGeometry.shouldBeOpen(
+                cursor: cursor, notch: self.notch, isOpen: self.isOpen
+            ))
+        }
         panel.contentView = hover
         hoverView = hover
 
@@ -94,7 +105,11 @@ final class NotchPanelController {
         return panel
     }
 
+    /// Every pointer move asks for a state, and most of them ask for the one
+    /// it is already in. Rebuilding the SwiftUI tree and restarting the
+    /// music timer on each of those would be a redraw per mouse move.
     private func setOpen(_ open: Bool) {
+        guard open != isOpen else { return }
         isOpen = open
         hosting?.rootView = shell(isOpen: open)
         // What the pointer can touch follows what is drawn: the notch alone

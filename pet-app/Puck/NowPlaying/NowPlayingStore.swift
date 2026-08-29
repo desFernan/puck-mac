@@ -24,7 +24,10 @@ final class NowPlayingStore: ObservableObject {
     @Published private(set) var artwork: NSImage?
 
     /// Injected so tests can answer without a music app or a network.
-    var read: () -> NowPlaying? = { NowPlayingReader.read() }
+    /// Answers with the cover too when whatever answered had one, which the
+    /// system route does: fetching it separately would be a second shell-out
+    /// for a picture already in hand.
+    var read: () -> (track: NowPlaying, artwork: Data?)? = { NowPlayingReader.read() }
     var fetchLyrics: (NowPlaying) async -> SyncedLyrics? = { await LyricsClient().lyrics(for: $0) }
     var fetchArtwork: (NowPlaying) -> NSImage? = { track in
         MusicApps.artwork(for: track.source).flatMap(NSImage.init(data:))
@@ -80,6 +83,10 @@ final class NowPlayingStore: ObservableObject {
         guard let source = track?.source else { return }
         Task.detached(priority: .userInitiated) {
             switch source {
+            case .system:
+                // Whatever is playing, told through the same route it was
+                // found on.
+                MediaRemoteReader.send(command.systemCommand)
             case .browser:
                 // A browser takes no orders, only keystrokes.
                 MediaKeys.send(command.mediaKey)
@@ -104,15 +111,15 @@ final class NowPlayingStore: ObservableObject {
         let mine = generation
         let read = read
         Task.detached(priority: .utility) {
-            let track = read()
+            let answer = read()
             await MainActor.run {
                 guard mine == self.generation else { return }
-                self.apply(track)
+                self.apply(answer?.track, cover: answer?.artwork)
             }
         }
     }
 
-    private func apply(_ new: NowPlaying?) {
+    private func apply(_ new: NowPlaying?, cover: Data?) {
         let changed = !(new?.isSameTrack(as: track) ?? (new == nil && track == nil))
         track = new
         guard changed else { return }
@@ -123,6 +130,11 @@ final class NowPlayingStore: ObservableObject {
         lyricsTask?.cancel()
         artworkTask?.cancel()
         guard let new, !new.title.isEmpty else { return }
+        // Already in hand, so there is nothing to go and fetch.
+        if let cover, let image = NSImage(data: cover) {
+            artwork = image
+            return
+        }
         artworkTask = Task { [fetchArtwork] in
             let image = await Task.detached(priority: .utility) { fetchArtwork(new) }.value
             guard !Task.isCancelled else { return }

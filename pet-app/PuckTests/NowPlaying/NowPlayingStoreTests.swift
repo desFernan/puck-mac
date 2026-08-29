@@ -23,7 +23,7 @@ final class NowPlayingStoreTests: XCTestCase {
     /// The words follow the clock.
     func test_theLyricShownIsTheOneBeingSung() async {
         let store = NowPlayingStore()
-        store.read = { self.track("한 곡", position: 45) }
+        store.read = { (self.track("한 곡", position: 45), nil) }
         store.fetchLyrics = { _ in self.words }
 
         store.start()
@@ -35,7 +35,7 @@ final class NowPlayingStoreTests: XCTestCase {
     /// A song with nothing in the index still shows: most music is not in it.
     func test_aSongWithNoWordsStillPlays() async {
         let store = NowPlayingStore()
-        store.read = { self.track("색인에 없는 곡") }
+        store.read = { (self.track("색인에 없는 곡"), nil) }
         store.fetchLyrics = { _ in nil }
 
         store.start()
@@ -50,7 +50,7 @@ final class NowPlayingStoreTests: XCTestCase {
     func test_theIndexIsAskedOncePerSongRatherThanPerTick() async {
         let store = NowPlayingStore()
         var position: TimeInterval = 0
-        store.read = { self.track("한 곡", position: position) }
+        store.read = { (self.track("한 곡", position: position), nil) }
         let asked = Counter()
         store.fetchLyrics = { _ in await asked.bump(); return self.words }
 
@@ -70,7 +70,7 @@ final class NowPlayingStoreTests: XCTestCase {
     /// song's words landing over the new one is worse than none.
     func test_wordsThatArriveLateForAnOldSongAreDropped() async {
         let store = NowPlayingStore()
-        store.read = { self.track("첫 곡") }
+        store.read = { (self.track("첫 곡"), nil) }
         store.fetchLyrics = { asked in
             // Slow enough that the song changes underneath it.
             try? await Task.sleep(nanoseconds: 120_000_000)
@@ -80,7 +80,7 @@ final class NowPlayingStoreTests: XCTestCase {
         store.start()
         // The song changes while the index is still being asked about the
         // first one.
-        store.read = { self.track("둘째 곡") }
+        store.read = { (self.track("둘째 곡"), nil) }
         store.refresh()
         await settle(store, seconds: 0.4)
 

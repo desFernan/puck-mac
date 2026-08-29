@@ -95,4 +95,36 @@ final class NotchPanelGeometryTests: XCTestCase {
         // Wider than the widest hardware notch by a clear margin.
         XCTAssertGreaterThan(NotchPanelGeometry.openWidth, 220)
     }
+
+    /// The reported fault: shut, the panel opened from most of the width of
+    /// the open panel -- the size it is not. Arriving is measured against the
+    /// notch, and a point outside the notch is not arriving at it however
+    /// much of the open panel would cover it.
+    func testAPointOutsideTheNotchDoesNotOpenAShutPanel() {
+        let notch = CGRect(x: 1628, y: 1400, width: 185, height: 34)
+        // Inside the open panel's width, well outside the notch's.
+        let beside = CGPoint(x: notch.maxX + 60, y: notch.midY)
+
+        XCTAssertTrue(NotchPanelGeometry.windowFrame(notch: notch).contains(beside),
+                      "the point has to be one the open panel would cover, or this proves nothing")
+        XCTAssertFalse(NotchPanelGeometry.shouldBeOpen(cursor: beside, notch: notch, isOpen: false))
+    }
+
+    /// The same point keeps an already-open panel open, which is the
+    /// hysteresis this pair exists for.
+    func testTheSamePointKeepsAnOpenPanelOpen() {
+        let notch = CGRect(x: 1628, y: 1400, width: 185, height: 34)
+        let beside = CGPoint(x: notch.maxX + 60, y: notch.midY)
+
+        XCTAssertTrue(NotchPanelGeometry.shouldBeOpen(cursor: beside, notch: notch, isOpen: true))
+    }
+
+    /// Pointing at the notch itself opens it, which is the whole feature.
+    func testPointingAtTheNotchOpensIt() {
+        let notch = CGRect(x: 1628, y: 1400, width: 185, height: 34)
+
+        XCTAssertTrue(NotchPanelGeometry.shouldBeOpen(
+            cursor: CGPoint(x: notch.midX, y: notch.midY), notch: notch, isOpen: false
+        ))
+    }
 }

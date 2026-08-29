@@ -23,6 +23,9 @@ final class NowPlayingReaderTests: XCTestCase {
     private func sources() -> NowPlayingReader.Sources {
         var sources = NowPlayingReader.Sources()
         sources.runningApps = { ["com.google.Chrome"] }
+        // The system route is covered on its own; these cases are about what
+        // happens when it has nothing to say.
+        sources.system = { nil }
         return sources
     }
 
@@ -33,7 +36,7 @@ final class NowPlayingReaderTests: XCTestCase {
         sources.appsMakingSound = { self.chromeSound }
         sources.browserTitle = { _ in "Radiohead - Creep - YouTube" }
 
-        XCTAssertEqual(NowPlayingReader.read(using: sources)?.title, "앱에서 나오는 곡")
+        XCTAssertEqual(NowPlayingReader.read(using: sources)?.track.title, "앱에서 나오는 곡")
     }
 
     /// What you can hear is what the panel should be about: a paused music
@@ -44,7 +47,7 @@ final class NowPlayingReaderTests: XCTestCase {
         sources.appsMakingSound = { self.chromeSound }
         sources.browserTitle = { _ in "Radiohead - Creep - YouTube" }
 
-        let read = NowPlayingReader.read(using: sources)
+        let read = NowPlayingReader.read(using: sources)?.track
 
         XCTAssertEqual(read?.title, "Creep")
         XCTAssertEqual(read?.artist, "Radiohead")
@@ -59,7 +62,7 @@ final class NowPlayingReaderTests: XCTestCase {
         sources.appsMakingSound = { [] }
         sources.browserTitle = { _ in "Radiohead - Creep - YouTube" }
 
-        XCTAssertEqual(NowPlayingReader.read(using: sources)?.title, "앱에서 나오는 곡")
+        XCTAssertEqual(NowPlayingReader.read(using: sources)?.track.title, "앱에서 나오는 곡")
     }
 
     /// With nothing audible at all, what is cued up beats showing nothing.
@@ -69,7 +72,7 @@ final class NowPlayingReaderTests: XCTestCase {
         sources.appsMakingSound = { [] }
         sources.browserTitle = { _ in nil }
 
-        XCTAssertEqual(NowPlayingReader.read(using: sources)?.isPlaying, false)
+        XCTAssertEqual(NowPlayingReader.read(using: sources)?.track.isPlaying, false)
     }
 
     /// A browser knows a name, never a playhead, so the panel must not be
@@ -80,7 +83,7 @@ final class NowPlayingReaderTests: XCTestCase {
         sources.appsMakingSound = { self.chromeSound }
         sources.browserTitle = { _ in "Some Song - YouTube" }
 
-        let read = NowPlayingReader.read(using: sources)
+        let read = NowPlayingReader.read(using: sources)?.track
 
         XCTAssertEqual(read?.source.reportsPosition, false)
         XCTAssertEqual(read?.duration, 0)

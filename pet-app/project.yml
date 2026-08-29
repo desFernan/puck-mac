@@ -92,6 +92,14 @@ targets:
       - path: Puck/Resources/Toys
         type: folder
         buildPhase: resources
+      # Folder reference, not a group: the framework has to keep its
+      # Versions/A/... layout in the bundle or perl cannot load it, and a
+      # group would flatten the whole thing into Resources/. Carried rather
+      # than linked -- Puck never calls into it. See
+      # Vendor/MediaRemoteAdapter/README.md for what it is and why.
+      - path: Vendor/MediaRemoteAdapter
+        type: folder
+        buildPhase: resources
     info:
       path: Puck/Resources/Info.plist
       properties:

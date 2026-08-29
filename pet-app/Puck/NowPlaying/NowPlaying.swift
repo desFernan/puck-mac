@@ -33,9 +33,14 @@ struct NowPlaying: Equatable {
     enum Source: Equatable {
         case music
         case spotify
-        /// Anything playing in a browser. Carries which browser, so the tab
-        /// is read from the one actually making the sound.
+        /// Anything playing in a browser, found by catching it making a
+        /// sound and reading its front tab. Only used when the system route
+        /// is unavailable -- see NowPlayingReader.
         case browser(Browser)
+        /// Whatever the system says is playing, whichever app that is.
+        /// Carries the app so the panel can name it and the transport can
+        /// reach it.
+        case system(bundleIdentifier: String, name: String)
 
         /// The apps that can be asked outright what they are playing, in the
         /// order they should be asked. A browser is not among them -- it has
@@ -48,6 +53,7 @@ struct NowPlaying: Equatable {
             case .music: return "Music"
             case .spotify: return "Spotify"
             case .browser(let browser): return browser.applicationName
+            case .system(_, let name): return name
             }
         }
 
@@ -56,6 +62,16 @@ struct NowPlaying: Equatable {
         var reportsPosition: Bool {
             if case .browser = self { return false }
             return true
+        }
+
+        /// Whether the panel should say where this came from. Worth saying
+        /// for anything but the two apps asked by name, because the whole
+        /// point of the system route is that it could be anything.
+        var isWorthNaming: Bool {
+            switch self {
+            case .music, .spotify: return false
+            case .browser, .system: return true
+            }
         }
     }
 

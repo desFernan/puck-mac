@@ -60,6 +60,14 @@ enum MusicApps {
 
         /// The same instruction as a keystroke, for anything that cannot be
         /// told outright.
+        var systemCommand: MediaRemoteReader.Command {
+            switch self {
+            case .playPause: return .playPause
+            case .next: return .next
+            case .previous: return .previous
+            }
+        }
+
         var mediaKey: MediaKeys.Key {
             switch self {
             case .playPause: return .playPause
@@ -154,6 +162,7 @@ extension NowPlaying.Source {
         case .music: return "com.apple.Music"
         case .spotify: return "com.spotify.client"
         case .browser: return nil
+        case .system(let identifier, _): return identifier
         }
     }
 }
@@ -181,8 +190,10 @@ extension MusicApps {
     /// track that simply has no art all land here.
     static func artwork(for source: NowPlaying.Source) -> Data? {
         switch source {
-        // A tab title is all a browser gives up; there is no cover behind it.
-        case .browser:
+        // A tab title is all a browser gives up; there is no cover behind
+        // it. The system route brings its own artwork with the track, so it
+        // never reaches here either.
+        case .browser, .system:
             return nil
         case .spotify:
             // Spotify keeps its covers on the web and hands out the address,
