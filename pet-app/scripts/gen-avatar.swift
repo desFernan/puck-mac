@@ -266,11 +266,11 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
     drawFace(c, cx, base + p.ry * 1.12, p)
     c.restoreGState()  // lean
 
-    for i in 0..<p.drops {
+    for i in 0..<(measuringFit ? 0 : p.drops) {
         fill(c, teardrop(cx + p.rx * 0.92 + CGFloat(i) * 16,
                          base + p.ry * 1.5 - CGFloat(i) * 22, 13), tear)
     }
-    if p.wind {
+    if p.wind, !measuringFit {
         for (i, y) in [0.4, 0.85, 1.3].enumerated() {
             let len: CGFloat = 34 - CGFloat(i) * 6
             for s in [-1.0, 1.0] as [CGFloat] {
@@ -280,27 +280,27 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
             }
         }
     }
-    if p.dust {
+    if p.dust, !measuringFit {
         for s in [-1.0, 1.0] as [CGFloat] {
             fill(c, ellipse(cx + (p.rx + 22) * s, base + 12, 15, 11), rgb(0x9A, 0x92, 0xC0, 0.6))
             fill(c, ellipse(cx + (p.rx + 44) * s, base + 26, 9, 7), rgb(0x9A, 0x92, 0xC0, 0.42))
         }
     }
-    if p.bubbles {
+    if p.bubbles, !measuringFit {
         for (i, r) in [7.0, 10.0, 14.0].enumerated() {
             let b = ellipse(cx + p.rx * 0.75 + CGFloat(i) * 22,
                             base + p.ry * 1.7 + CGFloat(i) * 24, CGFloat(r), CGFloat(r))
             fill(c, b, rgb(0xFF, 0xFF, 0xFF, 0.85)); stroke(c, b, 4)
         }
     }
-    if p.notes {
+    if p.notes, !measuringFit {
         for (i, dy) in [0.0, 34.0].enumerated() {
             let x = cx + p.rx * 0.9 + CGFloat(i) * 30, y = base + p.ry * 1.75 + dy
             fill(c, ellipse(x, y, 11, 8), ink)
             stroke(c, line(x + 10, y + 2, x + 10, y + 36), 5)
         }
     }
-    if p.spark {
+    if p.spark, !measuringFit {
         fill(c, star(cx, base + p.ry * 2.35, 26, 10), rgb(0xFF, 0xD9, 0x6B))
         stroke(c, star(cx, base + p.ry * 2.35, 26, 10), 6)
     }
@@ -310,6 +310,20 @@ func drawPet(_ c: CGContext, _ w: CGFloat, _ h: CGFloat, _ p: Pose) {
 /// Set once by the fit pass below.
 var fitScale: CGFloat = 1
 var fitShift: CGFloat = 0
+
+/// True only during the dry run that picks the scale.
+///
+/// The scale has to be one number for the whole pack, or the pet changes size
+/// when its face does. Measured over everything drawn, that number is set by
+/// whichever pose flings a sweat drop furthest -- and the character itself
+/// then fills a little over half the frame. The app fits the image into a
+/// fixed layer, so half a frame of art is a pet at half size with a hit area
+/// to match, which is what made the new pack hard to grab.
+///
+/// So the decorations sit out the measurement. They are drawn at full size
+/// like everything else; they just do not get a vote on how big the pet is,
+/// and may reach into the padding.
+var measuringFit = false
 
 // MARK: output
 
@@ -391,6 +405,8 @@ let PAD: CGFloat = 40
 // One scale for the whole pack, measured from the poses themselves, so the
 // ground line holds and the pet does not resize between expressions.
 do {
+    measuringFit = true
+    defer { measuringFit = false }
     let pw = 900, ph = 900
     var minX = pw, minY = ph, maxX = 0, maxY = 0
     for (name, pose) in pack {
