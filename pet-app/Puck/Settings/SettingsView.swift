@@ -149,6 +149,7 @@ struct SettingsView: View {
                     if sections.contains(.live) {
                         avatarSection
                         toySection
+                        muteSection
                     }
                     if sections.contains(.setOnce) {
                         soundSection
@@ -243,17 +244,33 @@ struct SettingsView: View {
         }
     }
 
-    private var soundSection: some View {
+    /// Mute alone, in the panel.
+    ///
+    /// The rest of the sound settings are set once and left, which is what
+    /// moved them to the window; mute is the one that gets reached for while
+    /// something is playing, and a toggle two clicks and a window away is a
+    /// toggle nobody uses. So it sits with the other live controls.
+    ///
+    /// Here and *only* here, deliberately. The window is kept between opens
+    /// rather than rebuilt, so a second switch over there would hold whatever
+    /// `store.isMuted` was when the window was first built and show the wrong
+    /// state the moment this one is used.
+    private var muteSection: some View {
         SettingsSection(title: text(.tabSound)) {
-            SettingsStackedRow(label: text(.volumeLabel)) {
-                Slider(value: $volume, in: 0...1)
-                    .onChange(of: volume) { _, newValue in store.volume = Float(newValue) }
-            }
             SettingsRow(label: text(.muteLabel)) {
                 Toggle("", isOn: $isMuted)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .onChange(of: isMuted) { _, newValue in store.isMuted = newValue }
+            }
+        }
+    }
+
+    private var soundSection: some View {
+        SettingsSection(title: text(.tabSound)) {
+            SettingsStackedRow(label: text(.volumeLabel)) {
+                Slider(value: $volume, in: 0...1)
+                    .onChange(of: volume) { _, newValue in store.volume = Float(newValue) }
             }
             SettingsRow(label: text(.autoMuteLabel)) {
                 Toggle("", isOn: $autoMuteOnFocus)
