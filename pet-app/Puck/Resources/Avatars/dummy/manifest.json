@@ -40,24 +40,5 @@
     "cheerful": "sunny",
     "shy": "bashful",
     "shadow": "spooked"
-  },
-  "sounds": {
-    "fall": "sounds/dont-put-me-down.wav",
-    "land": "sounds/waah.wav",
-    "point": "sounds/eh.wav",
-    "react_click": "sounds/eh-eu.wav",
-    "react_drag": "sounds/dont-pull-my-hair.wav",
-    "pet": "sounds/yay-yay.wav",
-    "spin": "sounds/hide-and-seek.wav",
-    "kick": "sounds/yay-yay-single.wav",
-    "kick_pumpkin": "sounds/pumpkin-love.wav",
-    "kick_wand": "sounds/mopping.wav",
-    "chatter_hide_and_seek": "sounds/hide-and-seek.wav",
-    "chatter_mopping": "sounds/mopping.wav",
-    "chatter_yay_yay": "sounds/yay-yay.wav",
-    "app_launch": "sounds/yay-yay-single.wav",
-    "task_success": "sounds/yay.wav",
-    "task_fail": "sounds/i-tried-hard.wav",
-    "listen_start": "sounds/speaki-speaki.wav"
   }
 }

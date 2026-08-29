@@ -38,9 +38,15 @@ final class StateSoundKeyTests: XCTestCase {
 
     /// The keys the states above ask for have to exist in the shipped avatar,
     /// or the whole wiring is silent in the app while green in tests.
+    ///
+    /// Skipped while the shipped pack carries no sounds at all, which it does
+    /// deliberately -- the ones it had were third party and went with the rest
+    /// of that artwork. This comes back the moment the pack names a sound
+    /// again, which is exactly when it is worth checking.
     func test_dummyManifest_mapsTheKeysTheStatesAskFor() throws {
         let manifestURL = RepositorySources.url("Resources/Avatars/dummy/manifest.json")
         let manifest = try JSONDecoder().decode(AvatarManifest.self, from: Data(contentsOf: manifestURL))
+        try XCTSkipIf(manifest.sounds.isEmpty, "the shipped pack ships no sounds yet")
         let table = SoundTable(
             avatarDirectory: manifestURL.deletingLastPathComponent(),
             sounds: manifest.sounds
