@@ -35,13 +35,13 @@ final class NowPlayingStore: ObservableObject {
 
     /// How often the player is asked, while the panel is open. A second is
     /// enough for a progress bar and a lyric line to look live.
-    static let interval: TimeInterval = 1
+    nonisolated static let interval: TimeInterval = 1
 
     /// And while it is shut. The shut notch shows a thumbnail and whether
     /// anything is playing -- neither of which changes between songs -- so
     /// asking every second for it would be paying an open panel's price all
     /// day for something nobody is reading.
-    static let idleInterval: TimeInterval = 4
+    nonisolated static let idleInterval: TimeInterval = 4
 
     /// Which of the two is running, so a change of pace restarts the timer
     /// rather than being noticed on the next tick or not at all.

@@ -55,7 +55,12 @@ final class NowPlayingStoreTests: XCTestCase {
         store.fetchLyrics = { _ in await asked.bump(); return self.words }
 
         store.start()
-        await settle(store)
+        // Waited for rather than slept past: the first read and its fetch
+        // are two hops through the concurrency machinery, and a fixed sleep
+        // that is long enough on an idle machine is not long enough on a
+        // busy one. Sleeping longer only moves the flake.
+        await waitUntil { await asked.value == 1 }
+
         for _ in 0..<4 {
             position += 10
             store.refresh()
@@ -63,7 +68,7 @@ final class NowPlayingStoreTests: XCTestCase {
         }
 
         let count = await asked.value
-        XCTAssertEqual(count, 1)
+        XCTAssertEqual(count, 1, "the index was asked again for a song that had not changed")
     }
 
     /// The song can change while the index is being asked, and the previous
@@ -103,6 +108,23 @@ final class NowPlayingStoreTests: XCTestCase {
 
     private func settle(_ store: NowPlayingStore, seconds: TimeInterval = 0.2) async {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+    }
+
+    /// Polls until `condition` holds or the deadline passes, so a test that
+    /// is waiting for work on another thread says how long it is willing to
+    /// wait rather than guessing how long the work takes.
+    private func waitUntil(
+        timeout: TimeInterval = 5,
+        _ condition: () async -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if await condition() { return }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("timed out waiting", file: file, line: line)
     }
 
     /// Counts across the actor hop the fetch makes.
