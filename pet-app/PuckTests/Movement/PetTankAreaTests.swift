@@ -169,23 +169,36 @@ final class PetTankAreaTests: XCTestCase {
     ///
     /// Asked of the *smallest* the island can be dragged to, since that is
     /// the one a person can reach and the one the default no longer protects.
+    /// The pet is fitted to the island rather than demanding a height of it,
+    /// so what has to hold is that the *fitted* pet fits -- at the smallest
+    /// the island can be dragged to, which is the one a person can reach.
+    ///
+    /// Asserting the raw height asked for instead pinned the island's minimum
+    /// to it, so making the pet bigger anywhere meant making the smallest
+    /// island bigger too, whether or not the pet ever needed that much.
     func test_theIslandIsTallEnoughForThePetThatLivesOnIt() {
-        let petHeight = TankResidency.defaultPetHeight
-        XCTAssertGreaterThanOrEqual(
-            PetTankView.minimumIslandHeight,
-            petHeight,
-            "an island the pet does not fit in is refused, and that looks like the pet refusing to come home"
+        // Square-ish is the worst case for the width rule; the bundled avatar
+        // is close to square.
+        let declared = CGSize(width: 130, height: 133)
+        let island = CGSize(width: 600, height: PetTankView.minimumIslandHeight)
+        var residency = TankResidency()
+        residency.lastReportedSize = island
+
+        let fitted = AvatarStandardSize.size(
+            hitbox: declared,
+            scale: CGFloat(residency.scale(forPetOfSize: declared))
         )
 
-        let accepted = PetTankArea.roamableArea(
-            fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(PetTankView.minimumIslandHeight)),
-            overlayOriginInQuartz: .zero,
-            overlaySize: CGSize(width: 1440, height: 900),
-            // Square-ish is the worst case for the width rule; the bundled
-            // avatar is 130x133, so its width at this height is close to it.
-            petSize: CGSize(width: petHeight, height: petHeight)
+        XCTAssertLessThanOrEqual(fitted.height, island.height, "the pet is taller than the shelf")
+        XCTAssertNotNil(
+            PetTankArea.roamableArea(
+                fromWire: BridgeRect(x: 0, y: 0, width: 600, height: Double(island.height)),
+                overlayOriginInQuartz: .zero,
+                overlaySize: CGSize(width: 1440, height: 900),
+                petSize: fitted
+            ),
+            "the island as drawn has to be a usable world"
         )
-        XCTAssertNotNil(accepted, "the island as drawn has to be a usable world")
     }
 
     /// The handle cannot be dragged past either end into a size that is not a

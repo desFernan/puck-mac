@@ -24,11 +24,28 @@ final class TankResidencyTests: XCTestCase {
         return residency
     }
 
-    /// A tank with room gives the height that was asked for.
-    func test_aTankWithRoomGivesTheHeightAsked() {
-        let scale = tank(CGSize(width: 900, height: 90)).scale(forPetOfSize: pet)
+    /// The height the pet is actually *drawn* at, which is the app's
+    /// standard times this scale -- not the manifest's own numbers times it.
+    /// Asserting the latter is what let the two part company: the renderer
+    /// moved to a standard height, this kept answering in the package's
+    /// units, and the pet swam around a fraction of the size the island had
+    /// made room for while every test here passed.
+    private func drawnHeight(_ scale: Double) -> CGFloat {
+        AvatarStandardSize.size(hitbox: pet, scale: CGFloat(scale)).height
+    }
 
-        XCTAssertEqual(CGFloat(scale) * pet.height, TankResidency.defaultPetHeight, accuracy: 0.0001)
+    private func drawnWidth(_ scale: Double) -> CGFloat {
+        AvatarStandardSize.size(hitbox: pet, scale: CGFloat(scale)).width
+    }
+
+    /// A tank with room gives the height that was asked for. "With room"
+    /// means taller than the ask -- a tank shorter than it is testing the
+    /// cap, which is the test below.
+    func test_aTankWithRoomGivesTheHeightAsked() {
+        let roomy = CGSize(width: 2000, height: TankResidency.defaultPetHeight + 50)
+        let scale = tank(roomy).scale(forPetOfSize: pet)
+
+        XCTAssertEqual(drawnHeight(scale), TankResidency.defaultPetHeight, accuracy: 0.0001)
     }
 
     /// The width is what usually binds: a tank has to be two pets across
@@ -41,7 +58,7 @@ final class TankResidencyTests: XCTestCase {
         XCTAssertLessThan(narrow, wide)
         XCTAssertGreaterThan(narrow, 0, "sized down, not refused")
         XCTAssertLessThanOrEqual(
-            CGFloat(narrow) * pet.width * PetTankArea.minimumWidthInPets,
+            drawnWidth(narrow) * PetTankArea.minimumWidthInPets,
             120.0001,
             "two of the pet at this scale must still fit across"
         )
@@ -51,7 +68,7 @@ final class TankResidencyTests: XCTestCase {
     func test_aShortTankGivesTheHeightItHas() {
         let scale = tank(CGSize(width: 900, height: 40)).scale(forPetOfSize: pet)
 
-        XCTAssertEqual(CGFloat(scale) * pet.height, 40, accuracy: 0.0001)
+        XCTAssertEqual(drawnHeight(scale), 40, accuracy: 0.0001)
     }
 
     /// Before the client has reported anything there is nothing to fit to,
@@ -59,7 +76,7 @@ final class TankResidencyTests: XCTestCase {
     func test_beforeAnyReportTheHeightAskedForIsTheAnswer() {
         let scale = tank(nil, petHeight: 50).scale(forPetOfSize: pet)
 
-        XCTAssertEqual(CGFloat(scale) * pet.height, 50, accuracy: 0.0001)
+        XCTAssertEqual(drawnHeight(scale), 50, accuracy: 0.0001)
     }
 
     /// No avatar yet -- which happens before one is installed and never while
@@ -74,5 +91,32 @@ final class TankResidencyTests: XCTestCase {
         let large = tank(CGSize(width: 900, height: 200), petHeight: 120).scale(forPetOfSize: pet)
 
         XCTAssertLessThan(small, large)
+    }
+
+    /// The reported fault, as a test: a package that declares a big hitbox
+    /// and one that declares a small one must be fitted to the same island
+    /// the same way, because neither number decides how big the pet is drawn.
+    func testTheFitDoesNotDependOnWhatThePackageClaims() {
+        let small = CGSize(width: 130, height: 133)
+        let large = CGSize(width: 251, height: 300)
+        let island = tank(CGSize(width: 900, height: 120))
+
+        let fromSmall = AvatarStandardSize.size(
+            hitbox: small, scale: CGFloat(island.scale(forPetOfSize: small))
+        ).height
+        let fromLarge = AvatarStandardSize.size(
+            hitbox: large, scale: CGFloat(island.scale(forPetOfSize: large))
+        ).height
+
+        XCTAssertEqual(fromSmall, fromLarge, accuracy: 0.0001)
+    }
+
+    /// An island with room to spare must actually use it. The height asked
+    /// for was low enough that the pet came out small in every island, not
+    /// just the cramped ones.
+    func testAnIslandWithRoomToSpareGetsABigPet() {
+        let roomy = tank(CGSize(width: 2000, height: 400)).scale(forPetOfSize: pet)
+
+        XCTAssertGreaterThanOrEqual(drawnHeight(roomy), 200)
     }
 }

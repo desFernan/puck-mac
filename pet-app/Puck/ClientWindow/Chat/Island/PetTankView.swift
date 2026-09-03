@@ -123,7 +123,13 @@ struct PetTankView: View {
     /// refused when it is shorter than the pet, so trimming 8pt off each end
     /// left 74 against an 80pt pet and the pet simply stayed on the desktop.
     /// The padding goes outside instead.
-    static let islandHeight: CGFloat = 90
+    ///
+    /// Tall enough that the pet living on it reads as the character it is
+    /// rather than a token. The pet is fitted to whatever room this leaves,
+    /// so this number *is* how big the pet comes out -- 90 gave a shelf you
+    /// had to lean in to see anything on, and the drag handle was the only
+    /// way to find that out.
+    static let islandHeight: CGFloat = 180
 
     /// The floor of the drag. Below this the pet no longer fits and the whole
     /// area is refused -- which looks like the pet refusing to come home, so

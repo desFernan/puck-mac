@@ -33,9 +33,9 @@ extension AppDelegate {
                 // asking what part of the island the overlay can draw on, and
                 // the island is a window's, not the desktop's.
                 overlaySize: window.frame.size,
-                petSize: CGSize(
-                    width: baseHitboxSize.width * self.tankScale,
-                    height: baseHitboxSize.height * self.tankScale
+                petSize: AvatarStandardSize.size(
+                    hitbox: baseHitboxSize,
+                    scale: CGFloat(self.tankScale)
                 )
             )
         }

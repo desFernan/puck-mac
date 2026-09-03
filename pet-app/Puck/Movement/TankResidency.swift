@@ -49,23 +49,34 @@ struct TankResidency {
     /// scale directly would just be overwritten by the next.
     var travelTargetScale: Double = 1
 
-    static let defaultPetHeight: CGFloat = 72
+    /// How tall the pet asks to be while it is living in the island.
+    ///
+    /// A ceiling, not a size: what it actually gets is this or whatever the
+    /// island can hold, whichever is less -- see PetTankArea.fittedPetHeight.
+    /// So this being low did not make the pet small in a small island, it
+    /// made it small in every island, including the ones with room to spare.
+    static let defaultPetHeight: CGFloat = 220
 
     /// The scale that puts the pet at `petHeight` -- or at whatever the tank
     /// can actually hold, when that is less.
     ///
     /// 1 when there is no avatar yet, which happens before one is installed
     /// and never while a move is running.
+    /// `base` is the manifest's hitbox, and only its shape is taken from it:
+    /// how tall the pet is drawn is the app's standard, not the package's
+    /// number. Dividing the fitted height by the package's own height -- as
+    /// this used to -- answers in units the renderer stopped using, and the
+    /// pet swam around a fraction of the size the island had made room for.
     func scale(forPetOfSize base: CGSize) -> Double {
         guard base.height > 0 else { return 1 }
         guard let lastReportedSize, base.width > 0 else {
-            return Double(petHeight / base.height)
+            return AvatarStandardSize.scale(forDrawnHeight: petHeight)
         }
         let fitted = PetTankArea.fittedPetHeight(
             desired: petHeight,
             tank: lastReportedSize,
             aspect: base.width / base.height
         )
-        return Double(fitted / base.height)
+        return AvatarStandardSize.scale(forDrawnHeight: fitted)
     }
 }

@@ -21,7 +21,11 @@ extension AppDelegate {
     /// state transition happens to move it.
     func applyLiveAvatarScale(_ scale: Double) {
         avatar?.updateScale(scale)
-        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+        // The drawn size, not the manifest's numbers times a scale: the
+        // two parted company when the renderer moved to a standard height,
+        // and a pet the movement system thinks is half the size it looks
+        // walks through things and stands off the floor.
+        avatarHitboxSize = AvatarStandardSize.size(hitbox: baseHitboxSize, scale: CGFloat(scale))
         characterController?.avatarHeight = avatarHitboxSize.height
         // Not `body.position = body.position` -- Swift rejects that as a
         // self-assignment, and CharacterBody's didSet wouldn't fire anyway.
