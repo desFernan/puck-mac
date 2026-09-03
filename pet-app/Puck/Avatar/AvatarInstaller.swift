@@ -12,11 +12,24 @@
 //  after cloning.
 //
 
+import CryptoKit
 import Foundation
 
 enum AvatarInstaller {
+    /// Who put the installed copy there.
+    ///
+    /// Recorded beside it, because "is this ours" is the only way to tell a
+    /// stale copy we seeded from an avatar the user chose -- and the two want
+    /// opposite treatment. Ours may be replaced; theirs may never be.
+    enum Origin: Equatable {
+        case bundled
+        case userImport
+    }
+
     enum Outcome: Equatable {
         case installed
+        /// Ours, and out of date: replaced with what the app now carries.
+        case replaced
         /// Something is already installed under that name — left untouched.
         case alreadyPresent
         /// The app bundle carries no package to seed at all (e.g. a build
@@ -31,11 +44,26 @@ enum AvatarInstaller {
     private static let lfsPointerPrefix = "version https://git-lfs.github.com/spec/v1"
 
     /// Copies `bundledPackage` to `intoAvatarsDirectory/<package name>` unless
-    /// something is already there. Never overwrites a real existing install:
-    /// the installed copy belongs to the user, who may have imported a real
-    /// avatar over it. A destination directory missing its manifest.json is
-    /// not a real install (a previous copy that died partway through) and is
-    /// repaired rather than left broken forever.
+    /// what is already there is the user's.
+    ///
+    /// An avatar the user imported is never touched. A copy this app seeded
+    /// is replaced when the app now carries a different one -- which it did
+    /// not used to do, and that turned out to matter: the bundled avatar was
+    /// withdrawn and replaced, and every machine that had already run the app
+    /// went on using the withdrawn one, because the installer saw a
+    /// manifest.json and stopped. Shipping a replacement is no use if it is
+    /// never installed.
+    ///
+    /// A copy with no marker beside it predates all of this. It is treated as
+    /// ours and replaced, which is the whole point -- those are the machines
+    /// still carrying the withdrawn package. The narrow cost is somebody who
+    /// imported an avatar of their own named exactly like the bundled one
+    /// before markers existed; they are asked to import it again, which is
+    /// the lesser of the two wrongs here.
+    ///
+    /// A destination directory missing its manifest.json is not a real
+    /// install (a previous copy that died partway through) and is repaired
+    /// rather than left broken forever.
     ///
     /// `overwriteExisting` is for the user-driven "Import Avatar Package…"
     /// flow (AvatarManagementView), which explicitly means to replace
@@ -46,7 +74,8 @@ enum AvatarInstaller {
     static func installIfNeeded(
         bundledPackage: URL,
         intoAvatarsDirectory avatarsDirectory: URL,
-        overwriteExisting: Bool = false
+        overwriteExisting: Bool = false,
+        origin: Origin = .bundled
     ) -> Outcome {
         let fileManager = FileManager.default
 
@@ -56,8 +85,20 @@ enum AvatarInstaller {
 
         let destination = avatarsDirectory.appendingPathComponent(bundledPackage.lastPathComponent, isDirectory: true)
         let destinationManifest = destination.appendingPathComponent("manifest.json")
-        guard overwriteExisting || !fileManager.fileExists(atPath: destinationManifest.path) else {
-            return .alreadyPresent
+        let isPresent = fileManager.fileExists(atPath: destinationManifest.path)
+        var replacing = false
+
+        if isPresent, !overwriteExisting {
+            switch marker(at: destination) {
+            case .some("user"):
+                return .alreadyPresent
+            case .some(let recorded) where recorded == seedMarker(for: bundledPackage):
+                return .alreadyPresent
+            default:
+                // Ours and stale, or from before markers existed. Either way
+                // the app carries something newer.
+                replacing = true
+            }
         }
 
         if let pointerFile = firstUnpulledLFSPointerFile(in: bundledPackage) {
@@ -68,10 +109,60 @@ enum AvatarInstaller {
             try? fileManager.removeItem(at: destination) // clear a partial/broken previous copy, if any
             try fileManager.createDirectory(at: avatarsDirectory, withIntermediateDirectories: true)
             try fileManager.copyItem(at: bundledPackage, to: destination)
-            return .installed
+            writeMarker(
+                origin == .userImport ? "user" : seedMarker(for: bundledPackage),
+                at: destination
+            )
+            return replacing ? .replaced : .installed
         } catch {
             return .failed(String(describing: error))
         }
+    }
+
+    // MARK: - Telling our copy from theirs
+
+    /// The file recording who put the installed package there. A dotfile, so
+    /// it is not mistaken for part of the avatar by anything listing it.
+    static let markerName = ".puck-origin"
+
+    /// What the bundled package looks like right now.
+    ///
+    /// Every file's name and length, plus the manifest itself. Names and
+    /// lengths rather than contents so seeding stays cheap on a package of
+    /// sprites, and both rather than the manifest alone -- artwork can be
+    /// replaced without a word of the manifest changing, which is exactly
+    /// what happened.
+    static func seedMarker(for package: URL) -> String {
+        let fileManager = FileManager.default
+        let entries = (try? fileManager.contentsOfDirectory(
+            at: package,
+            includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        let listing = entries
+            .filter { !$0.lastPathComponent.hasPrefix(".") }
+            .map { url -> String in
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                return "\(url.lastPathComponent):\(size)"
+            }
+            .sorted()
+            .joined(separator: "\n")
+        let digest = SHA256.hash(data: Data(listing.utf8))
+        return "bundled:" + digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func marker(at package: URL) -> String? {
+        try? String(
+            contentsOf: package.appendingPathComponent(markerName),
+            encoding: .utf8
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func writeMarker(_ value: String, at package: URL) {
+        try? value.write(
+            to: package.appendingPathComponent(markerName),
+            atomically: true,
+            encoding: .utf8
+        )
     }
 
     /// Scans the top level of `package` for a file whose content is a Git LFS

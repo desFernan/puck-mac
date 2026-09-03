@@ -51,21 +51,65 @@ final class AvatarInstallerTests: XCTestCase {
         XCTAssertTrue(isDirectory.boolValue, "the package layout must survive the copy")
     }
 
-    /// The installed copy is the user's — they may have swapped in a real
-    /// avatar via the import menu, or hand-edited the manifest. Re-seeding on
-    /// every launch would silently throw that away.
-    func test_doesNotOverwriteAnExistingInstall() throws {
-        try FileManager.default.createDirectory(
-            at: destinationRoot.appendingPathComponent("dummy", isDirectory: true),
-            withIntermediateDirectories: true
-        )
-        let userManifest = destinationRoot.appendingPathComponent("dummy/manifest.json")
-        try Data("{\"user\":true}".utf8).write(to: userManifest)
+    /// An avatar the user chose is theirs. They may have imported a real one
+    /// or hand-edited the manifest, and re-seeding on every launch would
+    /// silently throw that away.
+    func test_doesNotOverwriteAnAvatarTheUserImported() throws {
+        let userManifest = try writeExistingInstall(markedAs: "user")
 
         let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
 
         XCTAssertEqual(outcome, .alreadyPresent)
         XCTAssertEqual(try Data(contentsOf: userManifest), Data("{\"user\":true}".utf8))
+    }
+
+    /// A copy this app seeded is replaced when the app now carries a
+    /// different one. It did not used to be, and that turned out to matter:
+    /// the bundled avatar was withdrawn and replaced, and every machine that
+    /// had already run the app went on using the withdrawn one, because the
+    /// installer saw a manifest.json and stopped.
+    func test_replacesItsOwnStaleCopy() throws {
+        let manifest = try writeExistingInstall(markedAs: "bundled:something-older")
+
+        let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
+
+        XCTAssertEqual(outcome, .replaced)
+        XCTAssertNotEqual(try Data(contentsOf: manifest), Data("{\"user\":true}".utf8))
+    }
+
+    /// A copy with no marker beside it predates all of this -- which is
+    /// exactly the machines still carrying the withdrawn package.
+    func test_replacesACopyFromBeforeMarkersExisted() throws {
+        _ = try writeExistingInstall(markedAs: nil)
+
+        let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
+
+        XCTAssertEqual(outcome, .replaced)
+    }
+
+    /// And one that is already what the app carries is left alone, or every
+    /// launch would re-copy a package for nothing.
+    func test_leavesItsOwnCurrentCopyAlone() throws {
+        _ = try writeExistingInstall(markedAs: AvatarInstaller.seedMarker(for: bundled))
+
+        let outcome = AvatarInstaller.installIfNeeded(bundledPackage: bundled, intoAvatarsDirectory: destinationRoot)
+
+        XCTAssertEqual(outcome, .alreadyPresent)
+    }
+
+    /// An install that is already there, with `origin` recorded beside it or
+    /// not. Returns the manifest's URL so a caller can check whether it
+    /// survived.
+    @discardableResult
+    private func writeExistingInstall(markedAs origin: String?) throws -> URL {
+        let package = destinationRoot.appendingPathComponent("dummy", isDirectory: true)
+        try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
+        let manifest = package.appendingPathComponent("manifest.json")
+        try Data("{\"user\":true}".utf8).write(to: manifest)
+        if let origin {
+            try Data(origin.utf8).write(to: package.appendingPathComponent(AvatarInstaller.markerName))
+        }
+        return manifest
     }
 
     /// The bundle genuinely may not carry a package — usdz assets are Git LFS
