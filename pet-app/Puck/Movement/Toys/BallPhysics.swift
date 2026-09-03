@@ -75,6 +75,14 @@ enum BallPhysics {
     /// it, leaving a toy that creeps for ever and is never playable again.
     static let restingSpeed: CGFloat = 12
 
+    /// How much sideways speed the air takes each second, as a fraction.
+    ///
+    /// A hard flick used to cross the whole screen at the speed it left the
+    /// hand and only lose anything when it hit something. Small enough that a
+    /// gentle toss still travels, large enough that a violent one does not
+    /// arrive at the far wall as fast as it started.
+    static let airDrag: CGFloat = 0.6
+
     /// How far a resting toy may sit above its surface before it counts as
     /// having nothing underneath it. Absorbs the rounding of the landing
     /// itself, so a toy that just settled doesn't immediately re-fall.
@@ -150,7 +158,9 @@ enum BallPhysics {
 
             var next = state
             next.position = ceiling.position
-            next.horizontalVelocity = sideways.velocity
+            // The air, every frame, rather than only what a surface takes on
+            // contact.
+            next.horizontalVelocity = sideways.velocity * pow(1 - airDrag, CGFloat(dt))
             next.verticalVelocity = ceiling.velocity
             next.kickedElapsed = state.kickedElapsed + dt
 

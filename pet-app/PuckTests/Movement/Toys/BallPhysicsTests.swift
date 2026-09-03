@@ -400,4 +400,45 @@ final class BallRestingSurfaceTests: XCTestCase {
         XCTAssertLessThan(next.horizontalVelocity, 400)
         XCTAssertGreaterThan(next.horizontalVelocity, 0)
     }
+
+    // MARK: - Losing speed to the air
+
+    private var area: CGRect { CGRect(x: 0, y: 0, width: 1000, height: 800) }
+
+    /// A hard flick used to cross the whole screen at the speed it left the
+    /// hand, losing nothing until it hit something. Which way the toy is
+    /// turned is BallController's -- the orientation of every phase lives
+    /// there, and putting a second copy here is how the two come to disagree.
+    func testTheAirTakesSomeSpeed() {
+        var flung = BallState(position: CGPoint(x: 100, y: 100), phase: .kicked)
+        flung.horizontalVelocity = 1200
+        let openSky = CGRect(x: 0, y: 0, width: 100_000, height: 100_000)
+
+        var state = flung
+        for _ in 0..<60 { state = BallPhysics.step(state, dt: 1 / 60, landingY: 4000, roamableArea: openSky) }
+
+        XCTAssertLessThan(state.horizontalVelocity, flung.horizontalVelocity)
+        XCTAssertGreaterThan(state.horizontalVelocity, 0, "the air stops it, not a wall")
+    }
+
+    /// It slows the toy without turning it round, which a drag written as a
+    /// subtraction rather than a fraction would do at low speed.
+    func testTheAirNeverReversesTheToy() {
+        var slow = BallState(position: CGPoint(x: 100, y: 100), phase: .kicked)
+        slow.horizontalVelocity = 3
+        let openSky = CGRect(x: 0, y: 0, width: 100_000, height: 100_000)
+
+        var state = slow
+        for _ in 0..<600 { state = BallPhysics.step(state, dt: 1 / 60, landingY: 40_000, roamableArea: openSky) }
+
+        XCTAssertGreaterThanOrEqual(state.horizontalVelocity, 0)
+    }
+
+    /// A resting toy the physics has nothing to do with is left exactly as it
+    /// was, or it never stops producing new states for a toy nobody touched.
+    func testASettledToyIsLeftAlone() {
+        let still = BallState(position: CGPoint(x: 500, y: 700), phase: .resting)
+
+        XCTAssertEqual(BallPhysics.step(still, dt: 1 / 60, landingY: 700, roamableArea: area), still)
+    }
 }

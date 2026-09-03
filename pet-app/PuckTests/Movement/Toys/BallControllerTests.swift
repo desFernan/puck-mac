@@ -652,8 +652,11 @@ extension BallToyCarryTests {
         XCTAssertEqual(controller.layer.affineTransform(), settled, "still turning after it landed")
     }
 
-    /// A toy that doesn't twirl must not start doing so in flight.
-    func test_aPlainToyDoesNotSpinWhenThrown() {
+    /// Everything tumbles in flight, not only the toy whose whole idea is
+    /// twirling. A thrown object that holds one angle the whole way across
+    /// the screen reads as a picture being slid rather than a thing being
+    /// thrown.
+    func test_aThrownToyTumbles() {
         let controller = BallController(parent: CALayer(), toy: ToyCatalogue.pumpkin)
         controller.spawn(at: CGPoint(x: 200, y: 100))
         controller.tick(dt: 1, landingY: 500, roamableArea: roamableArea)
@@ -662,7 +665,25 @@ extension BallToyCarryTests {
 
         controller.tick(dt: 0.1, landingY: 5000, roamableArea: roamableArea)
 
-        XCTAssertEqual(controller.layer.affineTransform(), .identity)
+        XCTAssertNotEqual(controller.layer.affineTransform(), .identity)
+    }
+
+    /// And it turns the way it is going, or a toy thrown leftward rolls
+    /// uphill through the air.
+    func test_aThrownToyTurnsTheWayItTravels() {
+        func angle(afterThrowing velocity: CGPoint) -> CGFloat {
+            let controller = BallController(parent: CALayer(), toy: ToyCatalogue.pumpkin)
+            controller.spawn(at: CGPoint(x: 500, y: 100))
+            controller.tick(dt: 1, landingY: 500, roamableArea: roamableArea)
+            controller.grab()
+            controller.release(velocity: velocity)
+            controller.tick(dt: 0.1, landingY: 5000, roamableArea: roamableArea)
+            let t = controller.layer.affineTransform()
+            return atan2(t.b, t.a)
+        }
+
+        XCTAssertGreaterThan(angle(afterThrowing: CGPoint(x: 500, y: -400)), 0)
+        XCTAssertLessThan(angle(afterThrowing: CGPoint(x: -500, y: -400)), 0)
     }
 }
 

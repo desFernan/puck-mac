@@ -240,9 +240,21 @@ final class BallController {
     private func applyOrientation(for state: BallState, dt: TimeInterval) {
         switch state.phase {
         case .kicked, .falling:
-            guard toy.play == .spinOverhead else { return }
-            spinAngle += Self.spinRate * CGFloat(dt)
-            layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+            // Everything tumbles in flight now, not only the toy whose whole
+            // idea is twirling. A thrown object that holds one angle the
+            // whole way across the screen reads as a picture being slid
+            // rather than a thing being thrown, and that was the clearest
+            // sign nothing was being simulated.
+            //
+            // A twirler keeps its own rate, which is a property of the toy
+            // and not of how hard it was thrown. Everything else turns at a
+            // rate taken from how fast it is actually travelling, and in the
+            // direction it is going.
+            let rate = toy.play == .spinOverhead
+                ? Self.spinRate
+                : state.horizontalVelocity / 1000 * Self.tumbleRatePerSpeed
+            spinAngle += rate * CGFloat(dt)
+            layer.setAffineTransform(restingTransform.rotated(by: spinAngle))
         case .rolling:
             // A roll is not a spin rate: the angle follows the distance
             // covered, so it slows down exactly as the toy does and stops
@@ -254,7 +266,7 @@ final class BallController {
                 return
             }
             spinAngle += state.horizontalVelocity * CGFloat(dt) / rollingRadius
-            layer.setAffineTransform(CGAffineTransform(rotationAngle: spinAngle))
+            layer.setAffineTransform(restingTransform.rotated(by: spinAngle))
 
         case .resting, .gone:
             spinAngle = 0
@@ -272,6 +284,11 @@ final class BallController {
     /// Turns per second, as radians. Brisk enough to read as twirling rather
     /// than drifting, slow enough that the artwork doesn't blur into a smear.
     static let spinRate: CGFloat = 2 * .pi * 1.2
+
+    /// How fast a thrown toy tumbles, in radians per second for every
+    /// thousand points per second of travel. Enough to read as tumbling; past
+    /// this the artwork blurs into a smear.
+    static let tumbleRatePerSpeed: CGFloat = 7
 
     /// Lets go. With a `velocity` the toy is thrown and flies with it,
     /// the same way the pet itself can be grabbed and thrown; at rest it
