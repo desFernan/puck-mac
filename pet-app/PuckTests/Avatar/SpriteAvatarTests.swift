@@ -193,7 +193,10 @@ final class SpriteAvatarTests: XCTestCase {
 
         // Center = ground point minus half the rendered height, so the
         // sprite's bottom edge lands exactly on the ground point.
-        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 99 - 70))
+        XCTAssertEqual(
+            avatar.spriteLayer.position,
+            CGPoint(x: 42, y: 99 - avatar.spriteLayer.bounds.height / 2)
+        )
     }
 
     /// Hanging from the ceiling (F3, 2026-07-29): `position` is
@@ -212,7 +215,10 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.setUpsideDown(true)
         avatar.setScreenPosition(CGPoint(x: 42, y: 0))
 
-        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
+        XCTAssertEqual(
+            avatar.spriteLayer.position,
+            CGPoint(x: 42, y: avatar.spriteLayer.bounds.height / 2)
+        )
     }
 
     /// setUpsideDown only used to flip the transform (scaleY), never
@@ -230,7 +236,10 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.setScreenPosition(CGPoint(x: 42, y: 0))
         avatar.setUpsideDown(true)
 
-        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 42, y: 70))
+        XCTAssertEqual(
+            avatar.spriteLayer.position,
+            CGPoint(x: 42, y: avatar.spriteLayer.bounds.height / 2)
+        )
     }
 
     // MARK: - triggerJump (F3: agent_done / code_editor path change)
@@ -410,12 +419,22 @@ final class SpriteAvatarTests: XCTestCase {
         XCTAssertEqual(transform.b, 0, accuracy: 0.001)
     }
 
-    func test_init_sizesLayerToHitboxTimesScale() throws {
+    /// The manifest's hitbox decides the shape, not the size: every avatar
+    /// is drawn at the same standard height, or how big the pet comes out
+    /// depends on numbers each package picked for itself. See
+    /// AvatarStandardSize.
+    func test_init_sizesLayerToTheStandardHeightInTheManifestsShape() throws {
         try writePNG(named: "idle", color: .red)
-        let loadResult = try makeLoadResult()
+        let loadResult = try makeLoadResult() // hitbox 120x140
         let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
 
-        XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 120, height: 140))
+        XCTAssertEqual(avatar.spriteLayer.bounds.height, AvatarStandardSize.height)
+        XCTAssertEqual(
+            avatar.spriteLayer.bounds.width / avatar.spriteLayer.bounds.height,
+            120.0 / 140.0,
+            accuracy: 0.001,
+            "the shape still comes from the manifest"
+        )
     }
 
     // MARK: - updateScale (Settings size slider, 2026-07-29)
@@ -427,7 +446,7 @@ final class SpriteAvatarTests: XCTestCase {
 
         avatar.updateScale(0.5)
 
-        XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 60, height: 70))
+        XCTAssertEqual(avatar.spriteLayer.bounds.height, AvatarStandardSize.height * 0.5)
     }
 
     func test_updateScale_appliedTwice_isNotCumulative() throws {
@@ -441,7 +460,7 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.updateScale(0.5)
         avatar.updateScale(2.0)
 
-        XCTAssertEqual(avatar.spriteLayer.bounds.size, CGSize(width: 240, height: 280))
+        XCTAssertEqual(avatar.spriteLayer.bounds.height, AvatarStandardSize.height * 2)
     }
 
     /// updateScale changes spriteLayer.bounds.height, which
@@ -457,9 +476,16 @@ final class SpriteAvatarTests: XCTestCase {
         let avatar = SpriteAvatar(avatarDirectory: packageDirectory, loadResult: loadResult, parent: CALayer())
         avatar.setScreenPosition(CGPoint(x: 100, y: 200))
 
-        avatar.updateScale(0.5) // new height 70 -> offset -35
+        avatar.updateScale(0.5)
 
-        XCTAssertEqual(avatar.spriteLayer.position, CGPoint(x: 100, y: 165))
+        // Derived rather than written out: the offset is half the drawn
+        // height, and pinning the number instead made this break every time
+        // the drawn height changed for a reason that had nothing to do with
+        // the ground offset.
+        XCTAssertEqual(
+            avatar.spriteLayer.position,
+            CGPoint(x: 100, y: 200 - avatar.spriteLayer.bounds.height / 2)
+        )
     }
 
     // MARK: - showEmotion (Settings emotion mapping, 2026-07-29)

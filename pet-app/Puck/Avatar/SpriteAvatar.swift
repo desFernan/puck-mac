@@ -24,6 +24,12 @@ final class SpriteAvatar: AvatarPlayable {
     /// every time rather than the layer's current (already-scaled) bounds,
     /// so repeated Settings slider changes don't compound.
     private let hitbox: AvatarManifest.Hitbox
+    private var isMirrored = false
+    private var isOutlined = false
+    /// What is on screen, so a change to how sprites are drawn can put the
+    /// same pose back rather than waiting for the pet to move.
+    private var currentClip: String?
+    private var poseAdjustments = AvatarPoseAdjustments()
     let spriteLayer = CALayer()
     /// A flat colour washed over the character while a preset asks for a tint
     /// (the rainbow flips). Masked by the sprite itself, so it colours the
@@ -72,7 +78,7 @@ final class SpriteAvatar: AvatarPlayable {
         self.now = now
 
         let scale = loadResult.manifest.scale
-        spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
+        spriteLayer.bounds = CGRect(origin: .zero, size: Self.drawnSize(hitbox: hitbox, scale: scale))
         // SpriteVisualBounds re-derives this exact gravity to work out where
         // the artwork sits inside the layer -- changing it here without
         // changing it there silently makes every screen-edge limit wrong.
@@ -118,6 +124,7 @@ final class SpriteAvatar: AvatarPlayable {
     }
 
     func play(clip: String, loop: Bool) {
+        currentClip = clip
         guard let fileName = AvatarLoader.resolvedClipName(for: clip, in: loadResult) else { return }
         // A load failure (missing/corrupt file) leaves whatever was already
         // showing rather than blanking the pet -- same "don't strand the
@@ -172,6 +179,58 @@ final class SpriteAvatar: AvatarPlayable {
         return JumpFlourish.offset(elapsed: now() - jumpStartedAt)
     }
 
+    /// Mirrors the artwork, on top of whichever way the pet is facing.
+    ///
+    /// Multiplied into the same scaleX the turn animation uses rather than
+    /// swapping what `left` and `right` mean: the pet still turns to face
+    /// where it is going, and this only decides which way round the drawing
+    /// is while it does.
+    /// Draws a white edge around the character, sticker-fashion.
+    ///
+    /// Clears the cache, because the outline is baked into the images rather
+    /// than drawn over them -- see SpriteOutline for why. Turning it on and
+    /// off re-decodes a package's sprites, which is a cost paid once by
+    /// somebody looking at a switch.
+    func setOutlined(_ isOutlined: Bool) {
+        guard isOutlined != self.isOutlined else { return }
+        self.isOutlined = isOutlined
+        loadedImages.removeAll()
+        if let currentClip { play(clip: currentClip, loop: true) }
+    }
+
+    /// Per-pose corrections for artwork drawn the other way round.
+    func setPoseAdjustments(_ adjustments: AvatarPoseAdjustments) {
+        guard adjustments != poseAdjustments else { return }
+        poseAdjustments = adjustments
+        applyTransform()
+    }
+
+    /// Which of the poses the pet is in right now, so the right correction is
+    /// applied. Worked out from what is already known rather than pushed in
+    /// by the movement states: a pose is a clip and a direction, and both are
+    /// already here.
+    private var currentPose: AvatarPose? {
+        // Which way along the ceiling, for the reason the walls are two
+        // poses: upside down, a character drawn to face one way is wrong the
+        // other way in a way one correction cannot fix.
+        if isUpsideDown {
+            return facing == .left ? .onTheCeilingFacingLeft : .onTheCeilingFacingRight
+        }
+        // Which wall, not just "climbing": the pet keeps its facing all the
+        // way up, so that is which side it is on.
+        if currentClip == "climb" {
+            return facing == .left ? .climbingLeftWall : .climbingRightWall
+        }
+        guard currentClip == "walk" else { return nil }
+        return facing == .left ? .walkingLeft : .walkingRight
+    }
+
+    func setMirrored(_ isMirrored: Bool) {
+        guard isMirrored != self.isMirrored else { return }
+        self.isMirrored = isMirrored
+        applyTransform()
+    }
+
     func setFacing(_ facing: AvatarFacing) {
         guard facing != self.facing else { return }
         // Turning again mid-turn continues from the angle currently on
@@ -189,6 +248,12 @@ final class SpriteAvatar: AvatarPlayable {
     /// BounceTransform (BouncePreset.preset(for:)'s own dispatch), not
     /// re-derived here from the raw clip string.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double) {
+        // Recorded here as well as in `play`. This arrives every frame and
+        // `play` only on a change, and which pose the pet is in decides how
+        // the sprite is turned -- so taking it from `play` alone made the
+        // turn depend on two callers agreeing about the clip rather than on
+        // the one that is always current.
+        currentClip = clip
         currentBounce = BouncePreset.preset(for: clip).transform(elapsed: elapsed, intensity: intensity)
         applyTransform()
         // Called every frame regardless of state, same as applyTransform
@@ -223,10 +288,20 @@ final class SpriteAvatar: AvatarPlayable {
     /// review: a call site that forgot to re-push the position would leave
     /// the sprite floating at the stale offset).
     func updateScale(_ scale: Double) {
-        spriteLayer.bounds = CGRect(x: 0, y: 0, width: hitbox.width * scale, height: hitbox.height * scale)
+        spriteLayer.bounds = CGRect(origin: .zero, size: Self.drawnSize(hitbox: hitbox, scale: scale))
         tintLayer.frame = spriteLayer.bounds
         tintMaskLayer.frame = spriteLayer.bounds
         setScreenPosition(lastPosition)
+    }
+
+    /// The hitbox is a shape, not a size: every avatar is drawn at the same
+    /// standard height and the manifest's numbers only decide the aspect
+    /// ratio. See AvatarStandardSize.
+    private static func drawnSize(hitbox: AvatarManifest.Hitbox, scale: Double) -> CGSize {
+        AvatarStandardSize.size(
+            hitbox: CGSize(width: hitbox.width, height: hitbox.height),
+            scale: CGFloat(scale)
+        )
     }
 
     /// Settings' emotion mapping / EventRouter-driven mood swap. Silent
@@ -272,12 +347,24 @@ final class SpriteAvatar: AvatarPlayable {
     }
 
     private func applyTransform() {
-        let flipX = FlipAnimation.horizontalScale(atAngle: currentFlipAngle)
-        let flipY: CGFloat = isUpsideDown ? -1 : 1
-        var transform = CGAffineTransform(scaleX: CGFloat(currentBounce.scaleX) * flipX, y: CGFloat(currentBounce.scaleY) * flipY)
-        if currentBounce.rotatesQuarterTurn {
-            transform = transform.rotated(by: .pi / 2)
-        }
+        // The orientation the pose is in before anything moves, worked out in
+        // the one place the settings window's preview reads it from too --
+        // see AvatarPoseOrientation for what went wrong when there were two.
+        let pose = currentPose
+        let orientation = AvatarPoseOrientation.of(
+            pose,
+            adjustment: pose.map { poseAdjustments[$0] } ?? .none,
+            isMirrored: isMirrored
+        )
+        // How far through the turn the pet is, which the pose cannot know:
+        // facing is a fact, and this is the animation between two of them.
+        let turning = FlipAnimation.horizontalScale(atAngle: currentFlipAngle)
+            * (pose?.facing == .left ? -1 : 1)
+        var transform = CGAffineTransform(
+            scaleX: CGFloat(currentBounce.scaleX) * orientation.scaleX * turning,
+            y: CGFloat(currentBounce.scaleY) * orientation.scaleY
+        )
+        transform = transform.rotated(by: orientation.rotation)
         // After the climb turn, so the preset's rocking is relative to
         // however the sprite is already oriented rather than to the screen --
         // a climbing pet leans off its own upright, not off vertical.
@@ -407,7 +494,8 @@ final class SpriteAvatar: AvatarPlayable {
             AppLogger.shared.log(.error, "Failed to load avatar sprite at \(url.path)")
             return nil
         }
-        loadedImages[fileName] = image
-        return image
+        let drawn = isOutlined ? SpriteOutline.outlined(image) : image
+        loadedImages[fileName] = drawn
+        return drawn
     }
 }

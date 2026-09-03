@@ -22,6 +22,15 @@ protocol AvatarPlayable: AnyObject {
     func stop()
     func setScreenPosition(_ position: CGPoint)
     func setFacing(_ facing: AvatarFacing)
+    /// Draws the character the other way round -- see SettingsStore
+    /// .isAvatarMirrored. Defaulted, because an avatar kind that cannot
+    /// mirror is a kind that ignores it rather than one that fails to build.
+    func setMirrored(_ isMirrored: Bool)
+    /// Draws a white edge around the character -- see SettingsStore
+    /// .isAvatarOutlined.
+    func setOutlined(_ isOutlined: Bool)
+    /// Per-pose corrections -- see AvatarPose.
+    func setPoseAdjustments(_ adjustments: AvatarPoseAdjustments)
 
     /// Per-frame procedural "bounce" motion (2026-07-29 2D switch, F2) --
     /// `clip`/`elapsed` describe how long the current clip has been
@@ -102,4 +111,13 @@ extension AvatarPlayable {
     func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool {
         visualBounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
     }
+}
+
+extension AvatarPlayable {
+    /// Ignored by default. A kind of avatar with no flat artwork to mirror --
+    /// a 3D one -- has nothing sensible to do with this, and should not have
+    /// to say so.
+    func setMirrored(_ isMirrored: Bool) {}
+    func setOutlined(_ isOutlined: Bool) {}
+    func setPoseAdjustments(_ adjustments: AvatarPoseAdjustments) {}
 }
