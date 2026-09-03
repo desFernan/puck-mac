@@ -54,6 +54,15 @@ extension AppDelegate {
         // Settings' avatar picker writes this; activateAvatar
         // tears down whatever's running and swaps the new package in live.
         settingsStore.onSelectedAvatarChanged = { [weak self] name in self?.switchAvatar(to: name) }
+        settingsStore.onAvatarMirroredChanged = { [weak self] isMirrored in
+            self?.avatar?.setMirrored(isMirrored)
+        }
+        settingsStore.onAvatarOutlinedChanged = { [weak self] isOutlined in
+            self?.avatar?.setOutlined(isOutlined)
+        }
+        settingsStore.onAvatarPoseAdjustmentsChanged = { [weak self] adjustments in
+            self?.avatar?.setPoseAdjustments(adjustments)
+        }
         // autoMuteOnFocus existed as a setting with nothing acting on it --
         // FocusModeObserver was implemented but never instantiated anywhere.
         // Reads self.sfxPlayer fresh each time (not captured), so it keeps
@@ -120,7 +129,7 @@ extension AppDelegate {
         // before it).
         let scale = loadResult.manifest.scale
         baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
-        avatarHitboxSize = CGSize(width: baseHitboxSize.width * scale, height: baseHitboxSize.height * scale)
+        avatarHitboxSize = AvatarStandardSize.size(hitbox: baseHitboxSize, scale: CGFloat(scale))
 
         let newAvatar = SpriteAvatar(
             avatarDirectory: avatarDirectory,
@@ -133,6 +142,13 @@ extension AppDelegate {
         let initialPosition = characterBody?.position
             ?? GroundedSpawnPosition.position(in: screenWorkAreas.first ?? CGRect(origin: .zero, size: window.frame.size))
         newAvatar.setScreenPosition(initialPosition)
+        // Set here rather than only from the settings callback: switching
+        // avatars builds a fresh one, and a new avatar that ignored the
+        // setting until it was toggled again would come up facing the wrong
+        // way every time.
+        newAvatar.setMirrored(settingsStore.isAvatarMirrored)
+        newAvatar.setOutlined(settingsStore.isAvatarOutlined)
+        newAvatar.setPoseAdjustments(settingsStore.avatarPoseAdjustments)
         avatar = newAvatar
 
         let soundTable = SoundTable(avatarDirectory: avatarDirectory, sounds: loadResult.manifest.sounds)

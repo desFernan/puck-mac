@@ -65,6 +65,39 @@ enum AvatarManifestEditor {
     /// (overwriting any previous image for that key) and points
     /// manifest.emotions[emotion] at it.
     @discardableResult
+    /// Replaces the avatar's base drawing.
+    ///
+    /// `idle` and nothing else: every other clip already falls back to it
+    /// when a package does not name its own -- see
+    /// AvatarLoader.resolvedClipName -- so one picture is a complete avatar,
+    /// and this is the picture. Writing all the clips instead would make an
+    /// avatar that cannot later be given a walk of its own without clearing
+    /// them by hand.
+    static func setBaseImage(sourceFile: URL, directory: URL) throws -> AvatarManifest {
+        let existing = try loadManifest(directory: directory)
+
+        let destination = directory.appendingPathComponent("idle.png")
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.copyItem(at: sourceFile, to: destination)
+
+        var clips = existing.clips
+        clips["idle"] = .name("idle")
+
+        let updated = AvatarManifest(
+            schemaVersion: existing.schemaVersion,
+            name: existing.name,
+            type: existing.type,
+            scale: existing.scale,
+            bounceIntensity: existing.bounceIntensity,
+            hitbox: existing.hitbox,
+            clips: clips,
+            emotions: existing.emotions,
+            sounds: existing.sounds
+        )
+        try save(updated, directory: directory)
+        return updated
+    }
+
     static func setEmotionImage(named emotion: String, sourceFile: URL, directory: URL) throws -> AvatarManifest {
         guard isValidEmotionName(emotion) else {
             throw AvatarManifestEditorError.invalidEmotionName(emotion)

@@ -29,6 +29,9 @@ final class SettingsStore {
         static let toySummon2 = "Puck.hotkey.toySummon2"
         static let isMuteComplaintEnabled = "Puck.isMuteComplaintEnabled"
         static let selectedAvatarName = "Puck.selectedAvatarName"
+        static let isAvatarMirrored = "Puck.isAvatarMirrored"
+        static let isAvatarOutlined = "Puck.isAvatarOutlined"
+        static let avatarPoseAdjustments = "Puck.avatarPoseAdjustments"
         static let hasRequestedAccessibility = "Puck.hasRequestedAccessibility"
     }
 
@@ -134,6 +137,67 @@ final class SettingsStore {
     /// Which installed avatar (a folder name under AvatarCatalogue.avatars-
     /// Directory) is currently active. "dummy" is the bundled default,
     /// always seeded on first run (see AvatarInstaller).
+    /// Draws the avatar the other way round.
+    ///
+    /// Which way a character faces is decided by whoever drew it, and the app
+    /// assumes one of the two. An avatar drawn facing the other way walks
+    /// backwards for its whole life, and the only fix was to edit the
+    /// artwork. This is a mirror on top of the facing the pet already has,
+    /// so turning it on flips both directions rather than pinning the pet to
+    /// one of them.
+    var isAvatarMirrored: Bool {
+        get { defaults.bool(forKey: Keys.isAvatarMirrored) }
+        set {
+            defaults.set(newValue, forKey: Keys.isAvatarMirrored)
+            onAvatarMirroredChanged?(newValue)
+        }
+    }
+
+    var onAvatarMirroredChanged: ((Bool) -> Void)?
+
+    /// Draws a white edge around the character.
+    ///
+    /// Worth having because the pet is drawn over whatever is on screen, and
+    /// a dark character on a dark window is a shape you lose track of. A
+    /// sticker's edge separates it from the background whatever the
+    /// background is.
+    var isAvatarOutlined: Bool {
+        get { defaults.bool(forKey: Keys.isAvatarOutlined) }
+        set {
+            defaults.set(newValue, forKey: Keys.isAvatarOutlined)
+            onAvatarOutlinedChanged?(newValue)
+        }
+    }
+
+    var onAvatarOutlinedChanged: ((Bool) -> Void)?
+
+    /// Per-pose corrections for artwork drawn the other way round -- see
+    /// AvatarPose.
+    ///
+    /// Stored as JSON in one key rather than a key per pose: it is read and
+    /// written as a whole, and a key per pose is four times the chance of
+    /// half a setting surviving.
+    var avatarPoseAdjustments: AvatarPoseAdjustments {
+        get {
+            guard let data = defaults.data(forKey: Keys.avatarPoseAdjustments),
+                  let decoded = try? JSONDecoder().decode(AvatarPoseAdjustments.self, from: data)
+            else { return AvatarPoseAdjustments() }
+            return decoded
+        }
+        set {
+            // Cleared rather than written empty, so a settings file does not
+            // keep a record of corrections somebody undid.
+            if newValue.isEmpty {
+                defaults.removeObject(forKey: Keys.avatarPoseAdjustments)
+            } else if let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: Keys.avatarPoseAdjustments)
+            }
+            onAvatarPoseAdjustmentsChanged?(newValue)
+        }
+    }
+
+    var onAvatarPoseAdjustmentsChanged: ((AvatarPoseAdjustments) -> Void)?
+
     var selectedAvatarName: String {
         get { defaults.string(forKey: Keys.selectedAvatarName) ?? "dummy" }
         set {

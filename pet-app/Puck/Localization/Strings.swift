@@ -24,6 +24,10 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// Section headers in the menu bar panel. `tabAvatar` went with the tabs
     /// themselves -- AvatarManagementView titles its own sections now.
     case tabGeneral, tabSound, tabMovement
+    /// The settings window's own sidebar row for the avatar manager.
+    case tabAvatar
+    /// The avatar's base drawing, which every clip falls back to.
+    case baseImageHeader, baseImageExplanation, baseImageUpdated
 
     /// The UI language picker. Its options name themselves
     /// (`AppLanguage.displayName`) rather than going through this table.
@@ -244,6 +248,15 @@ enum L10nKey: String, CaseIterable, Hashable {
     case menuOpenClient
     case menuSettings
     case notchPanelLabel
+    /// Draws the avatar the other way round.
+    case mirrorAvatarLabel
+    /// A white edge around the character, sticker-fashion.
+    case outlineAvatarLabel
+    /// The pose preview: what the pet looks like walking, climbing, hanging.
+    case posePreviewHeader, posePreviewExplanation
+    case poseWalkingRight, poseWalkingLeft
+    case poseOnTheCeilingFacingRight, poseOnTheCeilingFacingLeft
+    case poseClimbingRightWall, poseClimbingLeftWall
 }
 
 enum Strings {
@@ -271,6 +284,10 @@ enum Strings {
     private static let korean: [L10nKey: String] = [
         .languageLabel: "언어",
         .tabGeneral: "일반",
+        .tabAvatar: "아바타",
+        .baseImageHeader: "기본 이미지",
+        .baseImageExplanation: "아바타가 기본으로 쓰는 그림입니다. 따로 지정하지 않은 동작은 전부 이 그림을 씁니다.",
+        .baseImageUpdated: "기본 이미지를 바꿨습니다.",
         .tabSound: "사운드",
         .tabMovement: "이동",
 
@@ -615,6 +632,16 @@ enum Strings {
         .menuQuit: "Puck 종료",
         .menuOpenClient: "Puck 채팅 열기",
         .menuSettings: "설정…",
+        .mirrorAvatarLabel: "아바타 좌우 반전",
+        .outlineAvatarLabel: "아바타 흰 테두리",
+        .posePreviewHeader: "자세 미리보기",
+        .posePreviewExplanation: "걷고 기어오를 때 아바타가 어떻게 보이는지입니다. 방향이 어긋나면 좌우 반전·상하 반전·회전으로 맞추세요.",
+        .poseWalkingRight: "오른쪽으로 걷기",
+        .poseWalkingLeft: "왼쪽으로 걷기",
+        .poseClimbingRightWall: "오른쪽 벽 타기",
+        .poseClimbingLeftWall: "왼쪽 벽 타기",
+        .poseOnTheCeilingFacingRight: "천장에서 오른쪽으로",
+        .poseOnTheCeilingFacingLeft: "천장에서 왼쪽으로",
         .notchPanelLabel: "노치 패널",
     ]
 
@@ -622,6 +649,10 @@ enum Strings {
         .languageLabel: "Language",
 
         .tabGeneral: "General",
+        .tabAvatar: "Avatar",
+        .baseImageHeader: "Base image",
+        .baseImageExplanation: "The drawing the avatar falls back to. Anything without a picture of its own uses this one.",
+        .baseImageUpdated: "Base image replaced.",
         .tabSound: "Sound",
         .tabMovement: "Movement",
 
@@ -966,6 +997,16 @@ enum Strings {
         .menuQuit: "Quit Puck",
         .menuOpenClient: "Open Puck Chat",
         .menuSettings: "Settings…",
+        .mirrorAvatarLabel: "Mirror the avatar",
+        .outlineAvatarLabel: "White outline",
+        .posePreviewHeader: "Pose preview",
+        .posePreviewExplanation: "How the avatar looks walking and climbing. If one faces the wrong way, flip or turn it here.",
+        .poseWalkingRight: "Walking right",
+        .poseWalkingLeft: "Walking left",
+        .poseClimbingRightWall: "Climbing a wall on the right",
+        .poseClimbingLeftWall: "Climbing a wall on the left",
+        .poseOnTheCeilingFacingRight: "On the ceiling, going right",
+        .poseOnTheCeilingFacingLeft: "On the ceiling, going left",
         .notchPanelLabel: "Notch panel",
     ]
 }

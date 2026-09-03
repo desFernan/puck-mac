@@ -30,3 +30,11 @@ Puck/Settings/SettingsView.swift
 # Runs the tools that act on the pet and the screen. PuckClient sends tool
 # calls across the bridge for Puck to execute.
 Puck/Tools/ToolExecutor.swift
+
+# The pet's own rendering. The pose preview draws the avatar the way the
+# overlay will and writes corrections the overlay applies; the chat window
+# neither owns an avatar nor draws one.
+Puck/Settings/AvatarPosePreview.swift
+
+# Draws one of the pet's own sprites. The chat window has no avatar.
+Puck/Settings/AvatarSpriteThumbnail.swift

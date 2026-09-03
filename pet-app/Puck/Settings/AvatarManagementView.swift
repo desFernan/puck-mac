@@ -22,20 +22,17 @@ struct AvatarManagementView: View {
     /// Called when the size slider changes, so AppDelegate can apply it to
     /// the *running* avatar immediately -- editing manifest.json alone only
     /// takes effect on next launch.
-    var onScaleChanged: ((Double) -> Void)?
 
     /// Which installed avatar is active when the panel opens. Seeds
     /// `selectedAvatarName` below; the panel is rebuilt on every open (same
     /// reasoning as SettingsView's initialToysOut), so this is a seed rather
     /// than a source of truth -- SettingsStore.selectedAvatarName is that.
     var initialSelectedAvatarName: String = "dummy"
-    /// Picking a different installed avatar swaps the *running*
-    /// pet immediately, the same live-apply contract onScaleChanged already
-    /// has.
+    /// Picking a different installed avatar swaps the *running* pet
+    /// immediately rather than at the next launch.
     var onSelectAvatar: ((String) -> Void)?
 
     @State private var reportMessage = ""
-    @State private var scale: Double = 1.0
     @State private var emotionKeys: [String] = AvatarManagementView.defaultEmotionKeys
     @State private var mappedEmotions: Set<String> = []
     @State private var newEmotionName: String = ""
@@ -44,11 +41,9 @@ struct AvatarManagementView: View {
     @State private var installedAvatarNames: [String] = []
 
     init(
-        onScaleChanged: ((Double) -> Void)? = nil,
         initialSelectedAvatarName: String = "dummy",
         onSelectAvatar: ((String) -> Void)? = nil
     ) {
-        self.onScaleChanged = onScaleChanged
         self.initialSelectedAvatarName = initialSelectedAvatarName
         self.onSelectAvatar = onSelectAvatar
         _selectedAvatarName = State(initialValue: initialSelectedAvatarName)
@@ -109,10 +104,25 @@ struct AvatarManagementView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
-                SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", scale)) {
-                    Slider(value: $scale, in: 0.25...3.0)
-                        .onChange(of: scale) { _, newValue in applyScale(newValue) }
+                // No size slider here. It is in the quick view, which is
+                // where a setting you nudge and look at belongs -- and two
+                // sliders for one number is two places to look when it is
+                // wrong.
+            }
+
+            SettingsSection(title: text(.baseImageHeader)) {
+                Text(text(.baseImageExplanation))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+                HStack(spacing: ClientTheme.Metrics.spacingMedium) {
+                    AvatarSpriteThumbnail(avatarName: selectedAvatarName, clip: "idle", refresh: refreshToken)
+                        .frame(width: 56, height: 56)
+                    Spacer(minLength: 0)
+                    Button(text(.chooseImageButton)) { chooseBaseImage() }
+                        .controlSize(.small)
                 }
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
             }
 
             SettingsSection(title: text(.emotionsHeader)) {
@@ -128,6 +138,16 @@ struct AvatarManagementView: View {
                     VStack(spacing: ClientTheme.Metrics.spacingMedium) {
                         ForEach(emotionKeys, id: \.self) { emotion in
                             SettingsRow(label: emotion) {
+                                // The picture, not just the word "mapped":
+                                // the whole question being answered here is
+                                // which drawing is on which feeling, and a
+                                // label cannot answer it.
+                                AvatarSpriteThumbnail(
+                                    avatarName: selectedAvatarName,
+                                    emotion: emotion,
+                                    refresh: refreshToken
+                                )
+                                .frame(width: 34, height: 34)
                                 Text(mappedEmotions.contains(emotion) ? text(.mappedLabel) : text(.notMappedLabel))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -194,19 +214,10 @@ struct AvatarManagementView: View {
         guard let manifest = try? AvatarManifestEditor.loadManifest(directory: directory) else {
             return
         }
-        scale = manifest.scale
         let mappedKeys = Set((manifest.emotions ?? [:]).keys)
         mappedEmotions = mappedKeys
         // Known keys first (stable order), then any custom keys the manifest already has.
         emotionKeys = Self.defaultEmotionKeys + mappedKeys.subtracting(Self.defaultEmotionKeys).sorted()
-    }
-
-    private func applyScale(_ newScale: Double) {
-        let directory = AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
-        guard (try? AvatarManifestEditor.updateScale(newScale, directory: directory)) != nil else {
-            return
-        }
-        onScaleChanged?(newScale)
     }
 
     private func addCustomEmotion() {
@@ -220,14 +231,37 @@ struct AvatarManagementView: View {
         newEmotionName = ""
     }
 
-    private func chooseEmotionImage(for emotion: String) {
+    /// Bumped whenever a picture is written, so the thumbnails re-read the
+    /// files. SwiftUI has no reason to know a PNG on disk changed.
+    @State private var refreshToken = 0
+
+    private func chooseBaseImage() {
+        guard let sourceURL = chosenPNG() else { return }
+        do {
+            try AvatarManifestEditor.setBaseImage(
+                sourceFile: sourceURL,
+                directory: AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
+            )
+            refreshToken += 1
+            emotionMessage = text(.baseImageUpdated)
+        } catch {
+            emotionMessage = String(describing: error)
+        }
+    }
+
+    private func chosenPNG() -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.png]
         panel.prompt = text(.choosePanelPrompt)
-        guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    private func chooseEmotionImage(for emotion: String) {
+        guard let sourceURL = chosenPNG() else { return }
 
         do {
             try AvatarManifestEditor.setEmotionImage(
@@ -236,6 +270,7 @@ struct AvatarManagementView: View {
                 directory: AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
             )
             mappedEmotions.insert(emotion)
+            refreshToken += 1
             emotionMessage = String(format: text(.updatedEmotionFormat), emotion)
         } catch {
             emotionMessage = String(format: text(.failedToSetEmotionFormat), emotion, String(describing: error))
@@ -270,10 +305,13 @@ struct AvatarManagementView: View {
         let outcome = AvatarInstaller.installIfNeeded(
             bundledPackage: sourceURL,
             intoAvatarsDirectory: AvatarCatalogue.avatarsDirectory,
-            overwriteExisting: true
+            overwriteExisting: true,
+            // Marked as theirs, so a later version of the app never decides
+            // this is a stale copy of its own and replaces it.
+            origin: .userImport
         )
         switch outcome {
-        case .installed:
+        case .installed, .replaced:
             reportMessage = report.missingRecommendedClipFiles.isEmpty
                 ? String(format: text(.installedFormat), report.manifest.name)
                 : String(

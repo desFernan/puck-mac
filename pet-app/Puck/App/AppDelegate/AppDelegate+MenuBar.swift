@@ -78,7 +78,10 @@ extension AppDelegate {
         let window = settingsWindow ?? {
             let created = NSWindow(
                 contentRect: .zero,
-                styleMask: [.titled, .closable],
+                // Resizable: the form is a scrolling list, and a window that
+                // opens at one height and cannot be grown is one you scroll
+                // for no reason on a large display.
+                styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,
                 defer: false
             )
@@ -86,6 +89,11 @@ extension AppDelegate {
             created.contentViewController = NSHostingController(
                 rootView: SettingsView(
                     store: settingsStore,
+                    // The window holds the avatar picker now, so it has to
+                    // carry the same callbacks the popover did -- a picker
+                    // with none of them is a control that does nothing, which
+                    // is what the split was written to prevent.
+                    onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) },
                     onNotchPanelChanged: { [weak self] _ in
                         guard let self, let controller = self.characterController else { return }
                         self.applyScreenNotches(to: controller)

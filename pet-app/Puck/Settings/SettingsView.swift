@@ -68,6 +68,11 @@ struct SettingsView: View {
     @State private var isMuteComplaintEnabled: Bool
     @State private var avoidClimbingFocusedWindow: Bool
     @State private var notchPanelEnabled: Bool
+    @State private var isAvatarMirrored: Bool
+    @State private var isAvatarOutlined: Bool
+    @State private var avatarScale: Double
+    @State private var poseAdjustments: AvatarPoseAdjustments
+    @State private var category: SettingsCategory = .avatar
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
     @State private var toysOut: Set<String>
@@ -108,6 +113,17 @@ struct SettingsView: View {
         _isMuteComplaintEnabled = State(initialValue: store.isMuteComplaintEnabled)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _notchPanelEnabled = State(initialValue: store.isNotchPanelEnabled)
+        _isAvatarMirrored = State(initialValue: store.isAvatarMirrored)
+        _isAvatarOutlined = State(initialValue: store.isAvatarOutlined)
+        _poseAdjustments = State(initialValue: store.avatarPoseAdjustments)
+        // Read from the avatar's manifest rather than a setting: that is
+        // where the size lives, and a slider that opened at the wrong value
+        // would move the pet the moment it was touched.
+        _avatarScale = State(
+            initialValue: (try? AvatarManifestEditor.loadManifest(
+                directory: AvatarManifestEditor.currentAvatarDirectory(named: store.selectedAvatarName)
+            ).scale) ?? 1
+        )
         _walkSpeedMultiplier = State(initialValue: store.walkSpeedMultiplier)
         _toyScale = State(initialValue: store.toyScale)
         _toysOut = State(initialValue: initialToysOut)
@@ -125,51 +141,129 @@ struct SettingsView: View {
     /// the toy tiles, the visibility row and Quit with every callback nil, so
     /// they rendered as live controls and did nothing. One list, tested.
     enum SectionGroup: Equatable {
-        /// Avatar and toys: what the pet is doing now, and needs callbacks.
-        case live
-        /// Sound, movement, language: set once and left.
-        case setOnce
+        /// Which avatar, how big, and which way round. The whole manager --
+        /// picker, import, emotion mapping. Window only; it is a page.
+        case avatar
+        /// Just the size slider, for reaching at a glance.
+        case avatarSize
+        /// What the pet looks like walking, climbing and hanging, and how to
+        /// turn one that came out the wrong way round.
+        case poses
+        /// Light, dark, or follow the system.
+        case theme
+        /// Which toys are out. Needs callbacks only the panel supplies.
+        case toys
+        /// Mute and volume: the two things worth reaching for mid-sentence.
+        case quickSound
+        /// The rest of sound, set once and left.
+        case sound
+        case movement
+        case general
         /// Open chat, hide, quit -- and the row that opens the window.
         case actions
     }
 
+    /// Which half of the split this instance draws.
+    ///
+    /// The window is where things are *configured*, so it holds everything
+    /// that can be: the avatar included, which used to be reachable only from
+    /// a menu bar popover you had to keep open while looking at it. The
+    /// popover keeps what you reach for without wanting a window -- the toys,
+    /// mute, the volume, and the way out.
+    ///
+    /// Volume is in both on purpose. It is the one setting people change
+    /// mid-sentence, and sending them to a window for it is the reason it was
+    /// worth splitting these at all.
+    /// The popover is a quick view, so it holds the handful of things worth
+    /// changing without opening anything: the toys, mute and volume, how big
+    /// the pet is, and which way the theme goes. Everything that is read
+    /// before it is decided -- the avatar manager, the movement options, the
+    /// language, the permissions -- is in the window.
+    ///
+    /// Size and theme are in both. They are settings you nudge and look at
+    /// rather than settings you sit down to, and sending somebody to a window
+    /// to nudge one is the reason the split exists.
     var sections: [SectionGroup] {
-        showsOnlyLiveControls ? [.live, .actions] : [.setOnce]
+        showsOnlyLiveControls
+            ? [.toys, .quickSound, .avatarSize, .theme, .actions]
+            : SettingsCategory.allCases.flatMap(\.sections)
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider().opacity(0.5)
-            ScrollView {
-                VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
-                    // One half or the other, never both: the live sections are
-                    // driven by callbacks only the panel supplies, so drawing
-                    // them in the window gave it controls that did nothing.
-                    if sections.contains(.live) {
-                        avatarSection
-                        toySection
-                        muteSection
-                    }
-                    if sections.contains(.setOnce) {
-                        soundSection
-                        movementSection
-                        generalSection
-                    }
-                }
-                .padding(ClientTheme.Metrics.spacingMedium)
-            }
-            if sections.contains(.actions) {
-                Divider().opacity(0.5)
-                actionSection
+    /// The window's left-hand list.
+    ///
+    /// The window used to be one column the width of the popover, so every
+    /// section added to it made the same scroll longer -- the avatar manager
+    /// alone is a picker, an importer and sixteen emotion rows, and after it
+    /// came four more sections nobody could see without scrolling past all of
+    /// that. A page you have to scroll to find out what is in it is a page
+    /// that hides its own contents.
+    ///
+    /// Categories rather than a longer window: a taller window runs out of
+    /// screen, and a wider one only helps if something is beside something
+    /// else.
+    enum SettingsCategory: String, CaseIterable, Identifiable {
+        case avatar
+        case poses
+        case sound
+        case movement
+        case general
+
+        var id: String { rawValue }
+
+        var sections: [SectionGroup] {
+            switch self {
+            case .avatar: return [.avatar]
+            case .poses: return [.poses]
+            case .sound: return [.quickSound, .sound]
+            case .movement: return [.movement]
+            case .general: return [.general]
             }
         }
-        .frame(
-            width: MenuBarController.panelSize.width,
-            // The window sizes itself to what it holds; only the popover has
-            // to be told, because a popover has no other way to know.
-            height: showsOnlyLiveControls ? MenuBarController.panelSize.height : nil
-        )
+
+        var symbol: String {
+            switch self {
+            case .avatar: return "person.crop.square"
+            case .poses: return "figure.walk"
+            case .sound: return "speaker.wave.2"
+            case .movement: return "arrow.left.arrow.right"
+            case .general: return "gearshape"
+            }
+        }
+
+        var label: L10nKey {
+            switch self {
+            case .avatar: return .tabAvatar
+            case .poses: return .posePreviewHeader
+            case .sound: return .tabSound
+            case .movement: return .tabMovement
+            case .general: return .tabGeneral
+            }
+        }
+    }
+
+    /// How tall the settings *window* asks to be.
+    ///
+    /// It has to ask. The window was left to size itself to its content, and
+    /// what it holds is a ScrollView -- which has no height of its own to
+    /// report, so there was nothing to size to. The window came up as a title
+    /// bar with a sliver underneath and read as empty, when everything was
+    /// in there all along.
+    ///
+    /// A minimum and an ideal rather than a fixed height, so the window opens
+    /// showing most of the form and can still be dragged taller.
+    static let windowMinHeight: CGFloat = 420
+    static let windowIdealHeight: CGFloat = 620
+
+    /// Wide enough for a form beside a list, rather than a column the width
+    /// of a menu bar popover.
+    static let sidebarWidth: CGFloat = 170
+    static let windowMinWidth: CGFloat = 560
+    static let windowIdealWidth: CGFloat = 820
+
+    var body: some View {
+        Group {
+            if showsOnlyLiveControls { popover } else { window }
+        }
         .preferredColorScheme(appearance.colorScheme)
         // `.id` forces SwiftUI to discard and rebuild this subtree instead of
         // diffing it in place: Light->System looked broken while Light->Dark
@@ -194,6 +288,73 @@ struct SettingsView: View {
 
     /// The reference opens with its mark and name; ours is the pumpkin that
     /// is already the app icon and the pet's toy.
+    /// The menu bar's quick view: one column, fixed size, nothing to choose
+    /// between.
+    private var popover: some View {
+        VStack(spacing: 0) {
+            header
+            Divider().opacity(0.5)
+            ScrollView {
+                column(of: sections)
+            }
+            if sections.contains(.actions) {
+                Divider().opacity(0.5)
+                actionSection
+            }
+        }
+        .frame(width: MenuBarController.panelSize.width, height: MenuBarController.panelSize.height)
+    }
+
+    /// The window: a list of categories beside the one that is chosen.
+    private var window: some View {
+        HStack(spacing: 0) {
+            List(SettingsCategory.allCases, selection: $category) { item in
+                Label(text(item.label), systemImage: item.symbol)
+                    .tag(item)
+            }
+            .listStyle(.sidebar)
+            .frame(width: Self.sidebarWidth)
+            Divider().opacity(0.5)
+            VStack(spacing: 0) {
+                header
+                Divider().opacity(0.5)
+                ScrollView {
+                    // Keyed on the category so the scroll starts at the top
+                    // of each page rather than wherever the last one was
+                    // left.
+                    column(of: category.sections).id(category)
+                }
+            }
+        }
+        .frame(
+            minWidth: Self.windowMinWidth,
+            idealWidth: Self.windowIdealWidth,
+            maxWidth: .infinity,
+            minHeight: Self.windowMinHeight,
+            idealHeight: Self.windowIdealHeight,
+            maxHeight: .infinity
+        )
+    }
+
+    private func column(of groups: [SectionGroup]) -> some View {
+        VStack(alignment: .leading, spacing: ClientTheme.Metrics.spacingLarge) {
+            // Each section is listed once and drawn where it is asked for.
+            // The two halves used to be all-or-nothing, and a section that
+            // belonged in both had nowhere to go.
+            if groups.contains(.avatar) { avatarSection }
+            if groups.contains(.toys) { toySection }
+            if groups.contains(.quickSound) { quickSoundSection }
+            if groups.contains(.avatarSize) { avatarSizeSection }
+            if groups.contains(.poses) { poseSection }
+            if groups.contains(.theme) { themeSection }
+            if groups.contains(.sound) { soundSection }
+            if groups.contains(.movement) { movementSection }
+            if groups.contains(.general) { generalSection }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(ClientTheme.Metrics.spacingMedium)
+    }
+
     private var header: some View {
         HStack(spacing: ClientTheme.Metrics.spacingSmall) {
             Image("PumpkinLogo")
@@ -210,7 +371,6 @@ struct SettingsView: View {
 
     private var avatarSection: some View {
         AvatarManagementView(
-            onScaleChanged: onAvatarScaleChanged,
             initialSelectedAvatarName: store.selectedAvatarName,
             onSelectAvatar: { store.selectedAvatarName = $0 }
         )
@@ -255,7 +415,60 @@ struct SettingsView: View {
     /// rather than rebuilt, so a second switch over there would hold whatever
     /// `store.isMuted` was when the window was first built and show the wrong
     /// state the moment this one is used.
-    private var muteSection: some View {
+    /// The size slider on its own, without the manager around it.
+    ///
+    /// Writes through the same store property and the same live-apply
+    /// callback the manager's slider uses, so the two cannot disagree about
+    /// how big the pet is.
+    private var avatarSizeSection: some View {
+        SettingsSection(title: text(.sizeHeader)) {
+            SettingsStackedRow(label: text(.sizeHeader), value: String(format: "%.2fx", avatarScale)) {
+                Slider(value: $avatarScale, in: 0.25...3.0)
+                    .onChange(of: avatarScale) { _, newValue in applyAvatarScale(newValue) }
+            }
+        }
+    }
+
+    /// Writes to the avatar's own manifest, which is where the size lives --
+    /// the manager's slider does the same thing, and two sliders writing to
+    /// two different places would be two sizes.
+    private func applyAvatarScale(_ newScale: Double) {
+        let directory = AvatarManifestEditor.currentAvatarDirectory(named: store.selectedAvatarName)
+        guard (try? AvatarManifestEditor.updateScale(newScale, directory: directory)) != nil else { return }
+        onAvatarScaleChanged?(newScale)
+    }
+
+    private var poseSection: some View {
+        AvatarPosePreviewSection(
+            avatarName: store.selectedAvatarName,
+            isMirrored: isAvatarMirrored,
+            adjustments: Binding(
+                get: { poseAdjustments },
+                set: { poseAdjustments = $0; store.avatarPoseAdjustments = $0 }
+            )
+        )
+    }
+
+    private var themeSection: some View {
+        SettingsSection(title: text(.appearanceLabel)) {
+            SettingsStackedRow(label: text(.appearanceLabel)) {
+                Picker("", selection: $appearance) {
+                    Text(text(.appearanceSystem)).tag(AppAppearance.system)
+                    Text(text(.appearanceLight)).tag(AppAppearance.light)
+                    Text(text(.appearanceDark)).tag(AppAppearance.dark)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                // Keyed on the language, for the reason the window's copy of
+                // this row is: a segmented picker keeps the titles it was
+                // built with while its rows' identities are unchanged.
+                .id(localization.language)
+                .onChange(of: appearance) { _, newValue in store.appearance = newValue }
+            }
+        }
+    }
+
+    private var quickSoundSection: some View {
         SettingsSection(title: text(.tabSound)) {
             SettingsRow(label: text(.muteLabel)) {
                 Toggle("", isOn: $isMuted)
@@ -263,15 +476,15 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .onChange(of: isMuted) { _, newValue in store.isMuted = newValue }
             }
+            SettingsStackedRow(label: text(.volumeLabel)) {
+                Slider(value: $volume, in: 0...1)
+                    .onChange(of: volume) { _, newValue in store.volume = Float(newValue) }
+            }
         }
     }
 
     private var soundSection: some View {
         SettingsSection(title: text(.tabSound)) {
-            SettingsStackedRow(label: text(.volumeLabel)) {
-                Slider(value: $volume, in: 0...1)
-                    .onChange(of: volume) { _, newValue in store.volume = Float(newValue) }
-            }
             SettingsRow(label: text(.autoMuteLabel)) {
                 Toggle("", isOn: $autoMuteOnFocus)
                     .labelsHidden()
@@ -304,6 +517,18 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(title: text(.tabGeneral)) {
+            SettingsRow(label: text(.mirrorAvatarLabel)) {
+                Toggle("", isOn: $isAvatarMirrored)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: isAvatarMirrored) { _, newValue in store.isAvatarMirrored = newValue }
+            }
+            SettingsRow(label: text(.outlineAvatarLabel)) {
+                Toggle("", isOn: $isAvatarOutlined)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: isAvatarOutlined) { _, newValue in store.isAvatarOutlined = newValue }
+            }
             SettingsRow(label: text(.notchPanelLabel)) {
                 Toggle("", isOn: $notchPanelEnabled)
                     .labelsHidden()
