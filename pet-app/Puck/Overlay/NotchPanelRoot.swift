@@ -49,6 +49,7 @@ struct NotchPanelRoot: View {
         ) {
             NotchPanelView(
                 music: music,
+                notchDepth: notch.height,
                 // Passed in as well as gating the shell: the content is built
                 // in both states so the field keeps what was typed across an
                 // open and shut, which means `onAppear` fires once, while

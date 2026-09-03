@@ -40,14 +40,30 @@ enum NotchPanelGeometry {
     static let topInset: CGFloat = 13
     static let bottomInset: CGFloat = 16
 
+    /// How far down the content has to start to be out from under the notch.
+    ///
+    /// On a MacBook the notch is the camera housing, and anything drawn
+    /// behind it is not dimmed or clipped -- it is simply not on the screen.
+    /// The panel is centred on the notch, so the middle of its top edge is
+    /// exactly where a title sits: a short one fitted in the gap either side
+    /// and a long one ran under the housing and disappeared.
+    ///
+    /// The ordinary padding when that is already enough, which it is on a
+    /// display whose notch is one we drew.
+    static func topInset(notchDepth: CGFloat) -> CGFloat {
+        max(topInset, notchDepth)
+    }
+
     /// How far the panel reaches below the notch when open.
     ///
     /// The two bands, the hairline between them, the gaps around it and the
     /// padding -- written as the sum rather than a measured number so that
     /// changing a band moves the window with it, instead of leaving the
     /// panel clipped or floating above its own bottom edge.
-    static let openHeight: CGFloat =
-        topInset + musicBandHeight + bandGap + 1 + bandGap + actionBandHeight + bottomInset
+    static func openHeight(notchDepth: CGFloat) -> CGFloat {
+        topInset(notchDepth: notchDepth)
+            + musicBandHeight + bandGap + 1 + bandGap + actionBandHeight + bottomInset
+    }
 
     /// How far the shut notch reaches out to each side while something is
     /// playing.
@@ -90,9 +106,9 @@ enum NotchPanelGeometry {
     static func windowFrame(notch: CGRect) -> CGRect {
         CGRect(
             x: notch.midX - openWidth / 2,
-            y: notch.maxY - openHeight,
+            y: notch.maxY - openHeight(notchDepth: notch.height),
             width: openWidth,
-            height: openHeight
+            height: openHeight(notchDepth: notch.height)
         )
     }
 

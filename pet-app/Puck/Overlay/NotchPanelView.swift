@@ -24,6 +24,9 @@ struct NotchPanelView: View {
     @ObservedObject private var localization = Localization.shared
     @ObservedObject var music: NowPlayingStore
 
+    /// How deep the notch is, so the content can start below it.
+    let notchDepth: CGFloat
+
     /// Which toys are out, so the tiles can show it. Passed in rather than
     /// read here: the toy box is the truth and it lives in the app delegate.
     /// Whether the panel is open. The shell draws this view in both states,
@@ -43,12 +46,14 @@ struct NotchPanelView: View {
 
     init(
         music: NowPlayingStore,
+        notchDepth: CGFloat,
         isOpen: Bool,
         toysOut: Set<String>,
         onToggleToy: @escaping (Toy) -> Set<String>,
         onSubmit: @escaping (String) -> Void
     ) {
         self.music = music
+        self.notchDepth = notchDepth
         self.isOpen = isOpen
         self.toysOut = toysOut
         self.onToggleToy = onToggleToy
@@ -69,7 +74,11 @@ struct NotchPanelView: View {
             actionBand
         }
         .padding(.horizontal, 18)
-        .padding(.top, NotchPanelGeometry.topInset)
+        // Below the notch, not behind it: on a MacBook the notch is the
+        // camera housing and a title drawn under it is not on the screen at
+        // all. The panel is centred on the notch, so the middle of its top
+        // edge is exactly where the title sits.
+        .padding(.top, NotchPanelGeometry.topInset(notchDepth: notchDepth))
         .padding(.bottom, NotchPanelGeometry.bottomInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // The toys can change while the panel is shut -- the status item's

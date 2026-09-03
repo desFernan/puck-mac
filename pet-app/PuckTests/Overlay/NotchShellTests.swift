@@ -19,17 +19,27 @@ final class NotchShellTests: XCTestCase {
 
         let scale = NotchShell<EmptyView>.contentScale(notchHeight: notchHeight)
 
-        XCTAssertEqual(scale, notchHeight / NotchPanelGeometry.openHeight, accuracy: 0.0001)
+        XCTAssertEqual(
+            scale,
+            notchHeight / NotchPanelGeometry.openHeight(notchDepth: notchHeight),
+            accuracy: 0.0001
+        )
     }
 
-    /// A display whose notch is somehow as deep as the open panel should
-    /// leave the content alone rather than blow it up.
+    /// The content is never blown up, whatever the notch's depth.
+    ///
+    /// The panel now grows to clear a deeper housing, so the shut shape can
+    /// no longer be taller than the open one and the clamp should never have
+    /// anything to do -- which is worth checking rather than assuming, since
+    /// it is a relationship between two numbers that are set apart.
     func testTheContentIsNeverScaledUp() {
-        let scale = NotchShell<EmptyView>.contentScale(
-            notchHeight: NotchPanelGeometry.openHeight * 3
-        )
-
-        XCTAssertEqual(scale, 1)
+        for depth in stride(from: CGFloat(1), through: 400, by: 7) {
+            XCTAssertLessThanOrEqual(
+                NotchShell<EmptyView>.contentScale(notchHeight: depth),
+                1,
+                "a \(depth)pt notch scales the content up"
+            )
+        }
     }
 
     /// A screen that reports no notch at all must not fold the content

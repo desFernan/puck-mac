@@ -21,7 +21,7 @@ final class NotchPanelGeometryTests: XCTestCase {
         let frame = NotchPanelGeometry.windowFrame(notch: notch)
 
         XCTAssertEqual(frame.width, NotchPanelGeometry.openWidth)
-        XCTAssertEqual(frame.height, NotchPanelGeometry.openHeight)
+        XCTAssertEqual(frame.height, NotchPanelGeometry.openHeight(notchDepth: notch.height))
     }
 
     /// Hanging from the notch, centred on it: the panel comes out of the
@@ -58,7 +58,10 @@ final class NotchPanelGeometryTests: XCTestCase {
     /// Once open, the panel is what the pointer is heading for -- closing the
     /// moment it leaves the notch would shut it before it arrived.
     func test_movingDownIntoThePanelKeepsItOpen() {
-        let insidePanel = CGPoint(x: notch.midX, y: notch.maxY - NotchPanelGeometry.openHeight + 20)
+        let insidePanel = CGPoint(
+            x: notch.midX,
+            y: notch.maxY - NotchPanelGeometry.openHeight(notchDepth: notch.height) + 20
+        )
 
         XCTAssertTrue(open(at: insidePanel, isOpen: true))
         XCTAssertFalse(open(at: insidePanel, isOpen: false), "but it could not have opened from there")
@@ -81,12 +84,13 @@ final class NotchPanelGeometryTests: XCTestCase {
     /// least as tall as what is drawn in it. Set as a measured number once,
     /// this drifted the moment a band changed and the bottom row was cut off.
     func testTheWindowIsTallEnoughForWhatIsDrawnInIt() {
-        let content = NotchPanelGeometry.topInset
+        let depth: CGFloat = 34
+        let content = NotchPanelGeometry.topInset(notchDepth: depth)
             + NotchPanelGeometry.musicBandHeight
             + NotchPanelGeometry.actionBandHeight
             + NotchPanelGeometry.bottomInset
 
-        XCTAssertGreaterThanOrEqual(NotchPanelGeometry.openHeight, content)
+        XCTAssertGreaterThanOrEqual(NotchPanelGeometry.openHeight(notchDepth: depth), content)
     }
 
     /// Wide enough that what opens reads as a panel coming out of the notch
@@ -158,5 +162,38 @@ final class NotchPanelGeometryTests: XCTestCase {
 
         XCTAssertFalse(aNotch.contains(onTheArt), "the point has to be off the notch itself")
         XCTAssertTrue(NotchPanelGeometry.shouldBeOpen(cursor: onTheArt, notch: live, isOpen: false))
+    }
+
+    // MARK: - Clearing the housing
+
+    /// The reported fault: a long title vanished. The panel is centred on the
+    /// notch, so the middle of its top edge is exactly where the title sits,
+    /// and on a MacBook that is the camera housing -- anything drawn there is
+    /// not dimmed or clipped, it is not on the screen at all. A short title
+    /// fitted in the gap either side, which is why it looked intermittent.
+    func testContentStartsBelowTheHousing() {
+        for depth in [CGFloat(32), 34, 37, 44] {
+            XCTAssertGreaterThanOrEqual(
+                NotchPanelGeometry.topInset(notchDepth: depth),
+                depth,
+                "content starts \(depth - NotchPanelGeometry.topInset(notchDepth: depth))pt under the housing"
+            )
+        }
+    }
+
+    /// A drawn notch on a display with no housing is shallower than the
+    /// padding the panel already had, and must not lose that padding to a
+    /// rule about hardware that is not there.
+    func testAShallowNotchKeepsTheOrdinaryPadding() {
+        XCTAssertEqual(NotchPanelGeometry.topInset(notchDepth: 4), NotchPanelGeometry.topInset)
+    }
+
+    /// The window has to grow with the inset, or clearing the housing just
+    /// pushes the bottom row out of the panel instead.
+    func testTheWindowGrowsWithADeeperHousing() {
+        XCTAssertGreaterThan(
+            NotchPanelGeometry.openHeight(notchDepth: 44),
+            NotchPanelGeometry.openHeight(notchDepth: 10)
+        )
     }
 }

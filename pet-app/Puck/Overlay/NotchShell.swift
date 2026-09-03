@@ -68,7 +68,7 @@ struct NotchShell<Content: View>: View {
     /// kept its size and slid upward out of the closing shape, which looked
     /// like two animations disagreeing about what was happening.
     static func contentScale(notchHeight: CGFloat) -> CGFloat {
-        max(0, min(1, notchHeight / NotchPanelGeometry.openHeight))
+        max(0, min(1, notchHeight / NotchPanelGeometry.openHeight(notchDepth: notchHeight)))
     }
     /// An open panel's, in points.
     static var openCornerRadius: CGFloat { 22 }
@@ -82,7 +82,7 @@ struct NotchShell<Content: View>: View {
 
     private var size: CGSize {
         isOpen
-            ? CGSize(width: NotchPanelGeometry.openWidth, height: NotchPanelGeometry.openHeight)
+            ? CGSize(width: NotchPanelGeometry.openWidth, height: NotchPanelGeometry.openHeight(notchDepth: notchSize.height))
             : notchSize
     }
 
@@ -137,7 +137,10 @@ struct NotchShell<Content: View>: View {
                     // across an open and shut, and faded rather than removed
                     // so the shape has nothing to resize around.
                     content()
-                        .frame(width: NotchPanelGeometry.openWidth, height: NotchPanelGeometry.openHeight)
+                        .frame(
+                            width: NotchPanelGeometry.openWidth,
+                            height: NotchPanelGeometry.openHeight(notchDepth: notchSize.height)
+                        )
                         .scaleEffect(
                             isOpen ? 1 : Self.contentScale(notchHeight: notchSize.height),
                             anchor: .top

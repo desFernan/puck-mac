@@ -187,9 +187,9 @@ final class NotchPanelController {
         let size = window?.frame.size ?? .zero
         return CGRect(
             x: (size.width - NotchPanelGeometry.openWidth) / 2,
-            y: size.height - NotchPanelGeometry.openHeight,
+            y: size.height - NotchPanelGeometry.openHeight(notchDepth: notch.height),
             width: NotchPanelGeometry.openWidth,
-            height: NotchPanelGeometry.openHeight
+            height: NotchPanelGeometry.openHeight(notchDepth: notch.height)
         )
     }
 
