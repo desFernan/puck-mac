@@ -23,6 +23,11 @@ AI 에이전트이기도 한 macOS 데스크톱 펫입니다. 두 개의 Swift �
 둘은 로컬 소켓 브리지로 통신합니다. 에이전트 코어(채팅, 도구, 승인, 세션)는
 `pet-app/Puck/Agent`에 있습니다.
 
+![채팅 창, 위쪽에 펫의 아일랜드](.github/media/island.png)
+
+채팅 창 위쪽 패널이 아일랜드입니다. 창이 열려 있는 동안 펫이 여기로 와서
+지냅니다. `Tank/seabed.png`에 원하는 그림을 넣으면 그 그림으로 채워집니다.
+
 ## 설치
 
 [Releases](https://github.com/desFernan/puck-mac/releases)에서

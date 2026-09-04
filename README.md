@@ -24,6 +24,12 @@ A macOS desktop pet that is also an AI agent. Two Swift apps:
 The two talk over a local socket bridge. The agent core (chat, tools,
 approvals, sessions) lives in `pet-app/Puck/Agent`.
 
+![The chat window, with the pet's island along the top](.github/media/island.png)
+
+The panel across the top of the chat window is the island: a picture the pet
+comes to live in while the window is open. Drop your own `Tank/seabed.png` in
+and it is filled with that instead.
+
 ## Install
 
 Download `Puck-<version>.dmg` from
