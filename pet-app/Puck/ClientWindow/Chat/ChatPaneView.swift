@@ -51,6 +51,9 @@ struct ChatPaneView: View {
     /// column is showing cannot be the way you show it -- with the column
     /// closed the key press fell through to the composer as a stray backtick.
     @AppStorage(TerminalSection.openStorageKey) private var isTerminalOpen = false
+    /// Whether the change review is up -- see ChangeReviewView. Held here
+    /// because the button that opens it is in this view's toolbar.
+    @State private var isReviewShowing = false
 
     var body: some View {
         NavigationSplitView {
@@ -84,6 +87,10 @@ struct ChatPaneView: View {
             .navigationTitle(session.displayTitle)
             .navigationSubtitle(activeWorkspace?.displayName ?? "")
             .toolbar { toolbarContent }
+            .sheet(isPresented: $isReviewShowing) {
+                ChangeReviewView(projectPath: activeWorkspace?.projectPath)
+                    .environment(\.clientPalette, palette)
+            }
         } else {
             // Only reachable if the active ids point at a session that no
             // longer exists; the store always seeds one per workspace.
@@ -233,6 +240,20 @@ struct ChatPaneView: View {
                 // stay in the old language.
                 .id(localization.language)
                 .help(Strings.text(.explorerTabFiles))
+            }
+        }
+        // Only where there is something to review. A project with no git
+        // repository has no "before" to compare against, so the button would
+        // open onto an empty sheet every time.
+        if activeWorkspace?.canOpenEditor == true {
+            ToolbarItem {
+                Button {
+                    isReviewShowing = true
+                } label: {
+                    Label(Strings.text(.reviewTitle), systemImage: "plusminus")
+                }
+                .help(Strings.text(.reviewTitle))
+                .keyboardShortcut("r", modifiers: [.command, .shift])
             }
         }
         // Beside the other two view toggles, because that is what it is: the
