@@ -23,13 +23,11 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      # lfs: the app icons and other Assets.xcassets images are LFS-tracked.
-      # Without it actool is handed the pointer text, the asset catalog fails
-      # to compile, and the GeneratedAssetSymbols.swift it produces takes the
-      # whole Puck target's compile down with it -- tests never run.
+      # No `lfs: true`: this repository stopped using Git LFS on 2026-08-29
+      # (see .gitattributes), so a plain checkout gets real PNGs. Asking for
+      # LFS anyway costs a step and would quietly come back if the option
+      # outlived the reason for it.
       - uses: actions/checkout@v4
-        with:
-          lfs: true
       # Puck.xcodeproj is generated from project.yml, not committed.
       - name: Install xcodegen
         run: brew install xcodegen
