@@ -70,4 +70,29 @@ final class AvatarStandardSizeTests: XCTestCase {
 
         XCTAssertGreaterThan(size.height, 0)
     }
+
+    /// The drawn height divides back to the scale that produced it.
+    ///
+    /// Not arithmetic for its own sake: going into its tank the pet remembers
+    /// the scale it had on the desktop, and there is nowhere to read that from
+    /// -- the size slider hands a scale straight in and nothing keeps it -- so
+    /// AppDelegate+Tank derives it back out of the drawn size. It divided by
+    /// the manifest's own hitbox height, which was the same thing until every
+    /// avatar started being drawn at one standard height, and after that the
+    /// pet came out of the tank at a size that had nothing to do with the one
+    /// it went in at.
+    func testTheDrawnHeightDividesBackToItsScale() {
+        for hitbox in [CGSize(width: 130, height: 133), CGSize(width: 251, height: 300), CGSize(width: 400, height: 100)] {
+            for scale in [0.1, 0.5, 1.0, 2.4] {
+                let drawn = AvatarStandardSize.size(hitbox: hitbox, scale: CGFloat(scale))
+
+                XCTAssertEqual(
+                    Double(drawn.height / AvatarStandardSize.height),
+                    scale,
+                    accuracy: 0.0001,
+                    "\(hitbox) at \(scale)"
+                )
+            }
+        }
+    }
 }

@@ -25,6 +25,30 @@ final class TravelState: StateHandler {
     let clipKey = "fall"
     let loopsClip = true
 
+    /// One trip, ordered as a unit -- see `order(from:to:onProgress:onArrival:)`.
+    struct Trip {
+        var origin: CGPoint
+        var destination: CGPoint
+        var onProgress: ((Double) -> Void)?
+        var onArrival: (() -> Void)?
+    }
+
+    /// The trip as it was ordered, kept so entering can put it back.
+    ///
+    /// Ordering a second trip while one is in the air means transitioning
+    /// into this state again, and re-entry is exit-then-enter: `exit()` clears
+    /// the four fields below, which the caller had just filled in. So the
+    /// second trip was wiped before its first frame -- `update` found no
+    /// origin, took the no-op exit, and neither `onProgress` nor `onArrival`
+    /// ever ran.
+    ///
+    /// What that looked like is the pet shrinking. The size is carried across
+    /// on `onProgress` and put back on `onArrival`, so a dropped trip left it
+    /// frozen part-way between the two worlds' sizes -- and the next trip home
+    /// wrote that half-size down as the size to come back out at. Every fast
+    /// alt-tab took another bite.
+    private var ordered: Trip?
+
     /// Set together, immediately before transitioning in.
     var origin: CGPoint?
     var destination: CGPoint?
@@ -54,13 +78,53 @@ final class TravelState: StateHandler {
     private var elapsed: TimeInterval = 0
     private var oneShot = OneShotTransition()
 
+    /// Installs the trip to run, and is the only way to start one.
+    ///
+    /// Through here rather than by setting the four fields, because they do
+    /// not survive being re-entered -- see `ordered`.
+    func order(
+        from origin: CGPoint,
+        to destination: CGPoint,
+        onProgress: @escaping (Double) -> Void,
+        onArrival: @escaping () -> Void
+    ) {
+        let trip = Trip(origin: origin, destination: destination, onProgress: onProgress, onArrival: onArrival)
+        ordered = trip
+        apply(trip)
+    }
+
+    /// Sends a trip already in the air somewhere else, keeping where it
+    /// started and how far along it is. What the island does when the window
+    /// it is drawn in moves while the pet is on its way to it.
+    func retarget(to destination: CGPoint, onArrival: @escaping () -> Void) {
+        guard ordered != nil else { return }
+        ordered?.destination = destination
+        ordered?.onArrival = onArrival
+        self.destination = destination
+        self.onArrival = onArrival
+    }
+
+    private func apply(_ trip: Trip) {
+        origin = trip.origin
+        destination = trip.destination
+        onProgress = trip.onProgress
+        onArrival = trip.onArrival
+    }
+
     func enter() {
         oneShot.reset()
         elapsed = 0
+        // Put back whatever the exit on the way in cleared. Nothing else
+        // enters this state -- a trip is always ordered immediately before
+        // transitioning -- so this can only ever restore the trip that is
+        // being started right now.
+        if let ordered { apply(ordered) }
     }
 
     func exit() {
-        // Cleared so a stale trip cannot be replayed by a later entry.
+        // Cleared so a stale trip cannot be replayed by a later entry. Only
+        // the live copy: `ordered` is what a re-entry restores, and it is
+        // dropped when the trip actually completes.
         origin = nil
         destination = nil
         onProgress = nil
@@ -93,7 +157,11 @@ final class TravelState: StateHandler {
         // The end of the same curve, so a trip that arrived in one long frame
         // still lands at the size it was heading for.
         onProgress?(1)
-        onArrival?()
+        let arrival = onArrival
+        // Consumed here rather than in `exit`: this trip is over, and the
+        // transition below is what clears the live copy.
+        ordered = nil
+        arrival?()
         // Land, not idle: arriving is a landing, and the bounce is what makes
         // the trip end rather than just stop.
         oneShot.fire(.land, using: context.requestTransition)

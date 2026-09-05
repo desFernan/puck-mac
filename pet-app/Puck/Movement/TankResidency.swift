@@ -43,6 +43,37 @@ struct TankResidency {
     /// slider hands a scale straight in and nothing keeps it.
     var desktopScale: Double = 1
 
+    /// The areas the pet roamed before it went home, kept alongside the scale
+    /// and for the same reason -- see `rememberingDesktop`.
+    var desktopAreas: [CGRect]?
+
+    /// Takes down what "the desktop" is, on the way into the tank.
+    ///
+    /// Only from a pet that is actually standing on the desktop. Mid-trip the
+    /// pet is at a size somewhere between the two ends and in an area widened
+    /// to cover both, and neither is the desktop -- so a second crossing that
+    /// starts before the first has landed must not record them as one.
+    ///
+    /// That is what two quick Cmd-Tabs did. The window loses front, the pet
+    /// sets off for the desktop; the window comes back before it lands, and
+    /// going home wrote down whatever size it was passing through as the size
+    /// to come back out at. The pet then left the tank at that size, and every
+    /// trip after it kept whatever the one before had recorded.
+    ///
+    /// - Returns: the areas to treat as the desktop from here on.
+    mutating func rememberingDesktop(
+        currentAreas: [CGRect],
+        currentScale: Double,
+        isMidTrip: Bool
+    ) -> [CGRect] {
+        if isMidTrip, let desktopAreas {
+            return desktopAreas
+        }
+        desktopAreas = currentAreas
+        desktopScale = currentScale
+        return currentAreas
+    }
+
     /// The size a trip in progress is heading for, so a drag during the
     /// flight home lands at the size that was chosen rather than the one
     /// chosen before it. The trip lerps toward this every frame; writing the

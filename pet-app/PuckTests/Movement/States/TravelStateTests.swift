@@ -173,4 +173,114 @@ final class TravelStateTests: XCTestCase {
         state.exit()
         XCTAssertNil(state.onProgress)
     }
+
+    // MARK: - A second trip ordered while one is in the air
+
+    /// The reported fault: the pet got smaller every time the window was
+    /// alt-tabbed away from quickly.
+    ///
+    /// Ordering a second trip means transitioning into this state again, and
+    /// re-entry is exit-then-enter -- so `exit()` cleared the route and the
+    /// callbacks the caller had just installed. The trip was dropped before
+    /// its first frame: no progress, no arrival. The size is carried on those
+    /// callbacks, so the pet froze part-way between the desktop's size and
+    /// the island's, and the next trip home wrote that half-size down as the
+    /// size to come back out at.
+    func test_aTripOrderedWhileOneIsInTheAirStillRuns() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        state.duration = 0.1
+        var firstArrived = false
+        state.order(from: .zero, to: CGPoint(x: 100, y: 0), onProgress: { _ in }, onArrival: { firstArrived = true })
+        state.enter()
+        state.update(dt: 0.03, context: world.context)
+
+        // 두 번째 여행: 실제 앱에서는 transition(to:)가 exit -> enter를 부른다.
+        var reported: [Double] = []
+        var secondArrived = false
+        state.order(
+            from: CGPoint(x: 40, y: 0),
+            to: CGPoint(x: 900, y: 0),
+            onProgress: { reported.append($0) },
+            onArrival: { secondArrived = true }
+        )
+        state.exit()
+        state.enter()
+
+        state.update(dt: 5, context: world.context)
+
+        XCTAssertEqual(reported.last, 1, "the second trip never ran")
+        XCTAssertTrue(secondArrived, "the second trip never arrived")
+        XCTAssertFalse(firstArrived, "the trip it replaced must not also arrive")
+        XCTAssertEqual(world.body.position.x, 900, accuracy: 0.001)
+    }
+
+    /// And the size lands exactly where it was heading, which is the whole
+    /// reason the drift compounded: a trip that stops short leaves the pet at
+    /// a size nothing put it at.
+    func test_aRestartedTripStillEndsAtItsFullProgress() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        state.duration = 0.1
+        var scale = 1.0
+        let departing = 1.0
+        let target = 0.14
+        state.order(from: .zero, to: CGPoint(x: 10, y: 0), onProgress: { _ in }, onArrival: {})
+        state.enter()
+        state.update(dt: 0.04, context: world.context)
+
+        state.order(
+            from: .zero,
+            to: CGPoint(x: 10, y: 0),
+            onProgress: { progress in scale = departing + (target - departing) * progress },
+            onArrival: {}
+        )
+        state.exit()
+        state.enter()
+        state.update(dt: 5, context: world.context)
+
+        XCTAssertEqual(scale, target, accuracy: 0.0001, "the pet has to land at the size it was heading for")
+    }
+
+    /// A trip that has completed is not put back by a later entry -- that is
+    /// the stale replay `exit()` was clearing for in the first place.
+    func test_aCompletedTripIsNotReplayedByALaterEntry() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        state.duration = 0.1
+        var arrivals = 0
+        state.order(from: .zero, to: CGPoint(x: 10, y: 0), onProgress: { _ in }, onArrival: { arrivals += 1 })
+        state.enter()
+        state.update(dt: 5, context: world.context)
+        XCTAssertEqual(arrivals, 1)
+
+        state.exit()
+        state.enter()
+        state.update(dt: 5, context: world.context)
+
+        XCTAssertEqual(arrivals, 1, "a finished trip must not run again")
+        XCTAssertNil(state.origin)
+    }
+
+    /// Retargeting keeps the trip: the island moves when its window does, and
+    /// a pet on its way to it should arrive where the island now is without
+    /// starting over.
+    func test_retargetingKeepsTheTripAndSurvivesARestart() {
+        let world = TestStateWorld()
+        let state = TravelState()
+        state.duration = 0.1
+        var arrivedAt: CGPoint?
+        state.order(from: .zero, to: CGPoint(x: 100, y: 0), onProgress: { _ in }, onArrival: {})
+        state.enter()
+        state.update(dt: 0.03, context: world.context)
+
+        state.retarget(to: CGPoint(x: 500, y: 0)) { arrivedAt = CGPoint(x: 500, y: 0) }
+        // 창이 다시 움직여 상태를 다시 들어가도 새 목적지가 남아 있어야 한다.
+        state.exit()
+        state.enter()
+        state.update(dt: 5, context: world.context)
+
+        XCTAssertEqual(arrivedAt, CGPoint(x: 500, y: 0))
+        XCTAssertEqual(world.body.position.x, 500, accuracy: 0.001)
+    }
 }

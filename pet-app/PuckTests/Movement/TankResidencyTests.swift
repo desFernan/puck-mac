@@ -119,4 +119,48 @@ final class TankResidencyTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(drawnHeight(roomy), 200)
     }
+
+    // MARK: - What "the desktop" is, across two quick trips
+
+    /// The size and the room the pet had on the desktop, taken down on the way
+    /// in.
+    func test_goingHomeRemembersTheDesktopItLeft() {
+        var tank = TankResidency()
+        let desktop = [CGRect(x: 0, y: 0, width: 1440, height: 900)]
+
+        let remembered = tank.rememberingDesktop(currentAreas: desktop, currentScale: 1.4, isMidTrip: false)
+
+        XCTAssertEqual(remembered, desktop)
+        XCTAssertEqual(tank.desktopScale, 1.4, accuracy: 0.0001)
+    }
+
+    /// Two quick Cmd-Tabs: the window loses front and the pet sets off for the
+    /// desktop, then the window comes back before it lands. What the pet is
+    /// passing through -- a size between the two ends, an area widened to
+    /// cover both -- is not the desktop, and writing it down as one is how the
+    /// pet came back out at whatever size the trip happened to be at.
+    func test_aTripThatHasNotLandedIsNotTheDesktop() {
+        var tank = TankResidency()
+        let desktop = [CGRect(x: 0, y: 0, width: 1440, height: 900)]
+        _ = tank.rememberingDesktop(currentAreas: desktop, currentScale: 1.4, isMidTrip: false)
+
+        // Heading back out, half way, at half the size and in the union of
+        // both worlds.
+        let midTrip = desktop + [CGRect(x: 400, y: 40, width: 600, height: 38)]
+        let remembered = tank.rememberingDesktop(currentAreas: midTrip, currentScale: 0.6, isMidTrip: true)
+
+        XCTAssertEqual(remembered, desktop, "the desktop is where the trip was heading, not where it is")
+        XCTAssertEqual(tank.desktopScale, 1.4, accuracy: 0.0001, "the desktop size must survive the crossing")
+    }
+
+    /// With nothing remembered yet there is nothing better to use, so a
+    /// mid-trip call still has to answer with something the pet can stand in.
+    func test_aTripWithNothingRememberedFallsBackToWhatItHas() {
+        var tank = TankResidency()
+        let areas = [CGRect(x: 0, y: 0, width: 800, height: 600)]
+
+        let remembered = tank.rememberingDesktop(currentAreas: areas, currentScale: 1, isMidTrip: true)
+
+        XCTAssertEqual(remembered, areas)
+    }
 }

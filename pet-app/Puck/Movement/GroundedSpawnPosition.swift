@@ -11,9 +11,9 @@
 //  visibly floating in empty space until the first wander timer fired.
 //
 //  No hitbox/height parameter needed: AvatarPlayable.setScreenPosition's
-//  input is the ground/feet point uniformly across avatar types (SpriteAvatar
-//  converts to its own CALayer center internally; USDZAvatar's rig is
-//  root-at-feet by convention already), so "the ground" is just the bottom edge.
+//  input is the ground/feet point whatever is drawing the character
+//  (SpriteAvatar converts to its own CALayer center internally), so "the
+//  ground" is just the bottom edge.
 
 import CoreGraphics
 
