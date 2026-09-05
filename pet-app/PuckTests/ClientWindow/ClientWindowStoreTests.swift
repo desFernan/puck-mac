@@ -578,4 +578,71 @@ final class ClientWindowStoreTests: XCTestCase {
 
         XCTAssertEqual(store.themeStyle, .dark)
     }
+
+    // MARK: - Chats that survive a quit
+
+    /// The window comes back holding what was said in it.
+    func test_theStoreRestoresItsChats() {
+        let storageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("chats.json")
+        defer { try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent()) }
+
+        let first = ClientWindowStore(
+            sender: UserInputSender(transport: { nil }),
+            archive: ChatArchive(storageURL: storageURL)
+        )
+        first.sendMessage("어제 하던 얘기", source: .text)
+        first.saveNow()
+
+        let second = ClientWindowStore(
+            sender: UserInputSender(transport: { nil }),
+            archive: ChatArchive(storageURL: storageURL)
+        )
+
+        let restored = second.session(
+            workspaceId: ClientWindowStore.defaultWorkspaceId,
+            sessionId: ClientWindowStore.defaultSessionId
+        )
+        XCTAssertEqual(restored?.timeline.count, 1)
+        guard case .userMessage(_, let text)? = restored?.timeline.first else {
+            return XCTFail("the message did not come back")
+        }
+        XCTAssertEqual(text, "어제 하던 얘기")
+    }
+
+    /// The casual session is seeded under every workspace, so restoring it
+    /// and seeding it are the same chat -- and the restored one has to win,
+    /// or every launch replaces it with an empty one.
+    func test_theSeededCasualChatDoesNotReplaceTheRestoredOne() {
+        let storageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("chats.json")
+        defer { try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent()) }
+
+        let first = ClientWindowStore(
+            sender: UserInputSender(transport: { nil }),
+            archive: ChatArchive(storageURL: storageURL)
+        )
+        first.sendMessage("일상 대화에 한 말", source: .text)
+        first.saveNow()
+
+        let second = ClientWindowStore(
+            sender: UserInputSender(transport: { nil }),
+            archive: ChatArchive(storageURL: storageURL)
+        )
+
+        let chats = second.sessions(in: ClientWindowStore.defaultWorkspaceId)
+        XCTAssertEqual(chats.count, 1, "the seed must not add a second casual chat")
+        XCTAssertEqual(chats.first?.timeline.count, 1)
+    }
+
+    /// Without an archive nothing is read and nothing is written -- which is
+    /// what every other test in this file depends on.
+    func test_aStoreWithNoArchiveKeepsNothing() {
+        let store = ClientWindowStore(sender: UserInputSender(transport: { nil }))
+        store.sendMessage("아무거나", source: .text)
+
+        XCTAssertNoThrow(store.saveNow())
+    }
 }

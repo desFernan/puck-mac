@@ -508,4 +508,64 @@ final class ChatSessionTests: XCTestCase {
 
         XCTAssertEqual(session.title, "첫 질문")
     }
+
+    // MARK: - Sending again while the agent is working
+
+    /// Sending a second message supersedes the first run, and a superseded
+    /// run keeps going until it notices -- so it ends *after* the run that
+    /// replaced it started. Its ending must not answer for the newer one.
+    func test_aSupersededRunsEndingDoesNotStopTheRunThatReplacedIt() {
+        let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
+
+        session.markWaitingForAgent()          // 첫 번째 전송
+        session.apply(.textChunk(text: "답하는 중"))
+        session.markWaitingForAgent()          // 답이 오는 중에 두 번째 전송
+        XCTAssertTrue(session.isRunning)
+
+        // 밀려난 첫 실행이 뒤늦게 끝난다.
+        session.apply(.agentDone(ok: false, summary: "중단됨"))
+
+        XCTAssertTrue(session.isRunning, "the run that replaced it is still working")
+
+        // 두 번째가 끝나야 비로소 멈춘다.
+        session.apply(.agentDone(ok: true, summary: "끝"))
+
+        XCTAssertFalse(session.isRunning)
+    }
+
+    /// And it must not take the newer run's approval banner with it: that
+    /// request has an answer coming, and clearing it leaves two buttons with
+    /// nothing behind them.
+    func test_aSupersededRunsEndingLeavesTheNewerRunsApprovalAlone() {
+        let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
+        session.markWaitingForAgent()
+        session.markWaitingForAgent()
+        session.apply(.awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1"))
+
+        session.apply(.agentDone(ok: false, summary: "중단됨"))
+
+        XCTAssertEqual(session.pendingApproval?.approvalId, "a1")
+        XCTAssertEqual(session.approvalState(for: "a1"), .actionable)
+
+        session.apply(.agentDone(ok: true, summary: "끝"))
+
+        XCTAssertNil(session.pendingApproval, "nothing is left to answer once the chat is idle")
+    }
+
+    /// A run this chat never saw start -- everything it hears comes off the
+    /// socket -- still balances, rather than driving the count below zero and
+    /// leaving a spinner that can never be turned off.
+    func test_aRunHeardOnlyFromTheSocketStillEnds() {
+        let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
+
+        session.apply(.agentThinking)
+        XCTAssertTrue(session.isRunning)
+        session.apply(.agentDone(ok: true, summary: "끝"))
+        XCTAssertFalse(session.isRunning)
+
+        // 그리고 짝 없는 done 하나가 더 와도 다음 실행이 망가지지 않는다.
+        session.apply(.agentDone(ok: true, summary: "또 끝"))
+        session.markWaitingForAgent()
+        XCTAssertTrue(session.isRunning)
+    }
 }

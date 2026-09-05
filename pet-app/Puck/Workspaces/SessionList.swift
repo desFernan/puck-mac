@@ -68,6 +68,12 @@ struct SessionList {
         return true
     }
 
+    /// Every session there is, oldest first. For whoever has to write them
+    /// all down -- see ChatArchive.
+    func all() -> [ChatSession] {
+        order.compactMap { byKey[$0] }
+    }
+
     /// Every session in a workspace, oldest first.
     func sessions(in workspaceId: String) -> [ChatSession] {
         order.compactMap { $0.workspaceId == workspaceId ? byKey[$0] : nil }

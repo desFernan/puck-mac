@@ -62,6 +62,28 @@ final class AgentConversations: @unchecked Sendable {
         stacks[key, default: [systemPrompt]].append(message)
     }
 
+    /// Gives a chat back the conversation it had before the app was quit.
+    ///
+    /// Only when it has none: a chat the model has already been talking in
+    /// this session must not have a restored copy of itself pushed underneath
+    /// what it just said. So this is the one-shot seed for a chat read off
+    /// disk, and a no-op for every other.
+    ///
+    /// What is seeded is prose, not the whole stack -- see
+    /// `ChatSession.spokenHistory` for why a restored tool call is a way to
+    /// break every message sent in the chat afterwards.
+    ///
+    /// - Returns: whether it seeded anything, which is also "was this chat
+    ///   restored".
+    @discardableResult
+    func seedIfEmpty(_ history: [(isUser: Bool, text: String)], to key: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard stacks[key] == nil, !history.isEmpty else { return false }
+        stacks[key] = [systemPrompt] + history.map { $0.isUser ? .user($0.text) : .assistant(text: $0.text, toolCalls: [], reasoning: nil) }
+        return true
+    }
+
     /// Gives `destination` the conversation `source` has, for the one case
     /// where a new chat is a continuation rather than a beginning: the agent
     /// branching its work into a task session.

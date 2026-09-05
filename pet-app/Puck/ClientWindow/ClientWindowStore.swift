@@ -153,8 +153,13 @@ final class ClientWindowStore: ObservableObject {
         editorRevealRequests += 1
     }
 
-    init(sender: UserInputSender) {
+    /// - Parameter archive: where the chats are kept between launches. Nil
+    ///   means "do not keep them", which is what every test wants -- a default
+    ///   pointing at the real file would have each of them reading and
+    ///   overwriting the user's own conversations.
+    init(sender: UserInputSender, archive: ChatArchive? = nil) {
         self.sender = sender
+        self.archive = archive
         workspaces = [ClientWorkspace(id: Self.defaultWorkspaceId, name: Self.casualSessionTitle, projectPath: nil)]
         activeWorkspaceId = Self.defaultWorkspaceId
         activeSessionId = Self.defaultSessionId
@@ -162,7 +167,48 @@ final class ClientWindowStore: ObservableObject {
         // built by hand -- after the last stored property, which is when
         // `self` may be used at all.
         refreshWorkspaceIndex()
+        // Before the casual session is seeded, not after: the seed is
+        // idempotent per (workspace, id), so a restored casual chat keeps
+        // everything said in it and the seed then does nothing. The other way
+        // round, an empty one would be in the list first and the restored one
+        // refused.
+        for session in archive?.load() ?? [] {
+            insertSession(session)
+        }
         seedDefaultSession(forWorkspace: Self.defaultWorkspaceId)
+    }
+
+    /// Everything said in every chat, kept between launches -- see ChatArchive.
+    private let archive: ChatArchive?
+    /// The pending write. Coalesced rather than written per change: a reply
+    /// streams in a chunk at a time, and a file write per chunk is a file
+    /// write per token.
+    private var pendingSave: DispatchWorkItem?
+
+    /// Long enough to fold a whole streamed reply into one write, short enough
+    /// that a crash loses a sentence rather than a conversation.
+    static let saveDelay: TimeInterval = 2
+
+    /// Something in a chat changed, so the file is now behind.
+    ///
+    /// Called from the places a transcript is actually mutated. It has to be
+    /// every one of them -- a chat that changed and never asked to be saved is
+    /// a chat that comes back missing its last exchange.
+    private func scheduleSave() {
+        guard archive != nil else { return }
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveNow() }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.saveDelay, execute: work)
+    }
+
+    /// Writes now rather than in a moment. For quitting, which is the one
+    /// case where "in a moment" never arrives.
+    func saveNow() {
+        guard let archive else { return }
+        pendingSave?.cancel()
+        pendingSave = nil
+        archive.save(sessionList.all(), knownWorkspaceIds: Set(workspaces.map(\.id)))
     }
 
     private func seedDefaultSession(forWorkspace workspaceId: String) {
@@ -191,6 +237,7 @@ final class ClientWindowStore: ObservableObject {
     private func announceIfChanged(_ changed: Bool) {
         guard changed else { return }
         objectWillChange.send()
+        scheduleSave()
     }
 
     /// Whether the sidebar's Delete should be offered for this chat.
@@ -342,7 +389,9 @@ final class ClientWindowStore: ObservableObject {
     /// yet (e.g. an event racing ahead of its session_create) is dropped
     /// rather than fabricated with guessed metadata.
     func handleChatEvent(_ event: BridgeEvent, workspaceId: String, sessionId: String) {
-        session(workspaceId: workspaceId, sessionId: sessionId)?.apply(event)
+        guard let session = session(workspaceId: workspaceId, sessionId: sessionId) else { return }
+        session.apply(event)
+        scheduleSave()
     }
 
     @discardableResult
@@ -423,6 +472,7 @@ final class ClientWindowStore: ObservableObject {
         if let command = SlashCommand.parse(text) {
             target?.appendUserMessage(text)
             target?.appendNotice(slashCommands.run(command))
+            scheduleSave()
             return .sent
         }
         // Nothing else puts the user's own text in the transcript -- the
@@ -446,6 +496,7 @@ final class ClientWindowStore: ObservableObject {
         // below carries them as attachments, which is what it is for.
         let carried = Self.message(text, carrying: onUserCommand == nil ? [] : (attachments ?? []))
         target?.appendUserMessage(carried)
+        scheduleSave()
         if let onUserCommand {
             onUserCommand(carried, activeWorkspaceId, activeSessionId)
             target?.markWaitingForAgent()
@@ -474,22 +525,6 @@ final class ClientWindowStore: ObservableObject {
         return text.isEmpty ? lines : text + "\n\n" + lines
     }
 
-    /// Shows text the user typed *somewhere else* (pet-app's quick-capture
-    /// bubble, mirrored over the socket as user_input) in this window's chat,
-    /// and switches to the session it was sent to -- submitting from the
-    /// quick-capture bubble should bring this window up showing what was
-    /// typed. Messages sent from this window's own input bar are echoed by
-    /// `sendMessage` instead, and go to the in-process agent rather than over
-    /// the socket -- see the note there about what would happen if they did.
-    ///
-    /// - Returns: whether it landed in an existing session (an unknown
-    ///   workspace/session is dropped rather than fabricated, same rule as
-    ///   handleChatEvent).
-    /// The sidebar's own selection. Goes through the store rather than setting
-    /// the two ids directly so that picking a chat by hand also puts down any
-    /// ChatSession.placeholderTitle still armed -- a request whose confirmation never arrived would
-    /// otherwise stay armed indefinitely and jump the user away from the chat
-    /// they chose the next time any user-origin session turned up.
     /// Asks pet-app to throw a workspace away. Nothing changes here until it
     /// confirms: the registry is over there, and a sidebar that removed the
     /// row on the ask would be showing a deletion that may not have happened.
@@ -521,13 +556,26 @@ final class ClientWindowStore: ObservableObject {
         activeSessionId = Self.defaultSessionId
     }
 
+    /// The sidebar's own selection. Goes through the store rather than
+    /// setting the two ids directly so that picking a chat by hand also puts
+    /// down any ChatSession.placeholderTitle still armed -- a request whose
+    /// confirmation never arrived would otherwise stay armed indefinitely and
+    /// jump the user away from the chat they chose the next time any
+    /// user-origin session turned up.
     func selectSession(workspaceId: String, sessionId: String) {
         pendingSessionRequests.removeValue(forKey: workspaceId)
         activeWorkspaceId = workspaceId
         activeSessionId = sessionId
     }
 
-    @discardableResult
+    /// Shows text the user typed *somewhere else* (pet-app's quick-capture
+    /// bubble, mirrored over the socket as user_input) in this window's chat,
+    /// and switches to the session it was sent to -- submitting from the
+    /// quick-capture bubble should bring this window up showing what was
+    /// typed. Messages sent from this window's own input bar are echoed by
+    /// `sendMessage` instead, and go to the in-process agent rather than over
+    /// the socket -- see the note there about what would happen if they did.
+    ///
     /// - Returns: where the text actually landed, so the caller can run the
     ///   agent against the same chat the user is now looking at, or nil when
     ///   there is nowhere at all to put it.
@@ -539,6 +587,7 @@ final class ClientWindowStore: ObservableObject {
     /// connection existed -- so a disagreement between its registry and this
     /// sidebar (a session_create that raced a reconnect) meant someone typed
     /// into the pet's bubble, watched it accept, and nothing ever happened.
+    @discardableResult
     func showUserMessage(
         _ text: String,
         workspaceId: String?,
@@ -548,6 +597,7 @@ final class ClientWindowStore: ObservableObject {
         let requestedSessionId = sessionId ?? Self.defaultSessionId
         if let session = session(workspaceId: requestedWorkspaceId, sessionId: requestedSessionId) {
             session.appendUserMessage(text)
+            scheduleSave()
             activeWorkspaceId = requestedWorkspaceId
             activeSessionId = requestedSessionId
             return (requestedWorkspaceId, requestedSessionId)
@@ -556,6 +606,7 @@ final class ClientWindowStore: ObservableObject {
             return nil
         }
         fallback.appendUserMessage(text)
+        scheduleSave()
         return (activeWorkspaceId, activeSessionId)
     }
 

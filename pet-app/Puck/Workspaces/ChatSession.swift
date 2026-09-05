@@ -108,6 +108,20 @@ final class ChatSession: ObservableObject, Identifiable {
     @Published private(set) var pendingApprovals: [PendingApproval] = []
     @Published private(set) var isRunning = false
 
+    /// How many runs this chat is waiting on.
+    ///
+    /// A count rather than a flag, because there can genuinely be two. Sending
+    /// while the agent is working supersedes the first run (AgentRunHandle),
+    /// and a superseded run keeps going until it next looks at
+    /// `Task.isCancelled` -- so it ends *after* the run that replaced it
+    /// started, and it ends the way every run ends, with `agent_done`.
+    ///
+    /// Against a flag that was the bug: the older run's ending turned off the
+    /// newer run's spinner and cleared the approval it was waiting on, so the
+    /// chat sat still and silent while the agent was in fact working, and an
+    /// approval banner vanished with nothing left to answer it.
+    private var runsInFlight = 0
+
     /// The request the approval buttons answer, or nil when none is waiting.
     var pendingApproval: PendingApproval? { pendingApprovals.first }
 
@@ -143,6 +157,59 @@ final class ChatSession: ObservableObject, Identifiable {
         self.title = title
         self.origin = origin
         self.isAutoTitled = Self.isDefaultTitle(title)
+    }
+
+    /// A chat read back off disk -- see ChatArchive.
+    ///
+    /// Everything a live chat derives from what has happened to it is passed
+    /// in instead, because none of it can be derived after the fact:
+    /// `isAutoTitled` was decided from the title this chat *started* with and
+    /// a restored one no longer has that, and `lastActivityAt` is when the
+    /// agent last said something rather than when the file was read.
+    ///
+    /// `isRunning` and `pendingApprovals` are deliberately not among them.
+    /// Both belong to a process that has gone: a restored spinner would never
+    /// stop, and a restored approval would offer two buttons with nothing
+    /// left to receive the answer.
+    init(
+        id: String,
+        workspaceId: String,
+        title: String,
+        origin: SessionOrigin,
+        isAutoTitled: Bool,
+        hasTopicTitle: Bool,
+        lastActivityAt: Date?,
+        timeline: [ChatTimelineEntry]
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.title = title
+        self.origin = origin
+        self.isAutoTitled = isAutoTitled
+        self.hasTopicTitle = hasTopicTitle
+        self.lastActivityAt = lastActivityAt
+        self.timeline = timeline
+    }
+
+    /// What the model has to be told again to carry a restored chat on.
+    ///
+    /// The prose only -- what was asked and what was answered. Tool calls are
+    /// left out on purpose: a provider rejects a stack whose assistant message
+    /// asks for tools that nothing replied to, and rebuilding those pairs
+    /// exactly across a restart is a way to break every message sent in the
+    /// chat from then on. What a continued conversation needs is what was
+    /// said, and that is what this is.
+    var spokenHistory: [(isUser: Bool, text: String)] {
+        timeline.compactMap { entry in
+            switch entry {
+            case .userMessage(_, let text):
+                return text.isEmpty ? nil : (true, text)
+            case .assistantText(_, let text):
+                return text.isEmpty ? nil : (false, text)
+            case .notice, .toolCall, .toolResult, .approvalRequested, .done:
+                return nil
+            }
+        }
     }
 
     /// The opening question and the answer to it -- the material a title is
@@ -214,6 +281,13 @@ final class ChatSession: ObservableObject, Identifiable {
         }
     }
 
+    /// The app's own reply to a slash command. Does not name the chat the way
+    /// `appendUserMessage` does: a session called "/help" tells the sidebar
+    /// nothing about what the conversation is.
+    func appendNotice(_ text: String) {
+        timeline.append(.notice(id: UUID(), text: text))
+    }
+
     /// Local echo of the user's own send -- called by ClientWindowStore, not
     /// folded from a BridgeEvent (protocol never sends the user's own text
     /// back).
@@ -225,13 +299,6 @@ final class ChatSession: ObservableObject, Identifiable {
     /// session the agent already named through open_task_session -- the latter
     /// matters because moveTurnToTaskSession feeds it the message that started
     /// it, which would otherwise overwrite the agent's title immediately.
-    /// The app's own reply to a slash command. Does not name the chat the way
-    /// `appendUserMessage` does: a session called "/help" tells the sidebar
-    /// nothing about what the conversation is.
-    func appendNotice(_ text: String) {
-        timeline.append(.notice(id: UUID(), text: text))
-    }
-
     func appendUserMessage(_ text: String) {
         if Self.isDefaultTitle(title) {
             title = Self.title(fromFirstMessage: text)
@@ -280,7 +347,16 @@ final class ChatSession: ObservableObject, Identifiable {
     /// the agent's very first act is a slow model call, that is the exact
     /// stretch the user is staring at.
     func markWaitingForAgent() {
+        runsInFlight += 1
         isRunning = true
+    }
+
+    /// A run this chat never saw start -- the first thing heard from it is
+    /// the agent already working. Counted as one so its `agent_done` balances
+    /// rather than driving the count negative.
+    private func noteRunStartedElsewhere() {
+        guard runsInFlight == 0 else { return }
+        runsInFlight = 1
     }
 
     /// Folds one BridgeEvent into the timeline. Caller (ClientWindowStore) is
@@ -291,9 +367,11 @@ final class ChatSession: ObservableObject, Identifiable {
         lastActivityAt = Date()
         switch event {
         case .agentThinking:
+            noteRunStartedElsewhere()
             isRunning = true
 
         case .textChunk(let text):
+            noteRunStartedElsewhere()
             isRunning = true
             if case .assistantText(let entryId, let existing) = timeline.last {
                 timeline[timeline.count - 1] = .assistantText(id: entryId, text: existing + text)
@@ -329,11 +407,17 @@ final class ChatSession: ObservableObject, Identifiable {
             )
 
         case .agentDone(let ok, let summary):
-            isRunning = false
-            // The run is over, so nothing is waiting on these any more. The
-            // side holding the requests fails whatever is left (AgentHost),
-            // so no answer is silently dropped here.
-            pendingApprovals.removeAll()
+            // One run ended, which is not the same as this chat being idle --
+            // see `runsInFlight`. A superseded turn ends while the turn that
+            // replaced it is still working, and it must not answer for it.
+            runsInFlight = max(0, runsInFlight - 1)
+            isRunning = runsInFlight > 0
+            // Only once nothing is left running. The side holding the
+            // requests fails whatever it still owns (AgentHost), so no answer
+            // is silently dropped here -- but clearing the queue while a
+            // newer run is waiting on it takes away a banner that has an
+            // answer coming.
+            if runsInFlight == 0 { pendingApprovals.removeAll() }
             timeline.append(.done(id: UUID(), ok: ok, summary: summary))
 
         case .petSays:
