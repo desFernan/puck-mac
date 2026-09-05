@@ -81,8 +81,13 @@ Everything you can swap lives in one folder:
     Tank/seabed.png     the picture the island is filled with
 ```
 
-Settings has a button that opens it (아바타 → 커스터마이징 폴더 열기), which also
-creates the folders if they are not there yet.
+Right-click Puck's menu bar icon for the quick panel — the toys, mute and
+volume, how big the pet is, which way the theme goes — and **설정** in it opens
+the settings window: one page each for the avatar, its poses, sound, movement
+and the rest. (A left-click on the same icon opens the chat window instead.)
+
+The window's **아바타** page has a button that opens the folder above
+(**커스터마이징 폴더 열기**), and creates it if it is not there yet.
 
 ### The tank
 
@@ -105,7 +110,7 @@ Avatars/my-pet/
 
 #### Adding one, start to finish
 
-1. **Open the folder.** Settings → 아바타 → **커스터마이징 폴더 열기**. It creates
+1. **Open the folder.** 설정 → 아바타 → **커스터마이징 폴더 열기**. It creates
    `Avatars/` and `Tank/` if they are not there yet, so this also tells you the
    folder exists.
 2. **Make a folder for your character** inside `Avatars/`. Its name is the name
@@ -127,9 +132,12 @@ Avatars/my-pet/
    }
    ```
 
-   `hitbox` is the size it will be drawn and clicked at, in points — match your
-   drawing's proportions or it will look squashed.
-4. **Load it.** Settings → 아바타 → **아바타 다시 불러오기**, then press **선택**
+   `hitbox` is your drawing's *proportions*, not its size: every avatar stands
+   the same height whatever numbers it declares, and only the ratio between
+   these two is read. Match your drawing's aspect ratio or it will look
+   squashed. How big the pet actually stands is the size slider in the quick
+   panel.
+4. **Load it.** 설정 → 아바타 → **아바타 다시 불러오기**, then press **선택**
    next to its name. No restart: the reload button rebuilds the running pet
    from what is on disk, which is also how you see a redrawn sprite or an
    edited manifest without quitting.
@@ -167,19 +175,40 @@ so it is the louder way to find out what is missing.
 - **`sounds`** are paths inside the package, and may sit in a subfolder. Keys
   are clip names plus a few events: `app_launch`, `task_success`, `task_fail`,
   `listen_start`, `kick_<toy>`, `chatter_*`.
-- **`hitbox`** is the character's size in points at `scale` 1 — what the pet is
-  clicked, stood and thrown by. **`bounce_intensity`** (0–1) is how much the
-  squash-and-stretch shows on a still drawing.
+- **`hitbox`** is the character's shape — the ratio of its width to its height,
+  which is what the pet is clicked, stood and thrown by once it has been drawn
+  at the app's own standard height. **`bounce_intensity`** (0–1) is how much
+  the squash-and-stretch shows on a still drawing.
+- **`type`** must be `sprites`. It is the only kind this build can draw; a
+  package declaring anything else is refused by name rather than loaded and
+  drawn as nothing.
 - Only `schema_version`, `name`, `type`, `hitbox` and `clips` have to be there.
   `scale` defaults to 1, `sounds` and `emotions` to nothing at all, and
   `bounce_intensity` to the app's own default.
 - Paths in the manifest stay inside the package: a name that climbs out of it
   is refused rather than read.
 
-`pet-app/Puck/Resources/Avatars/dummy` is a complete example, and Settings'
-import button takes a folder like the above and copies it in for you.
+Two things on those pages are worth knowing about before you hand-edit
+anything. The **아바타** page has a base-image slot, which sets `idle` from one
+picture you pick — and since every other clip falls back to `idle`, that alone
+is a complete character. The **자세 미리보기** page draws what the pet will look like
+walking, climbing each wall and crossing the ceiling in each direction, with a
+flip and a quarter turn per pose: that is the way to fix artwork that climbs
+head-first without redrawing it.
+
+`pet-app/Puck/Resources/Avatars/dummy` is a complete example, and the import
+button takes a folder like the above and copies it in for you.
 
 ## Community
 
 Questions, bug reports, feature ideas, or just want to show off your custom
 avatar — join us on **[Discord](https://discord.gg/nGqtBGP857)**.
+
+Want to help? [CONTRIBUTING.md](CONTRIBUTING.md) says how to build it, where
+the easy issues are, and what a good pull request looks like here.
+
+## License
+
+MIT for the source — see [LICENSE](LICENSE). **Not** for the artwork, icons,
+fonts or audio distributed next to it: see
+[LICENSE-ASSETS.md](LICENSE-ASSETS.md) for why.
