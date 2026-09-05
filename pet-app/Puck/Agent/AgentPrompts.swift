@@ -50,6 +50,30 @@ extension AgentRunner {
         )
     }()
 
+    static let terminalStartToolName = "terminal_start"
+    static let terminalReadToolName = "terminal_read"
+    static let terminalSendToolName = "terminal_send"
+    static let terminalStopToolName = "terminal_stop"
+
+    /// The four, for the router: a name in this set goes to the terminal
+    /// delegate rather than to the socket.
+    static let terminalToolNames: Set<String> = [
+        terminalStartToolName, terminalReadToolName, terminalSendToolName, terminalStopToolName,
+    ]
+
+    /// The four together, because they are useless apart: a start with no
+    /// read is a process nobody hears from, and a read with no start has
+    /// nothing to read.
+    static let terminalSpecs: [GPTToolSpec] = [
+        terminalStartToolName, terminalReadToolName, terminalSendToolName, terminalStopToolName,
+    ].map { name in
+        GPTToolSpec(
+            name: name,
+            description: description(for: name),
+            parameters: ToolRegistry.tool(named: name)?.parameters ?? []
+        )
+    }
+
     static let readFileSpec: GPTToolSpec = GPTToolSpec(
         name: readFileToolName,
         description: description(for: readFileToolName),
@@ -98,6 +122,33 @@ extension AgentRunner {
             Needs the app's pid plus role or title_contains. Not finding anything is a success with null \
             data, not an error -- try a different role or title before giving up. Requires Accessibility \
             permission; without it this fails with permission_denied and you should tell the user to grant it.
+            """
+        case "app_snapshot":
+            return """
+            List what is in an app's windows: one line per element, with its role, its label and its \
+            frame. Start here rather than guessing at find_ui_element -- the frames it returns are \
+            exactly what point_at, click_element and scroll take, so a line from this can be used \
+            directly. Needs the app's pid, from list_running_apps or launch_app. Requires \
+            Accessibility permission.
+            """
+        case "type_text":
+            return """
+            Type text wherever the keyboard focus already is. This does NOT move the focus -- click \
+            the field first if it is not already there. Right on any keyboard layout, so prefer it \
+            over run_shell or AppleScript for putting text into an app. Requires the user's approval.
+            """
+        case "press_key":
+            return """
+            Press one key, with modifiers: "Return", "escape", "tab", "cmd+s", "cmd+shift+p". For \
+            keys that have no character -- to type characters use type_text. Requires the user's \
+            approval.
+            """
+        case "scroll":
+            return """
+            Scroll up or down, at the pointer or at the centre of `frame` if you pass one. `lines` \
+            defaults to a small nudge; call it again rather than asking for a huge number. Use this \
+            to read a window that does not fit on screen, then app_snapshot again to see what came \
+            into view.
             """
         case "point_at":
             return """
@@ -155,6 +206,33 @@ extension AgentRunner {
             guessing a path -- a large project returns only its first 400 paths without a filter, \
             and those may all be generated output. Never use run_shell to look for files.
             """
+        case terminalStartToolName:
+            return """
+            Start a command that keeps running -- a dev server, a test watcher, a build -- in the \
+            project's directory, and return its terminal id. It returns as soon as the command has \
+            started, NOT when it finishes: that is the whole point. Use run_shell instead for \
+            anything that ends on its own within a minute. Read what it says with terminal_read a \
+            few seconds later, so you can tell the user whether it actually came up.
+            """
+        case terminalReadToolName:
+            return """
+            Everything a terminal has said since you last read it -- new output only, so reading \
+            twice does not repeat itself. Also says whether it is still running, and its exit code \
+            if it stopped. An empty read means it has said nothing new, which for a server that is \
+            already up is the normal answer, not a failure.
+            """
+        case terminalSendToolName:
+            return """
+            Type one line into a running terminal, as though at its prompt -- for answering \
+            something that is waiting on input. The newline is added for you. Requires the user's \
+            approval.
+            """
+        case terminalStopToolName:
+            return """
+            End a terminal you started. Pass `id` for one, or leave it out to stop all of them. Its \
+            output stays readable afterwards, which is usually the part worth looking at. Stop what \
+            you started once you are done: these are real processes on the user's machine.
+            """
         case openInEditorToolName:
             return """
             Open a file as a tab in the client window's editor pane, so the user can see (and, if they \
@@ -194,6 +272,10 @@ extension AgentRunner {
     - Call tools through the tool interface, one at a time. NEVER write a tool call as text or as \
       a code snippet -- code in your reply is something the user reads, not something that runs. If \
       no tool can do what was asked, say so plainly instead of writing what the call would look like.
+    - A command that does not finish on its own -- a dev server, a watcher, a build you want to \
+      follow -- goes to terminal_start, not run_shell. run_shell waits for an exit that never \
+      comes and kills it at its timeout. Read it back with terminal_read a few seconds later \
+      rather than immediately: a server that has not printed its port yet has not failed.
     - When the user asks for code to be written or changed, use code_editor if you have it. You \
       never edit files yourself, and the shell is not a substitute for it. If you also have \
       open_task_session, call it first so the editing runs in its own session.

@@ -32,10 +32,28 @@ enum ToolTimeouts {
         "find_ui_element": 15,
         "point_at": 30,
         "click_element": 15,
+        // Walking a whole app's tree is find_ui_element's work and then some,
+        // so it gets the same bound the inspector already runs under.
+        "app_snapshot": 15,
+        // Typing is paced, so a long string genuinely takes a moment.
+        "type_text": 30,
+        "press_key": 5,
+        "scroll": 5,
         "run_shell": 60,
         "run_applescript": 60,
-        // workspace executor
+        // workspace executor. 600 is now how long the agent may stay *silent*
+        // rather than how long a run may take -- CodeEditorRunner puts the
+        // clock back on every ACP update (see AgentProgress), so a long edit
+        // is no longer a timeout.
         "code_editor": 600,
+        // The agent's own shells (2026-09-04). None of the four waits for the
+        // command itself -- a start answers when the process has launched and
+        // a read answers with whatever is buffered -- so these bound the call,
+        // not the work. See AgentTerminals.
+        "terminal_start": 15,
+        "terminal_read": 10,
+        "terminal_send": 10,
+        "terminal_stop": 10,
         "open_in_editor": 10,
         "list_files": 15,
         "read_file": 10,

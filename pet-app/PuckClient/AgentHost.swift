@@ -32,6 +32,14 @@ final class AgentHost {
     private let describeWorkspace: (String) -> AgentRunner.WorkspaceContext?
     /// read_file/open_in_editor's implementation -- see EditorFileDelegate.
     private let editorFileDelegate: EditorFileDelegate
+    /// The agent's own long-running shells, and the four tools that reach
+    /// them. Held here for the app's lifetime rather than per run: a dev
+    /// server started in one turn is the thing the next turn asks about.
+    private let terminals = AgentTerminals()
+    /// Built after `init`, not in it: the project a terminal opens in is the
+    /// *active* workspace's, and answering that needs a `self` that does not
+    /// exist yet while the stored properties are still being filled in.
+    private var terminalToolDelegate: TerminalToolDelegate?
     /// show_code's implementation. Assigned after `runner`, because it
     /// captures `self` to reach the pane and the point_at dispatcher.
     private var codeTourDelegate: CodeTourDelegate!
@@ -62,13 +70,10 @@ final class AgentHost {
     /// AgentRunner, BridgeServer and ToolExecutor already made.
     private let stateQueue = DispatchQueue(label: "PuckClient.AgentHost.state")
 
-    /// Re-read on every access rather than cached: the key can be typed into
-    /// Puck's settings panel while this app is running, and the two are
-    /// separate processes -- there is no change notification to subscribe to,
-    /// only the file both of them read.
-    /// Read fresh every time rather than held: the .env behind it is a file
-    /// somebody edits while the app is running, and a turn should use what is
-    /// there now.
+    /// Read fresh on every access rather than cached: the .env behind it is a
+    /// file somebody edits -- from Puck's own settings, in another process --
+    /// while this app is running, and there is no change notification to
+    /// subscribe to. A turn should use what is there now.
     ///
     /// Through a closure so a test can say what it found. Everything else
     /// here is reachable without one, but the branch that matters most --
@@ -267,6 +272,12 @@ final class AgentHost {
                     contains: contains
                 )
             },
+            delegateTerminal: { [weak self] tool, arguments in
+                guard let self else {
+                    return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
+                }
+                return self.terminalDelegate().handle(tool: tool, arguments: arguments)
+            },
             delegateShowCode: { [weak self] path, startLine, endLine, caption in
                 guard let self else {
                     return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: nil)
@@ -402,6 +413,32 @@ final class AgentHost {
         codeEditorRunner.terminateAll()
     }
 
+    /// What was said in a chat before this process started, for the first
+    /// turn taken in a restored one. Wired to the window's own transcript,
+    /// which is what ChatArchive brings back; nil where nothing is restored.
+    var priorConversation: ((_ workspaceId: String, _ sessionId: String) -> [(isUser: Bool, text: String)])?
+
+    /// The terminal tools, made once and kept.
+    ///
+    /// Not in `init` for the reason the property says: the project a terminal
+    /// opens in is the active workspace's, which is a question only a fully
+    /// built `self` can answer.
+    private func terminalDelegate() -> TerminalToolDelegate {
+        if let terminalToolDelegate { return terminalToolDelegate }
+        let made = TerminalToolDelegate(terminals: terminals) { [weak self] in
+            guard let self else { return nil }
+            return self.resolveProjectPath(self.activeWorkspaceId)
+        }
+        terminalToolDelegate = made
+        return made
+    }
+
+    /// Every shell the agent started, ended. Called when this app quits: a
+    /// dev server that outlives it is one nobody can find to kill.
+    func endAgentTerminals() {
+        terminals.stopAll()
+    }
+
     /// Every tool_result off the socket, so the dispatcher can match it to
     /// the call waiting for it.
     func handle(_ result: ToolResult) {
@@ -410,6 +447,7 @@ final class AgentHost {
 
     /// The agent decided this turn is real work and wants it out of the
     /// casual session (protocol 3.4 `session_create(origin=agent)`).
+    ///
     /// Two things happen, in this order:
     ///
     /// 1. The session is announced. Like every other event this app produces,
@@ -465,9 +503,6 @@ final class AgentHost {
         stateQueue.sync { sessionWorkspaces[sessionId] = nil }
     }
 
-    /// The workspace a chat belongs to. Falls back to the active one for a
-    /// session this host has never run in -- there is nothing better to say,
-    /// and it is what every event used before.
     /// Puts one event on the socket, or -- when it will not go -- hands it
     /// to `onUndeliverableEvent`. Every event this host produces goes through
     /// here so there is one answer to "what if nobody is listening".
@@ -476,6 +511,9 @@ final class AgentHost {
         onUndeliverableEvent?(event, workspaceId, sessionId)
     }
 
+    /// The workspace a chat belongs to. Falls back to the active one for a
+    /// session this host has never run in -- there is nothing better to say,
+    /// and it is what every event used before.
     private func workspace(of sessionId: String) -> String {
         stateQueue.sync { sessionWorkspaces[sessionId] } ?? activeWorkspaceId
     }
@@ -519,6 +557,13 @@ final class AgentHost {
         // chat, so without this they would all share one context -- see
         // AgentRunner.conversations.
         runner.sessionId = sessionId
+        // A chat restored from disk has a transcript and no conversation --
+        // the model's own stack lives for the length of a process. Handed
+        // back here, on the first turn after a restart, so continuing an old
+        // chat is continuing it rather than starting over in front of a
+        // transcript that says otherwise. A no-op for every chat this process
+        // has already run in.
+        runner.restoreConversation(priorConversation?(workspaceId, sessionId) ?? [], to: sessionId)
         // Before the run, not at init: which workspace is active changes
         // between turns, and the runner only re-announces it when it differs.
         let workspaceContext = describeWorkspace(workspaceId)

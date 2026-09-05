@@ -176,11 +176,37 @@ final class AgentJSONBridgingTests: XCTestCase {
 }
 
 final class AgentToolRegistryTests: XCTestCase {
-    /// The three tools the plan gates behind approval, and nothing else.
+    /// The tools gated behind approval, and nothing else.
+    ///
+    /// The three the plan named, plus the two that start or type into one of
+    /// the agent's own shells (2026-09-04). `terminal_start` is `run_shell`
+    /// with no time limit, so it cannot be a smaller decision than
+    /// `run_shell`; `terminal_send` types into a live process, which is the
+    /// same act. Reading and stopping are not on the list: they are looking
+    /// at, and cleaning up after, something already allowed.
     func test_approvalRequiredMatchesTheContract() {
         let gated = Set(ToolRegistry.all.filter(\.requiresApproval).map(\.name))
 
-        XCTAssertEqual(gated, ["click_element", "run_shell", "run_applescript"])
+        XCTAssertEqual(gated, [
+            "click_element", "run_shell", "run_applescript",
+            "terminal_start", "terminal_send",
+            // Typing into somebody else's app with the user's own keyboard is
+            // click_element's decision exactly (2026-09-04).
+            "type_text", "press_key",
+        ])
+    }
+
+    /// And the ones deliberately not gated, said out loud so that adding a
+    /// gate to any of them is a decision rather than an accident.
+    ///
+    /// Reading and stopping a terminal are looking at, and cleaning up after,
+    /// something already allowed. `app_snapshot` reads a window without
+    /// acting on it. `scroll` changes what is on screen and nothing else --
+    /// a prompt per look would make reading a long window unusable.
+    func test_lookingAtSomethingNeedsNoApproval() {
+        for tool in ["terminal_read", "terminal_stop", "app_snapshot", "scroll"] {
+            XCTAssertEqual(ToolRegistry.tool(named: tool)?.requiresApproval, false, tool)
+        }
     }
 
     /// Only pet-app's tools are offered to the model, because only pet-app
@@ -191,6 +217,9 @@ final class AgentToolRegistryTests: XCTestCase {
         XCTAssertEqual(petAppTools, [
             "launch_app", "list_running_apps", "get_frontmost_window", "find_ui_element",
             "point_at", "click_element", "run_shell", "run_applescript",
+            // Computer use, widened 2026-09-04: reading a window's contents,
+            // and the keyboard and wheel to go with the mouse it already had.
+            "app_snapshot", "type_text", "press_key", "scroll",
         ])
     }
 

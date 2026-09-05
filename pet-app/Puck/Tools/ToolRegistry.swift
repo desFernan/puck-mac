@@ -108,6 +108,29 @@ enum ToolRegistry {
             Parameter(name: "frame", type: .object, isRequired: true),
             Parameter(name: "hold_seconds", type: .number, isRequired: false),
         ]),
+        // What is in the window, before asking whether one particular thing
+        // is (2026-09-04). find_ui_element answers a question you can only
+        // pose once you know what to look for; this is the one that comes
+        // first. No approval: reading a window is not acting on it.
+        Tool(name: "app_snapshot", executor: .petApp, approval: .notRequired, parameters: [
+            Parameter(name: "pid", type: .number, isRequired: true),
+        ]),
+        // Typing and pressing are acting on somebody else's app with the
+        // user's own keyboard, which is click_element's decision exactly.
+        Tool(name: "type_text", executor: .petApp, approval: .required, parameters: [
+            Parameter(name: "text", type: .string, isRequired: true),
+        ]),
+        Tool(name: "press_key", executor: .petApp, approval: .required, parameters: [
+            Parameter(name: "key", type: .string, isRequired: true),
+        ]),
+        // Scrolling changes what is on screen and nothing else, so it is not
+        // gated -- a prompt per look would make reading a long window
+        // unusable.
+        Tool(name: "scroll", executor: .petApp, approval: .notRequired, parameters: [
+            Parameter(name: "direction", type: .string, isRequired: true),
+            Parameter(name: "lines", type: .number, isRequired: false),
+            Parameter(name: "frame", type: .object, isRequired: false),
+        ]),
         Tool(name: "click_element", executor: .petApp, approval: .required, parameters: [
             Parameter(name: "frame", type: .object, isRequired: true),
         ]),
@@ -140,6 +163,26 @@ enum ToolRegistry {
             Parameter(name: "start_line", type: .number, isRequired: true),
             Parameter(name: "end_line", type: .number, isRequired: true),
             Parameter(name: "caption", type: .string, isRequired: true),
+        ]),
+        // A shell that outlives the call that started it (2026-09-04). The
+        // one shape run_shell cannot take: a dev server, a watcher, a build
+        // with no end -- run_shell waits for an exit that never comes and
+        // kills the process at its timeout. Approval is required to start
+        // one for the same reason run_shell needs it, and only to start:
+        // reading and stopping something the user already allowed is not a
+        // second decision. See AgentTerminals.
+        Tool(name: "terminal_start", executor: .delegated, approval: .required, parameters: [
+            Parameter(name: "command", type: .string, isRequired: true),
+        ]),
+        Tool(name: "terminal_read", executor: .delegated, approval: .notRequired, parameters: [
+            Parameter(name: "id", type: .string, isRequired: true),
+        ]),
+        Tool(name: "terminal_send", executor: .delegated, approval: .required, parameters: [
+            Parameter(name: "id", type: .string, isRequired: true),
+            Parameter(name: "text", type: .string, isRequired: true),
+        ]),
+        Tool(name: "terminal_stop", executor: .delegated, approval: .notRequired, parameters: [
+            Parameter(name: "id", type: .string, isRequired: false),
         ]),
         Tool(name: "read_file", executor: .delegated, approval: .notRequired, parameters: [
             Parameter(name: "path", type: .string, isRequired: true),
