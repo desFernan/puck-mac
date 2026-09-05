@@ -36,4 +36,62 @@ final class ChatTranscriptViewTests: XCTestCase {
         XCTAssertNil(toolFailureLine(ok: true, error: nil, detail: "wrote 3 files"))
         XCTAssertNil(toolFailureLine(ok: nil, error: nil, detail: nil))
     }
+
+    // MARK: - What a collapsed row says it was called with
+
+    /// A tool call is a line now, not a card, and a line is only enough if it
+    /// says which call it was: three `read_file` rows are otherwise three
+    /// identical rows.
+    func test_theSummaryIsTheArgumentWorthReading() {
+        let summary = toolArgumentSummary(.object([
+            "cwd": .string("/tmp"),
+            "command": .string("swift build"),
+        ]))
+
+        XCTAssertEqual(summary, "swift build")
+    }
+
+    /// Named keys in a fixed order, because a JSON object's key order is not
+    /// one: picking "the first string" would put `cwd` on one row and
+    /// `command` on the next row of the same tool.
+    func test_theSameToolAlwaysSummarisesTheSameField() {
+        let fields: [String: JSONValue] = [
+            "path": .string("Sources/App.swift"),
+            "encoding": .string("utf8"),
+        ]
+
+        for _ in 0..<20 {
+            XCTAssertEqual(toolArgumentSummary(.object(fields)), "Sources/App.swift")
+        }
+    }
+
+    /// Nothing recognised still has to be stable across calls, so the fallback
+    /// is ordered too.
+    func test_anUnrecognisedCallFallsBackToAStableField() {
+        let summary = toolArgumentSummary(.object([
+            "zebra": .string("last"),
+            "alpha": .string("first"),
+        ]))
+
+        XCTAssertEqual(summary, "first")
+    }
+
+    /// A row is a line: a heredoc'd shell command has to be flattened and cut
+    /// rather than made into a paragraph.
+    func test_aLongMultiLineArgumentIsFlattenedAndCut() {
+        let summary = toolArgumentSummary(
+            .object(["command": .string("echo one\n  echo two\n  echo three")]),
+            limit: 12
+        )
+
+        XCTAssertEqual(summary, "echo one ech…")
+    }
+
+    /// Nothing to say is said with nothing, not with an empty line.
+    func test_aCallWithNothingToSummarise() {
+        XCTAssertNil(toolArgumentSummary(nil))
+        XCTAssertNil(toolArgumentSummary(.object([:])))
+        XCTAssertNil(toolArgumentSummary(.object(["count": .number(3)])))
+        XCTAssertNil(toolArgumentSummary(.object(["command": .string("   ")])))
+    }
 }

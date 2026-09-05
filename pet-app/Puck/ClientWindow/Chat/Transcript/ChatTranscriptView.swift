@@ -10,6 +10,7 @@
 //  there is no view model between them.
 //
 
+import AppKit
 import SwiftUI
 
 struct ChatTranscriptView: View {
@@ -161,23 +162,132 @@ func toolFailureLine(ok: Bool?, error: ToolErrorCode?, detail: String?) -> Strin
     return error?.rawValue ?? Strings.text(.chatFailed)
 }
 
+/// The keys worth showing on a collapsed tool row, in the order they are
+/// looked for.
+///
+/// Named rather than "whichever string comes first": a JSON object's key order
+/// is arbitrary, so an unordered pick would put `cwd` on one row and `command`
+/// on the next row of the same tool.
+let toolSummaryKeys = [
+    "command", "path", "file", "task", "query", "text", "name",
+    "bundle_id", "app", "url", "contains", "script",
+]
+
+/// One line's worth of what a tool was called with, or nil when there is
+/// nothing worth putting on the line.
+///
+/// This is what lets a tool call be a line rather than a card: three
+/// `read_file` rows in a column are otherwise three identical rows, and which
+/// files were read is the question being asked of them.
+///
+/// Whitespace collapsed and cut short -- a `run_shell` command can be a
+/// heredoc, and a row is a row.
+func toolArgumentSummary(_ args: JSONValue?, limit: Int = 80) -> String? {
+    guard case .object(let fields)? = args else { return nil }
+    let named = toolSummaryKeys.compactMap { key -> String? in
+        guard case .string(let value)? = fields[key] else { return nil }
+        return value
+    }.first
+    // Nothing recognised: the alphabetically first string field, which is at
+    // least the same field every time for the same tool.
+    let fallback = fields.sorted { $0.key < $1.key }.compactMap { _, value -> String? in
+        guard case .string(let value) = value else { return nil }
+        return value
+    }.first
+    guard let picked = named ?? fallback else { return nil }
+    let flattened = picked.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    guard !flattened.isEmpty else { return nil }
+    return flattened.count <= limit ? flattened : String(flattened.prefix(limit)) + "…"
+}
+
 // MARK: - Rows
 
 /// What the user said: still a balloon, still trailing, still one glance's
 /// worth. It hugs its text and stops short of the full column so the two
 /// sides of the conversation stay told apart by shape rather than by colour
 /// alone.
+///
+/// Tinted rather than filled. It was a solid accent fill with white on it,
+/// which at this size is a lit orange slab: the accent is the app's one loud
+/// colour and a bubble sent every other turn is the last place to spend it.
+/// A wash of the same hue with the ordinary text colour on top says whose
+/// message it is just as clearly, and lets the reply beside it be the thing
+/// being read.
+///
+/// A long one is folded -- see LongMessage. Nothing is lost: the model was
+/// sent all of it, the whole text is one press away, and `.txt로 열기` writes
+/// it out for anything that wants a file.
 private struct UserMessageBubble: View {
+    /// Redraws this view when the UI language changes. Needed on every view
+    /// that resolves a string, not just the window root: SwiftUI skips a
+    /// child whose own inputs are unchanged, and a table lookup inside `body`
+    /// is not an input.
+    @ObservedObject private var localization = Localization.shared
+    @Environment(\.clientPalette) private var palette
+
     let text: String
 
+    @State private var isExpanded = false
+
+    private var isLong: Bool { LongMessage.isLong(text) }
+    private var shown: String { isExpanded || !isLong ? text : LongMessage.preview(of: text) }
+
     var body: some View {
-        Text(text)
-            .textSelection(.enabled)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.tint, in: .rect(cornerRadius: 12))
-            .foregroundStyle(.white)
-            .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth * 0.8, alignment: .trailing)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(shown)
+                .textSelection(.enabled)
+                .foregroundStyle(palette.textPrimary)
+            if isLong { footer }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(palette.accent.opacity(0.14), in: .rect(cornerRadius: 12))
+        // A hairline of the real accent: the wash alone is close enough to
+        // the window's own ground that the bubble loses its edge on a wide
+        // window, and the edge is what makes it a bubble.
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(palette.accent.opacity(0.35), lineWidth: 1)
+        }
+        .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth * 0.8, alignment: .trailing)
+    }
+
+    /// How much is folded away, and the two ways to see it.
+    private var footer: some View {
+        HStack(spacing: 10) {
+            Text(LongMessage.summary(of: text))
+                .font(.caption)
+                .foregroundStyle(palette.textSecondary)
+            Spacer(minLength: 0)
+            Button(Strings.text(isExpanded ? .chatCollapseMessage : .chatExpandMessage)) {
+                isExpanded.toggle()
+            }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(palette.accent)
+            Button(Strings.text(.chatOpenMessageAsFile), action: openAsFile)
+                .buttonStyle(.plain)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(palette.accent)
+        }
+    }
+
+    /// Writes the message out and opens it.
+    ///
+    /// In the customisation folder rather than a temp directory: this is a
+    /// file somebody asked for, and one that vanishes on the next reboot is
+    /// not one they can point anything else at. `Customisation` already owns
+    /// the folder people are sent to.
+    private func openAsFile() {
+        do {
+            let directory = Customisation.messagesDirectory
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let url = directory.appendingPathComponent(LongMessage.fileName())
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.open(url)
+        } catch {
+            AppLogger.shared.log(.error, "could not write the message out: \(error)")
+        }
     }
 }
 
@@ -194,8 +304,6 @@ private struct AgentMessage: View {
     }
 }
 
-/// A tool call and, once it lands, its result. Collapsed by default: the
-/// arguments matter when something went wrong and are noise otherwise.
 /// The app answering a slash command. Reads as the agent's own prose --
 /// same markdown, same column -- but tinted, because who is speaking matters
 /// when the answer is about the app rather than from the model.
@@ -223,6 +331,15 @@ private struct NoticeMessage: View {
     }
 }
 
+/// A tool call and, once it lands, its result.
+///
+/// One line, collapsed by default. It was a card -- 10pt of padding around a
+/// body-sized name, its own rounded rectangle -- which is fine for the two or
+/// three calls an API turn makes and is most of the transcript once a coding
+/// CLI is driving: those run tools constantly, and a screen of cards with one
+/// word in each pushes the conversation they belong to off the top. A line
+/// with the call summarised on it says more in a fifth of the height, and the
+/// arguments are still one click away.
 private struct ToolCallRow: View {
     let tool: String
     let args: JSONValue?
@@ -231,53 +348,92 @@ private struct ToolCallRow: View {
     @State private var isExpanded = false
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 6) {
-                if let args, let rendered = Self.pretty(args) {
-                    Text(rendered)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                }
-                if let detail = fullResultDetail {
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                isExpanded.toggle()
+            } label: {
+                header
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 4)
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .foregroundStyle(iconStyle)
-                        // Decoration: the tool's name is next to it, and the
-                        // outcome is spelled out in the row below.
-                        .accessibilityHidden(true)
-                    Text(tool)
-                        .font(.system(.body, design: .monospaced))
-                    if isPending {
-                        ProgressView().controlSize(.small)
-                    }
-                }
-                // Shown collapsed, not inside the disclosure body: a failed
-                // call used to be a red triangle next to the tool's name and
-                // nothing else, with the reason hidden behind a triangle the
-                // user had no reason to think held anything.
-                if let failure = toolFailureLine(ok: ok, error: resultError, detail: resultDetail) {
-                    Text(failure)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            .buttonStyle(.plain)
+            failureLine
+            if isExpanded { expanded }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(.quaternary.opacity(0.3), in: .rect(cornerRadius: 6))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The whole row, collapsed: what was called, and enough of what it was
+    /// called with to recognise it. The argument summary is what makes a line
+    /// enough -- three `read_file` rows in a column are otherwise three
+    /// identical rows, and which files were read is the question being asked.
+    private var header: some View {
+        HStack(spacing: 5) {
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                // The row says what it is; the triangle only says which way
+                // it is turned.
+                .accessibilityHidden(true)
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(iconStyle)
+                // Decoration: the tool's name is next to it, and a failure
+                // spells itself out on the line below.
+                .accessibilityHidden(true)
+            Text(tool)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+            if let summary = toolArgumentSummary(args) {
+                Text(summary)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    // From the middle: the ends of a path and of a command are
+                    // the parts that identify it.
+                    .truncationMode(.middle)
+            }
+            if isPending {
+                ProgressView().controlSize(.mini)
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(.rect)
+    }
+
+    /// Shown collapsed, under the name: a failed call used to be an orange
+    /// triangle and nothing else, with the reason behind a triangle nobody had
+    /// a reason to open. Only a failure gets the second line -- a row that
+    /// worked stays one line tall, which is the point of the row.
+    @ViewBuilder
+    private var failureLine: some View {
+        if let failure = toolFailureLine(ok: ok, error: resultError, detail: resultDetail) {
+            Text(failure)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .textSelection(.enabled)
+                .padding(.leading, 18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var expanded: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let args, let rendered = Self.pretty(args) {
+                Text(rendered)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+            if let detail = fullResultDetail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
         }
-        .padding(10)
-        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 18)
     }
 
     private var isPending: Bool { result == nil }

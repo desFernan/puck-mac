@@ -37,6 +37,19 @@ enum Customisation {
         directory.appendingPathComponent("Tank", isDirectory: true)
     }
 
+    /// Where a message written out of the transcript lands -- see
+    /// LongMessage. Not a temp directory: this is a file somebody asked for,
+    /// and one that disappears at the next reboot is not one they can point
+    /// anything else at.
+    ///
+    /// Not made by `createDirectories`, unlike the two above: those are
+    /// folders people are sent to and have to find things in, and this one is
+    /// made the first time it is used. An empty "Messages" beside them would
+    /// be a folder that looks like somewhere to put something.
+    static var messagesDirectory: URL {
+        directory.appendingPathComponent("Messages", isDirectory: true)
+    }
+
     /// Makes the folders, so opening them shows where things go rather than
     /// nothing at all -- the tank one does not otherwise exist until somebody
     /// creates it, which is the moment they need to know its name.
