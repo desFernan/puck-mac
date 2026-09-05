@@ -16,10 +16,16 @@ us. Come say hi!
 A macOS desktop pet that is also an AI agent. Two Swift apps:
 
 - **Puck** — the pet: an always-on-top character that walks your screen, points
-  at things, listens for voice, and drives the Mac (`run_shell`,
-  `run_applescript`, click/find UI elements, launch apps).
+  at things, listens for voice, reads and types into other apps, and drives the
+  Mac (`run_shell`, `run_applescript`, click/find UI elements, launch apps).
 - **PuckClient** — its window: chat, workspaces, git status, a native SwiftUI
   code editor, and a terminal pane.
+
+Conversations are kept between launches. The agent can hold shells open that
+outlive the call that started them — a dev server, a watcher — and can be given
+something to run on a schedule ("every morning, check CI"), which runs while
+Puck is up. Before you keep what it changed, ⇧⌘R shows the diff file by file,
+and puts one back if you would rather it had not.
 
 The two talk over a local socket bridge. The agent core (chat, tools,
 approvals, sessions) lives in `pet-app/Puck/Agent`.
