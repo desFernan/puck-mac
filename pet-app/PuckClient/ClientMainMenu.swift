@@ -41,7 +41,12 @@ enum ClientMainMenu {
         // the responder chain (nil target): AppKit checks NSApp.delegate as
         // a target-for-action fallback, which is where AppDelegate implements
         // this -- the agent's settings live in this app, not the pet's.
-        menu.addItem(title: "설정…", action: Selector(("showSettings:")), keyEquivalent: ",")
+        //
+        // NSSelectorFromString rather than Selector(("...")): the compiler can
+        // see AppDelegate's method in this target and tells you to write
+        // #selector instead, which is the one thing that cannot be written
+        // here. The two build the same selector.
+        menu.addItem(title: "설정…", action: NSSelectorFromString("showSettings:"), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(title: "\(appName) 가리기", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         menu.addItem(
