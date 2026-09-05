@@ -32,6 +32,30 @@ struct AgentSettingsView: View {
     /// switching workspaces re-reads that project's own `.claude/skills`
     /// rather than showing the one the window happened to open on.
     @ObservedObject var clientWindowStore: ClientWindowStore
+    /// Things to do later, on a repeat -- see AgentSchedule. Owned by the app
+    /// delegate, which is what actually runs them; this only lists and edits.
+    @ObservedObject var schedules: AgentScheduleStore
+
+    /// What the "add" row is currently filled in with. Held here rather than
+    /// in a sheet: a schedule is three fields, and a sheet for three fields
+    /// is a window to open and close for something that fits on one row.
+    @State private var draftPrompt = ""
+    @State private var draftCadence = ScheduleDraftCadence.daily
+    @State private var draftHour = 9
+    @State private var draftMinute = 0
+    @State private var draftMinutes = 60
+
+    /// The three shapes a schedule can take, as the picker offers them --
+    /// see AgentSchedule.Cadence for why these three and not cron.
+    enum ScheduleDraftCadence: String, CaseIterable, Identifiable {
+        case everyMinutes
+        case daily
+        case weekly
+
+        var id: String { rawValue }
+    }
+
+    @State private var draftDays: Set<Int> = [2, 3, 4, 5, 6]
 
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
@@ -72,6 +96,84 @@ struct AgentSettingsView: View {
         AppLanguage.sharedDefaults?.set(language.rawValue, forKey: AppLanguage.defaultsKey)
         Localization.shared.apply(language)
         language.broadcast()
+    }
+
+    /// The row that makes a new one.
+    ///
+    /// In the active workspace, always: a schedule runs a prompt against a
+    /// project, and the one being looked at is the only one the person adding
+    /// it has in mind. Picking a workspace here would be a second thing to
+    /// get right for no gain.
+    @ViewBuilder
+    private var scheduleDraft: some View {
+        SettingsStackedRow(label: text(.schedulesNew)) {
+            TextField(text(.schedulesPromptPlaceholder), text: $draftPrompt)
+                .textFieldStyle(.roundedBorder)
+        }
+        SettingsStackedRow(label: text(.schedulesWhen)) {
+            Picker("", selection: $draftCadence) {
+                Text(text(.scheduleEveryLabel)).tag(ScheduleDraftCadence.everyMinutes)
+                Text(text(.scheduleDailyLabel)).tag(ScheduleDraftCadence.daily)
+                Text(text(.scheduleWeeklyLabel)).tag(ScheduleDraftCadence.weekly)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .id(localization.language)
+        }
+        switch draftCadence {
+        case .everyMinutes:
+            SettingsStackedRow(label: text(.scheduleEveryLabel), value: "\(draftMinutes)") {
+                // 5 to 240 minutes: below five is a loop rather than a
+                // schedule, and past four hours "daily" says it better.
+                Slider(value: Binding(
+                    get: { Double(draftMinutes) },
+                    set: { draftMinutes = Int($0) }
+                ), in: 5...240, step: 5)
+            }
+        case .daily, .weekly:
+            SettingsStackedRow(label: text(.scheduleAtLabel), value: String(format: "%02d:%02d", draftHour, draftMinute)) {
+                HStack {
+                    Stepper("", value: $draftHour, in: 0...23).labelsHidden()
+                    Stepper("", value: $draftMinute, in: 0...55, step: 5).labelsHidden()
+                }
+            }
+        }
+        if draftCadence == .weekly {
+            SettingsStackedRow(label: text(.scheduleDaysLabel)) {
+                HStack(spacing: 4) {
+                    // Calendar's own numbering, 1 = Sunday, so the row reads
+                    // in the order the user's own locale puts the week.
+                    ForEach(1...7, id: \.self) { day in
+                        Button(AgentSchedule.Cadence.weekdayName(day)) {
+                            if draftDays.contains(day) { draftDays.remove(day) } else { draftDays.insert(day) }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(draftDays.contains(day) ? .accentColor : .gray)
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+        SettingsActionRow(label: text(.schedulesAdd), systemImage: "plus") {
+            addSchedule()
+        }
+    }
+
+    private func addSchedule() {
+        let prompt = draftPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return }
+        let cadence: AgentSchedule.Cadence
+        switch draftCadence {
+        case .everyMinutes: cadence = .everyMinutes(draftMinutes)
+        case .daily: cadence = .daily(hour: draftHour, minute: draftMinute)
+        case .weekly: cadence = .weekly(days: draftDays, hour: draftHour, minute: draftMinute)
+        }
+        schedules.add(AgentSchedule(
+            prompt: prompt,
+            workspaceId: clientWindowStore.activeWorkspaceId,
+            cadence: cadence
+        ))
+        draftPrompt = ""
     }
 
     private func text(_ key: L10nKey) -> String {
@@ -190,6 +292,29 @@ struct AgentSettingsView: View {
     @ViewBuilder
     private var skillsSection: some View {
         let installed = skills
+        SettingsSection(title: text(.schedulesHeader)) {
+            Text(text(.schedulesExplanation))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            ForEach(schedules.schedules) { schedule in
+                SettingsRow(label: schedule.prompt) {
+                    Text(schedule.cadence.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle("", isOn: Binding(
+                        get: { schedule.isEnabled },
+                        set: { schedules.setEnabled($0, id: schedule.id) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    Button(text(.commonDelete)) { schedules.remove(id: schedule.id) }
+                        .controlSize(.small)
+                }
+            }
+            scheduleDraft
+        }
+
         SettingsSection(title: text(.skillsHeader)) {
             if installed.isEmpty {
                 Text(text(.skillsEmpty))

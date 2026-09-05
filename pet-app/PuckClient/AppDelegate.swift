@@ -18,7 +18,11 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bridgeClient = BridgeSocketClient()
     private lazy var userInputSender = UserInputSender(transport: { [weak self] in self?.bridgeClient })
-    private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender)
+    /// Chats survive a quit -- see ChatArchive. The store is what folds the
+    /// event stream into a transcript, so it is what writes it down.
+    private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender, archive: ChatArchive())
+    /// Things to do later, on a repeat -- see AgentSchedule.
+    private let schedules = AgentScheduleStore()
     /// Second consumer of clientWindowStore's mutations, alongside the store
     /// itself -- see ClientChatBridge's own header comment for why this is
     /// pushed to imperatively rather than Combine-observed.
@@ -57,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CompanionAppLauncher.launchIfNeeded(bundleIdentifier: AppIdentity.puckBundleID)
 
         setUpLanguage()
+        // First, before the editor's watchers and long before an agent is
+        // spawned: a child inherits this, and 256 is what killed the coding
+        // CLI on its own settings file. See FileDescriptorLimit.
+        FileDescriptorLimit.raise()
+
         setUpClientThemeStyle()
         setUpAppearance()
 
@@ -89,6 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         clientWindowStore.onRunCancelled = { [weak self] in
             self?.agentHost.cancelPendingApprovals()
+        }
+        // What the chat already says, for a chat that came back from disk with
+        // a transcript and no conversation behind it -- see AgentHost.
+        agentHost.priorConversation = { [weak self] workspaceId, sessionId in
+            self?.clientWindowStore.session(workspaceId: workspaceId, sessionId: sessionId)?.spokenHistory ?? []
         }
         agentHost.onRunFinished = { [weak self] workspaceId, sessionId in
             self?.nameChatAfterItsTopic(workspaceId: workspaceId, sessionId: sessionId)
@@ -148,7 +162,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // Scheduled runs, started once the rest is wired: a schedule whose
+        // time passed while the app was shut fires on this first look.
+        schedules.onDue = { [weak self] schedule in
+            self?.runScheduled(schedule)
+        }
+        schedules.start()
+
         showWindow()
+    }
+
+    /// A schedule came round. Sent exactly as though it had been typed into
+    /// that workspace's chat, so everything downstream -- the transcript, the
+    /// pet, the approval gate -- is the ordinary path rather than a second
+    /// one that has to be kept in step.
+    private func runScheduled(_ schedule: AgentSchedule) {
+        clientWindowStore.activeWorkspaceId = schedule.workspaceId
+        clientWindowStore.sendMessage(schedule.prompt, source: .text)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -168,7 +198,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Closing the window quits this app, which with a code_editor run in
     /// flight means an ACP child with nobody left to end it.
     func applicationWillTerminate(_ notification: Notification) {
+        // Before anything else is torn down: the chats are saved on a short
+        // delay (see ClientWindowStore.saveDelay), and quitting is the one
+        // moment where that delay never arrives.
+        clientWindowStore.saveNow()
+        schedules.stop()
         agentHost.endCodeEditorAgents()
+        // And the shells it started itself -- a dev server left holding a
+        // port after the app is gone is one nobody can find to kill.
+        agentHost.endAgentTerminals()
     }
 
     // MARK: - Theme (ClientThemeStyle, synced from Puck's Settings)
@@ -378,7 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             newWindow.isReleasedWhenClosed = false
             newWindow.applyGlassChrome()
-            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView(clientWindowStore: clientWindowStore))
+            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView(clientWindowStore: clientWindowStore, schedules: schedules))
             newWindow.center()
             settingsWindow = newWindow
             return newWindow
@@ -407,18 +445,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task { [chatTitler] in
             guard let topic = await chatTitler.title(user: exchange.user, reply: exchange.reply) else { return }
-            await MainActor.run { session.applyTopicTitle(topic) }
+            await MainActor.run {
+                session.applyTopicTitle(topic)
+                // The name is part of what is written down, and nothing else
+                // in this path touches the store.
+                self.clientWindowStore.saveNow()
+            }
         }
     }
 
     private func showWindow() {
         clientWindowStore.setWindowIsOpen(true)
         let window = window ?? {
-            // Sidebar + file tree + Monaco + chat all fighting for width once
-            // the editor pane opens. At origin (0,0) it opens in the
-            // bottom-left corner, so this keeps the explicit contentRect
-            // instead of relying on center() alone.
-            let newWindow = ClientWindow(contentRect: CGRect(x: 0, y: 0, width: 1440, height: 900))
+            // Sized to the screen the window will open on rather than to a
+            // number -- see DefaultWindowSize for why 1440x900 was smaller
+            // than what this window holds.
+            let floor = CGSize(
+                width: ClientTheme.Metrics.windowMinWidth,
+                height: ClientTheme.Metrics.windowMinHeight
+            )
+            let content = DefaultWindowSize.size(
+                forVisibleFrame: (NSScreen.main?.visibleFrame ?? .zero).size,
+                minimum: floor
+            )
+            let newWindow = ClientWindow(contentRect: CGRect(origin: .zero, size: content))
             let hosting = NSHostingController(rootView: ClientWindowView(store: clientWindowStore))
             // NSHostingController defaults to sizingOptions
             // .preferredContentSize, i.e. it keeps pushing the SwiftUI
@@ -427,11 +477,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 700x471) no matter what contentRect or setContentSize said.
             hosting.sizingOptions = []
             newWindow.contentViewController = hosting
-            newWindow.setContentSize(CGSize(width: 1440, height: 900))
+            newWindow.setContentSize(content)
             // The floor for a chat-only window. ClientWindowView raises it
             // while the editor pane is open (WindowMinimumSize) -- one number
             // cannot serve both, and this one is only the starting value.
-            newWindow.minSize = CGSize(width: ClientTheme.Metrics.windowMinWidth, height: ClientTheme.Metrics.windowMinHeight)
+            newWindow.minSize = floor
             newWindow.center()
             self.window = newWindow
             return newWindow
