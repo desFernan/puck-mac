@@ -41,6 +41,17 @@ final class AcpAgentProcess: AcpAgentTransport {
     private let stderrPipe = Pipe()
     private let stderrLock = NSLock()
     private var stderrTail = ""
+    /// Everything that takes output out of the two pipes runs here, one at a
+    /// time -- the readers and the drain the exit does. Not for the tail's own
+    /// safety, which the lock covers, but so that reading a pipe and doing
+    /// something with what came out cannot be split in half.
+    ///
+    /// It could be: the reader took the child's last words out of the pipe,
+    /// and before it had added them to the tail the exit ran, found the pipe
+    /// empty and the tail empty, and reported a child that died silently. On
+    /// this machine that window is microseconds and on a loaded CI runner it
+    /// is not.
+    private let outputQueue = DispatchQueue(label: "com.speaki-e.puck.acp.output")
 
     let connection: AcpConnection
     /// What the child was given. Exposed so the trimming can be asserted --
@@ -231,15 +242,23 @@ final class AcpAgentProcess: AcpAgentTransport {
             try? FileManager.default.removeItem(at: sandboxTemporaryDirectory)
             throw error
         }
-        stdoutPipe.fileHandleForReading.readabilityHandler = { [connection] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
-            connection.receive(data)
+        // The read itself is inside the queue, not just what follows it: a
+        // handler that has taken data out of the pipe but not yet accounted
+        // for it is the one state the exit path cannot see.
+        stdoutPipe.fileHandleForReading.readabilityHandler = { [connection, outputQueue] handle in
+            outputQueue.sync {
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                connection.receive(data)
+            }
         }
         stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty, let self else { return }
-            self.appendStderr(data)
+            guard let self else { return }
+            self.outputQueue.sync {
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                self.appendStderr(data)
+            }
         }
         process.terminationHandler = { [weak self] process in
             guard let self else { return }
@@ -249,7 +268,9 @@ final class AcpAgentProcess: AcpAgentTransport {
             // pipe when this fires, and the reader is now gone. Left unread it
             // is usually the reply that finished the run, so a run that
             // succeeded would be reported as "the process exited".
-            self.drainRemainingOutput()
+            // On the queue, so a reader already holding the child's last
+            // words finishes putting them somewhere before the tail is read.
+            self.outputQueue.sync { self.drainRemainingOutput() }
             try? FileManager.default.removeItem(at: self.sandboxTemporaryDirectory)
             let tail = self.currentStderrTail()
             self.connection.failAllPending(with: AcpError.processExited(detail: tail))
