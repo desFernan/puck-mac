@@ -4,9 +4,9 @@
 //
 //  owner: 강상우 (Sangwoo Kang)
 //  Avatar import/switch UI, wired to AvatarImportValidator. Also hosts the
-//  size slider and per-emotion image mapping (both edit the active avatar's
-//  manifest.json via AvatarManifestEditor). Embedded as the Settings
-//  window's "Avatar" tab rather than a separate window.
+//  base image and per-emotion image mapping (both edit the active avatar's
+//  manifest.json via AvatarManifestEditor). The Settings window's "Avatar"
+//  page; the size slider is the quick view's, not this.
 //
 
 import AppKit
@@ -19,14 +19,11 @@ struct AvatarManagementView: View {
     /// manifest already has (loaded in onAppear) or the user adds below.
     private static let defaultEmotionKeys = ["happy", "thinking", "sad"]
 
-    /// Called when the size slider changes, so AppDelegate can apply it to
-    /// the *running* avatar immediately -- editing manifest.json alone only
-    /// takes effect on next launch.
-
-    /// Which installed avatar is active when the panel opens. Seeds
-    /// `selectedAvatarName` below; the panel is rebuilt on every open (same
-    /// reasoning as SettingsView's initialToysOut), so this is a seed rather
-    /// than a source of truth -- SettingsStore.selectedAvatarName is that.
+    /// Which installed avatar is active when this is built. Seeds
+    /// `selectedAvatarName` below; both surfaces that draw settings are built
+    /// afresh every time they are shown (same reasoning as SettingsView's
+    /// initialToysOut), so this is a seed rather than a source of truth --
+    /// SettingsStore.selectedAvatarName is that.
     var initialSelectedAvatarName: String = "dummy"
     /// Picking a different installed avatar swaps the *running* pet
     /// immediately rather than at the next launch.
@@ -37,6 +34,7 @@ struct AvatarManagementView: View {
     @State private var mappedEmotions: Set<String> = []
     @State private var newEmotionName: String = ""
     @State private var emotionMessage = ""
+    @State private var baseImageMessage = ""
     @State private var selectedAvatarName: String
     @State private var installedAvatarNames: [String] = []
 
@@ -123,6 +121,16 @@ struct AvatarManagementView: View {
                         .controlSize(.small)
                 }
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+                // Its own line rather than the emotion list's: what this
+                // button did was being reported underneath a different
+                // section's heading, which reads as a message about the
+                // emotions.
+                if !baseImageMessage.isEmpty {
+                    Text(baseImageMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+                }
             }
 
             SettingsSection(title: text(.emotionsHeader)) {
@@ -243,9 +251,9 @@ struct AvatarManagementView: View {
                 directory: AvatarManifestEditor.currentAvatarDirectory(named: selectedAvatarName)
             )
             refreshToken += 1
-            emotionMessage = text(.baseImageUpdated)
+            baseImageMessage = text(.baseImageUpdated)
         } catch {
-            emotionMessage = String(describing: error)
+            baseImageMessage = String(describing: error)
         }
     }
 

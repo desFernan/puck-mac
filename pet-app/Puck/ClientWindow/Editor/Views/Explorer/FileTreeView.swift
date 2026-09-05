@@ -34,13 +34,13 @@ struct FileTreeView: View {
     /// touched is the question the tree is being looked at with, and having
     /// to switch tabs to answer it means holding two lists in your head.
     var changedPaths: [String: String] = [:]
-    /// What a right-click can do. Nil in a tree that only browses -- the
-    /// detached window's, for one -- so the menu is absent rather than
-    /// present and inert.
     /// The file the editor is showing, so the tree points at it. Xcode keeps
     /// its navigator on the file in the editor; a tree that stays where you
     /// last clicked makes you find the current file by reading.
     var activePath: String?
+    /// What a right-click can do. Nil in a tree that only browses -- the
+    /// detached window's, for one -- so the menu is absent rather than
+    /// present and inert.
     var actions: FileTreeActions?
 
     @State private var query = ""

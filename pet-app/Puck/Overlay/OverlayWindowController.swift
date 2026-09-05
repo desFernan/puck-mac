@@ -4,9 +4,6 @@
 //
 //  owner: 강상우 (Sangwoo Kang)
 //  Creates/positions the overlay window, rebuilding on display changes
-//
-//  TODO(perf, F1): downshift frame rate 60->15 after 30s
-//  idle. Needs the FSM wired in (P2+) to know when nothing is moving.
 
 import AppKit
 

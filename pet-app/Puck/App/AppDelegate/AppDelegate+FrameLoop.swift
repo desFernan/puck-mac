@@ -137,9 +137,6 @@ extension AppDelegate {
         frameClock.start()
     }
 
-    /// Walks the pet over to a freshly launched app's window (M-1's visible
-    /// half). The window doesn't exist the instant the app launches, so F4's
-    /// list is polled briefly rather than read once.
     /// A tool was blocked by a missing permission: put the system's own
     /// request dialog on screen, and have the pet walk over and ask the user
     /// to click it.
@@ -167,7 +164,7 @@ extension AppDelegate {
             // can actually open the Accessibility pane with us pre-selected.
             _ = AccessibilityPermission.isTrusted(prompt: true)
             self.showNoticeBubble(
-                Strings.text(.permissionNeededBubble),
+                avatarLines.text(.permissionNeeded),
                 for: Self.permissionGuidanceDuration
             ) { [weak self] in
                 self?.isGuidingPermission = false
@@ -221,6 +218,9 @@ extension AppDelegate {
         }
     }
 
+    /// Walks the pet over to a freshly launched app's window (M-1's visible
+    /// half). The window doesn't exist the instant the app launches, so F4's
+    /// list is polled briefly rather than read once.
     func sendPetToWindow(ownedBy pid: pid_t, attemptsRemaining: Int = 20) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, let controller = self.characterController else { return }

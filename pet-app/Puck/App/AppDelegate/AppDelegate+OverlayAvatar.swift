@@ -127,6 +127,7 @@ extension AppDelegate {
         // via review: this used to read the .zero default here because the
         // computation used to happen after controller setup instead of
         // before it).
+        avatarLines = AvatarLines.from(manifest: loadResult.manifest.lines)
         let scale = loadResult.manifest.scale
         baseHitboxSize = CGSize(width: loadResult.manifest.hitbox.width, height: loadResult.manifest.hitbox.height)
         avatarHitboxSize = AvatarStandardSize.size(hitbox: baseHitboxSize, scale: CGFloat(scale))
@@ -448,7 +449,7 @@ extension AppDelegate {
     /// where there is nothing and walking through what there is.
     func applyScreenNotches(to controller: CharacterController) {
         // Both halves follow the one switch, or the pet ducks around a
-        // housing nobody can see. Off by default -- see
+        // housing nobody can see. On by default -- see
         // SettingsStore.isNotchPanelEnabled.
         guard settingsStore.isNotchPanelEnabled else {
             controller.notches = []
@@ -483,7 +484,7 @@ extension AppDelegate {
     func overlayLocalWindows(excluding overlay: NSWindow?) -> [WindowInfo] {
         // Reuses ScreenManager's cached GlobalScreenSpace instead of calling
         // GlobalScreenSpace.current() fresh here -- this runs every frame
-        // (60Hz while active) via CharacterController.windows(), and
+        // (30Hz while active) via CharacterController.windows(), and
         // .current() re-queries NSScreen.screens and rebuilds the whole
         // space from scratch every time, for a value that only actually
         // changes on a real display reconfiguration (which ScreenManager

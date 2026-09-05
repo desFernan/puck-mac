@@ -142,17 +142,20 @@ final class NowPlayingStore: ObservableObject {
         lyricsTask?.cancel()
         artworkTask?.cancel()
         guard let new, !new.title.isEmpty else { return }
-        // Already in hand, so there is nothing to go and fetch.
+        // Already in hand, so there is nothing to go and fetch. Only the
+        // cover, though: this used to return here, and the words are asked
+        // for below -- so a song whose artwork arrived with it, which is
+        // every song the system route finds, never got any.
         if let cover, let image = NSImage(data: cover) {
             artwork = image
-            return
-        }
-        artworkTask = Task { [fetchArtwork] in
-            let image = await Task.detached(priority: .utility) { fetchArtwork(new) }.value
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard new.isSameTrack(as: self.track) else { return }
-                self.artwork = image
+        } else {
+            artworkTask = Task { [fetchArtwork] in
+                let image = await Task.detached(priority: .utility) { fetchArtwork(new) }.value
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard new.isSameTrack(as: self.track) else { return }
+                    self.artwork = image
+                }
             }
         }
         lyricsTask = Task { [fetchLyrics] in

@@ -28,7 +28,7 @@ final class ManifestSFXKeyCoverageTests: XCTestCase {
     {
       "schema_version": 1,
       "name": "dummy",
-      "type": "usdz",
+      "type": "sprites",
       "scale": 1.0,
       "hitbox": { "width": 120, "height": 140 },
       "clips": {

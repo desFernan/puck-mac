@@ -6,8 +6,10 @@
 //  protocol: play(clip:loop:) / stop / setScreenPosition / setFacing
 //
 //  The FSM (Movement/CharacterController) only knows this protocol — it has no
-//  idea whether USDZAvatar/VideoAvatar/SpriteAvatar is actually playing
-//  (F2).
+//  idea what is actually drawing the character (F2). SpriteAvatar is the only
+//  implementation that ships; the defaults below are what keeps a stand-in --
+//  a test double, or a second renderer -- from having to answer questions it
+//  has no answer to.
 
 import CoreGraphics
 import Foundation
@@ -35,30 +37,29 @@ protocol AvatarPlayable: AnyObject {
     /// Per-frame procedural "bounce" motion (2026-07-29 2D switch, F2) --
     /// `clip`/`elapsed` describe how long the current clip has been
     /// playing, `intensity` is the manifest's bounce_intensity. Default is a
-    /// no-op: usdz/video avatars have no use for this, only SpriteAvatar acts on it.
+    /// no-op: an avatar with nothing to squash has no use for it.
     func updateBounce(clip: String, elapsed: TimeInterval, intensity: Double)
 
     /// Live-applies a new `manifest.scale` (Settings' size slider). Default
-    /// is a no-op -- usdz/video avatars don't support live resizing.
+    /// is a no-op -- an avatar that cannot resize itself ignores it.
     func updateScale(_ scale: Double)
 
     /// Swaps to the manifest's `emotions[emotion]` image, if one is mapped
     /// (Settings' emotion mapping, driven by EventRouter's emotion field).
     /// Silent no-op if the key isn't mapped -- same "unmapped = do nothing"
-    /// policy as the sounds table. Default is a no-op: usdz/video avatars
-    /// don't support emotion images.
+    /// policy as the sounds table. Default is a no-op: an avatar with no
+    /// per-emotion artwork has none to swap to.
     func showEmotion(_ emotion: String)
 
     /// F3 ceiling-crawling (2026-07-29): flips the sprite vertically while
-    /// CeilingState owns the character. Default is a no-op -- usdz/video
-    /// avatars have no use for this, only SpriteAvatar acts on it.
+    /// CeilingState owns the character. Default is a no-op -- an avatar with
+    /// no flat artwork to flip has no use for it.
     func setUpsideDown(_ isUpsideDown: Bool)
 
     /// A short visual hop (F3: agent_done, code_editor
     /// detail.path changes) -- JumpFlourish, purely a render-time overlay
     /// like bounce/tint, never touching the FSM's actual position. Default
-    /// is a no-op -- usdz/video avatars have no use for this, only
-    /// SpriteAvatar acts on it.
+    /// is a no-op.
     func triggerJump()
 
     /// The character's visible outline as a rectangle, relative to its ground
@@ -85,7 +86,7 @@ protocol AvatarPlayable: AnyObject {
     /// something small doesn't demand pixel precision.
     ///
     /// Default falls back to `visualBounds`, which is what an avatar with no
-    /// measurable artwork (usdz, video) can honestly answer.
+    /// measurable artwork can honestly answer.
     func hitTest(_ point: CGPoint, tolerance: CGFloat) -> Bool
 
     /// Fades the whole avatar out and back in. Used when the pet moves
@@ -114,9 +115,8 @@ extension AvatarPlayable {
 }
 
 extension AvatarPlayable {
-    /// Ignored by default. A kind of avatar with no flat artwork to mirror --
-    /// a 3D one -- has nothing sensible to do with this, and should not have
-    /// to say so.
+    /// Ignored by default. An avatar with no flat artwork to mirror has
+    /// nothing sensible to do with this, and should not have to say so.
     func setMirrored(_ isMirrored: Bool) {}
     func setOutlined(_ isOutlined: Bool) {}
     func setPoseAdjustments(_ adjustments: AvatarPoseAdjustments) {}

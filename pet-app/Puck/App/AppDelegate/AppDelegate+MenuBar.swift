@@ -72,10 +72,17 @@ extension AppDelegate {
     /// walk speed and the language are set once and left, and having them
     /// there made a drop-down into a scrolling form.
     ///
-    /// Kept between opens rather than rebuilt: unlike the panel, none of what
-    /// is in here is live state that goes stale while the window is shut.
+    /// The window itself is kept -- so it reopens where it was left, at the
+    /// size it was dragged to -- but its contents are built afresh on every
+    /// show, the way the panel's are. SettingsView seeds its SwiftUI state
+    /// from the store once, at init, so a kept view goes on showing whatever
+    /// was true when it was first built: mute, the volume, the theme and the
+    /// pet's size are all reachable from the panel too, and every one of them
+    /// was stale in here the moment it was changed over there. Which page is
+    /// open survives the rebuild because SettingsView stores it.
     func showSettingsWindow() {
-        let window = settingsWindow ?? {
+        let existing = settingsWindow
+        let window = existing ?? {
             let created = NSWindow(
                 contentRect: .zero,
                 // Resizable: the form is a scrolling list, and a window that
@@ -86,30 +93,41 @@ extension AppDelegate {
                 defer: false
             )
             created.isReleasedWhenClosed = false
-            created.contentViewController = NSHostingController(
-                rootView: SettingsView(
-                    store: settingsStore,
-                    // The window holds the avatar picker now, so it has to
-                    // carry the same callbacks the popover did -- a picker
-                    // with none of them is a control that does nothing, which
-                    // is what the split was written to prevent.
-                    onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) },
-                    onNotchPanelChanged: { [weak self] _ in
-                        guard let self, let controller = self.characterController else { return }
-                        self.applyScreenNotches(to: controller)
-                    }
-                )
-            )
-            created.center()
             settingsWindow = created
             return created
         }()
+        // Read before the swap and put back after it: assigning a
+        // contentViewController resizes the window to that view's fitting
+        // size, which would undo a window the user had dragged bigger.
+        let frame = window.frame
+        window.contentViewController = NSHostingController(rootView: makeSettingsWindowView())
+        if existing == nil {
+            window.center()
+        } else {
+            window.setFrame(frame, display: false)
+        }
         // Set on every show: the window outlives its closing, and the title
         // is the one part of it AppKit owns rather than SwiftUI -- nothing
         // would relabel it on a language change otherwise.
         window.title = Strings.text(.menuSettings)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// What the window shows. Built per show -- see showSettingsWindow.
+    private func makeSettingsWindowView() -> SettingsView {
+        SettingsView(
+            store: settingsStore,
+            // The window holds the avatar picker now, so it has to carry the
+            // same callbacks the popover did -- a picker with none of them is
+            // a control that does nothing, which is what the split was
+            // written to prevent.
+            onAvatarScaleChanged: { [weak self] scale in self?.applyLiveAvatarScale(scale) },
+            onNotchPanelChanged: { [weak self] _ in
+                guard let self, let controller = self.characterController else { return }
+                self.applyScreenNotches(to: controller)
+            }
+        )
     }
 
     /// Hides/shows the pet without quitting the

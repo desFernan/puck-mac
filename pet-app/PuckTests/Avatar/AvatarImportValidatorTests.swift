@@ -4,9 +4,9 @@
 //
 //  owner: 강상우 (Sangwoo Kang)
 //  Validates the file-per-clip package layout:
-//  each clip's {name}.usdz must actually exist on disk (not just as a
-//  manifest key) and fit the per-file size budget. Mesh height/scale and
-//  loop pose-matching aren't checked here — there is no fixture for it.
+//  each clip's {name}.png must actually exist on disk (not just as a
+//  manifest key) and fit the per-file size budget. Image dimensions aren't
+//  checked here — there is no fixture for it.
 //
 
 import XCTest
@@ -25,7 +25,7 @@ final class AvatarImportValidatorTests: XCTestCase {
         try? FileManager.default.removeItem(at: packageDirectory)
     }
 
-    private func writeManifest(clips: [String: String], type: String = "usdz") throws {
+    private func writeManifest(clips: [String: String], type: String = "sprites") throws {
         let clipsJSON = clips.map { "\"\($0.key)\": \"\($0.value)\"" }.joined(separator: ", ")
         let json = """
         {
@@ -42,7 +42,7 @@ final class AvatarImportValidatorTests: XCTestCase {
         )
     }
 
-    private func writeClipFile(_ fileName: String, sizeInBytes: Int = 1024, extension fileExtension: String = "usdz") throws {
+    private func writeClipFile(_ fileName: String, sizeInBytes: Int = 1024, extension fileExtension: String = "png") throws {
         let data = Data(repeating: 0, count: sizeInBytes)
         try data.write(to: packageDirectory.appendingPathComponent("\(fileName).\(fileExtension)"))
     }
@@ -65,7 +65,7 @@ final class AvatarImportValidatorTests: XCTestCase {
     func test_missingRequiredClipFile_isInvalid() throws {
         // idle is the sole required clip as of the 2026-07-29 2D switch.
         try writeManifest(clips: ["idle": "idle"])
-        // idle.usdz intentionally not written, even though the manifest key exists
+        // idle.png intentionally not written, even though the manifest key exists
 
         let report = try AvatarImportValidator.validate(packageDirectory: packageDirectory)
 
@@ -84,8 +84,8 @@ final class AvatarImportValidatorTests: XCTestCase {
         XCTAssertEqual(Set(report.missingRecommendedClipFiles), Set(AvatarLoader.recommendedClips))
     }
 
-    func test_sprites_checksPngFilesNotUsdz() throws {
-        try writeManifest(clips: ["idle": "idle", "walk": "walk"], type: "sprites")
+    func test_clipFilesAreLookedForAsPNGs() throws {
+        try writeManifest(clips: ["idle": "idle", "walk": "walk"])
         try writeClipFile("idle", extension: "png")
         // walk.png intentionally not written, even though the manifest key exists
 
@@ -94,6 +94,21 @@ final class AvatarImportValidatorTests: XCTestCase {
         XCTAssertTrue(report.isValid)
         XCTAssertTrue(report.missingRequiredClipFiles.isEmpty)
         XCTAssertTrue(report.missingRecommendedClipFiles.contains("walk"))
+    }
+
+    /// The import button is the loud way to find out a package is wrong, so a
+    /// kind of package this build cannot draw has to be refused here too --
+    /// and it is, because the file checks run behind AvatarLoader.load.
+    func test_packageOfATypeThisBuildCannotDraw_isRefused() throws {
+        try writeManifest(clips: ["idle": "idle"], type: "usdz")
+        try writeClipFile("idle", extension: "usdz")
+
+        XCTAssertThrowsError(try AvatarImportValidator.validate(packageDirectory: packageDirectory)) { error in
+            guard case AvatarLoaderError.unsupportedAvatarType(let reported) = error else {
+                return XCTFail("expected .unsupportedAvatarType, got \(error)")
+            }
+            XCTAssertEqual(reported, "usdz")
+        }
     }
 
     func test_oversizedClipFile_isReported() throws {

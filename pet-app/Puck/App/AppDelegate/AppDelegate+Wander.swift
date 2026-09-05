@@ -116,15 +116,6 @@ extension AppDelegate {
         }
     }
 
-    /// Settings' "포커스된 창 위로는 올라가지 않기" toggle, resolved against the
-    /// window list the pet is currently walking through. Empty while the
-    /// toggle is off, so the pet climbs whatever it reaches.
-    ///
-    /// The reader the setting never had: `avoidClimbingFocusedWindow` was
-    /// written by the Settings panel and consulted by nothing, so the toggle
-    /// changed nothing at all. Same shape as `autoMuteOnFocus`'s reader in
-    /// AppDelegate+OverlayAvatar -- read fresh at the moment the decision is
-    /// made rather than cached, since the panel writes it while the pet runs.
     /// The pet's footing went behind a window the user just brought forward.
     ///
     /// It still falls: the surface it was standing on really did go away, and
@@ -143,6 +134,7 @@ extension AppDelegate {
     ///
     /// The fallback wall: always there, and the one that cannot be closed or
     /// moved out from under the pet on the way over.
+    ///
     /// Where the pet's feet go for its outline to meet that edge -- the same
     /// place containment would put it, so the walk arrives rather than being
     /// clamped a step short of its own target forever.
@@ -235,6 +227,15 @@ extension AppDelegate {
         controller.transition(to: .moveTo)
     }
 
+    /// Settings' "포커스된 창 위로는 올라가지 않기" toggle, resolved against the
+    /// window list the pet is currently walking through. Empty while the
+    /// toggle is off, so the pet climbs whatever it reaches.
+    ///
+    /// The reader the setting never had: `avoidClimbingFocusedWindow` was
+    /// written by the Settings panel and consulted by nothing, so the toggle
+    /// changed nothing at all. Same shape as `autoMuteOnFocus`'s reader in
+    /// AppDelegate+OverlayAvatar -- read fresh at the moment the decision is
+    /// made rather than cached, since the panel writes it while the pet runs.
     func unclimbableWindowIDs(in windows: [WindowInfo]) -> Set<CGWindowID> {
         guard settingsStore.avoidClimbingFocusedWindow else { return [] }
         let focusedPID = NSWorkspace.shared.frontmostApplication?.processIdentifier

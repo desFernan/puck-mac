@@ -126,6 +126,7 @@ extension AppDelegate {
     /// window up showing the text. Closing or quitting that window changes
     /// nothing here -- it's a separate process, and the pet doesn't observe
     /// its presence.
+    ///
     /// Not private: the notch panel sends its line through here too, so a
     /// turn started there and one started from the bubble are the same turn.
     func submitFromInputBubble(_ text: String, attachments: [Attachment] = []) {
@@ -239,7 +240,7 @@ extension AppDelegate {
     /// PuckClient now, not workspace -- it hosts the agent as of 2026-08-15 --
     /// so the wording names the chat window the user would actually open.
     private func showClientOfflineBubble() {
-        showNoticeBubble(Strings.text(.bubbleClientOffline), for: 2.5)
+        showNoticeBubble(avatarLines.text(.clientOffline), for: 2.5)
     }
 
     /// Puts the bubble over the pet's head, so what it says comes from it
@@ -250,9 +251,6 @@ extension AppDelegate {
     /// field the user aims at, not something that should chase the pet
     /// around the screen.
     ///
-    /// `wasMovedByUser` is deliberately ignored: a bubble the user once
-    /// dragged is still the pet's speech, and leaving it parked where the pet
-    /// no longer is defeats the whole point.
     /// Live captions while push-to-talk is held.
     ///
     /// No timer, unlike a notice: this bubble lasts exactly as long as the
@@ -283,6 +281,17 @@ extension AppDelegate {
         textInputBubbleWindow?.closeAndYieldFocus()
     }
 
+    /// Puts the bubble over the pet's head, so what it says comes from it
+    /// rather than from the middle of the screen.
+    ///
+    /// Only speech does this. The Option+Shift+Space input panel stays put at
+    /// its own fixed spot (bottom-center, see makeBubble) -- it's a capture
+    /// field the user aims at, not something that should chase the pet
+    /// around the screen.
+    ///
+    /// `wasMovedByUser` is deliberately ignored: a bubble the user once
+    /// dragged is still the pet's speech, and leaving it parked where the pet
+    /// no longer is defeats the whole point.
     func anchorBubbleToPet(_ bubbleWindow: TextInputBubbleWindow, size: CGSize) {
         bubbleWindow.setContentSize(size)
 
@@ -309,8 +318,8 @@ extension AppDelegate {
     /// follow the pet for the same reason.
     ///
     /// Placement only, never sizing: the text has not changed, and re-running
-    /// `speechSize(for:)` per frame would measure the same string 60 times a
-    /// second.
+    /// `speechSize(for:)` per frame would measure the same string thirty times
+    /// a second.
     func keepSpeechBubbleOnPet() {
         guard
             let bubbleWindow = textInputBubbleWindow,

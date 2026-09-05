@@ -286,11 +286,6 @@ final class BridgeServer: @unchecked Sendable {
         try? FileManager.default.removeItem(at: lockFileURL)
     }
 
-    /// The socket had no peer authentication and default permissions
-    /// (srwxr-xr-x) -- any other local-user-owned process could connect and
-    /// dispatch run_shell/run_applescript, bypassing ai-module's upstream
-    /// approval UI entirely (found via review). Restricting to owner-only
-    /// read/write at least closes it off to every other local account.
     /// Owner-only on the directory the socket lives in. Belt and braces with
     /// `restrictSocketPermissions`, and the half that holds during the moment
     /// between bind and .ready.
@@ -300,6 +295,11 @@ final class BridgeServer: @unchecked Sendable {
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
     }
 
+    /// The socket had no peer authentication and default permissions
+    /// (srwxr-xr-x) -- any other local-user-owned process could connect and
+    /// dispatch run_shell/run_applescript, bypassing the client's approval UI
+    /// entirely (found via review). Restricting to owner-only read/write at
+    /// least closes it off to every other local account.
     private func restrictSocketPermissions() {
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketURL.path)
     }

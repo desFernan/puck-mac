@@ -90,15 +90,15 @@ final class LoopbackHTTPServer: @unchecked Sendable {
 
     // MARK: - Lifecycle
 
+    /// A loopback listener on an OS-chosen port is ready in milliseconds;
+    /// this only exists so an unreachable state cannot stall a turn.
+    private static let readyTimeout: TimeInterval = 5
+
     /// Opens the listener and returns once it is actually accepting. Throws
     /// rather than returning a half-open server: the caller has to put a
     /// reachable URL into `session/new`, and a URL for a port nothing is
     /// listening on would fail later, inside the agent, as an MCP error nobody
     /// can read.
-    /// A loopback listener on an OS-chosen port is ready in milliseconds;
-    /// this only exists so an unreachable state cannot stall a turn.
-    private static let readyTimeout: TimeInterval = 5
-
     func start() async throws -> Endpoint {
         let token = Self.makeToken()
         let parameters = NWParameters.tcp

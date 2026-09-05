@@ -6,6 +6,7 @@
 //  over this one.
 //
 
+import AppKit
 import XCTest
 @testable import Puck
 
@@ -91,6 +92,28 @@ final class NowPlayingStoreTests: XCTestCase {
 
         XCTAssertEqual(store.track?.title, "둘째 곡")
         XCTAssertNil(store.currentLyric, "the first song's words must not appear over the second")
+    }
+
+    /// The system route answers with the cover in hand, and that used to be
+    /// the end of it: the words were asked for further down the same method,
+    /// past a `return`. So every song found that way -- which is most of them
+    /// -- showed a thumbnail and never a line of lyrics.
+    func test_aSongThatArrivesWithItsCoverStillGetsItsWords() async {
+        let store = NowPlayingStore()
+        let cover = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 4,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )?.representation(using: .png, properties: [:])
+        XCTAssertNotNil(cover, "the fixture itself has to be a real image")
+        store.read = { (self.track("한 곡", position: 45), cover) }
+        store.fetchLyrics = { _ in self.words }
+
+        store.start()
+        await settle(store)
+
+        XCTAssertNotNil(store.artwork, "the cover that came with the song was not used")
+        XCTAssertEqual(store.currentLyric, "둘째 줄")
     }
 
     /// Nothing playing is a state, not a failure.

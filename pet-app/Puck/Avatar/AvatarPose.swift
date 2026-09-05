@@ -95,13 +95,6 @@ struct AvatarPoseAdjustment: Equatable, Codable {
     }
 
     var rotation: CGFloat { CGFloat(quarterTurns) * .pi / 2 }
-
-    /// The correction as the renderer applies it, before the pose's own
-    /// orientation and the clip's bounce.
-    func transform() -> CGAffineTransform {
-        CGAffineTransform(scaleX: flipsHorizontally ? -1 : 1, y: flipsVertically ? -1 : 1)
-            .rotated(by: rotation)
-    }
 }
 
 /// Every pose's correction, as one value.

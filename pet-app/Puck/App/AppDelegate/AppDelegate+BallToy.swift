@@ -119,6 +119,7 @@ extension AppDelegate {
     /// Menu bar toy list — puts the chosen toy out at the cursor, onto
     /// whatever's below it (F4's landing-surface logic, same as Fall), or
     /// takes it away if it was already out.
+    ///
     /// Returns the toys that are out afterwards -- the settings window's toy
     /// grid seeds itself from the same answer the menu bar gets, so the two
     /// switches for one toy box can't drift apart.

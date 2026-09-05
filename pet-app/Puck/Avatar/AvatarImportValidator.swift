@@ -5,19 +5,17 @@
 //  owner: 강상우 (Sangwoo Kang)
 //  Import-menu validator: checks manifest schema + clip existence, reports missing items
 //
-//  Checks manifest schema/required-clip-keys (via AvatarLoader) plus the
-//  file-per-clip package layout: each clip's {name}.png
-//  (sprites, 2026-07-29's primary type) or {name}.usdz (legacy) must actually
-//  exist in the package directory and fit the size budget. Does NOT check
-//  image dimensions or usdz mesh height/scale/loop pose-matching — that needs
-//  a real fixture to verify against, and isn't wired up yet.
+//  Checks manifest schema/type/required-clip-keys (via AvatarLoader) plus the
+//  file-per-clip package layout: each clip's {name}.png must actually exist in
+//  the package directory and fit the size budget. Does NOT check image
+//  dimensions — that needs a real fixture to verify against, and isn't wired
+//  up yet.
 
 import Foundation
 
 enum AvatarImportValidator {
-    /// Per-clip file size budget. Generous for both PNG sprites (each just a
-    /// static image, typically well under this) and the legacy usdz path
-    /// (only the mesh-carrying clip holds real geometry/textures there).
+    /// Per-clip file size budget. Generous for a PNG sprite, which is one
+    /// static image and typically well under this.
     static let maxClipFileSizeBytes = 4 * 1024 * 1024
 
     struct Report: Equatable {
@@ -39,8 +37,9 @@ enum AvatarImportValidator {
     }
 
     /// Validates a package directory. Throws whatever AvatarLoader.load throws
-    /// (manifest not decodable, unsupported schema version, missing required
-    /// clip *keys*) before doing the file-per-clip disk checks this type adds.
+    /// (manifest not decodable, unsupported schema version, an avatar type
+    /// this build cannot draw, missing required clip *keys*) before doing the
+    /// file-per-clip disk checks this type adds.
     static func validate(packageDirectory: URL) throws -> Report {
         let loadResult = try AvatarLoader.load(avatarDirectory: packageDirectory)
         return report(for: loadResult, packageDirectory: packageDirectory)
@@ -53,11 +52,11 @@ enum AvatarImportValidator {
             guard case .name(let fileName) = manifest.clips[clip] else {
                 return .missing
             }
-            // 2026-07-29 2D switch: sprites clips are PNG files, not usdz.
-            let fileExtension = manifest.type == .sprites ? "png" : "usdz"
+            // One PNG per clip: AvatarLoader has already refused every other
+            // kind of package, so there is only the one extension to look for.
             guard let url = AvatarPackagePath.fileURL(
                 in: packageDirectory,
-                relativePath: "\(fileName).\(fileExtension)"
+                relativePath: "\(fileName).png"
             ) else {
                 // Reported as missing rather than ok: nothing inside the
                 // package answers to that name, which is what the report is

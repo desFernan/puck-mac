@@ -38,9 +38,13 @@ enum AvatarInstaller {
         case failed(String)
     }
 
-    /// A real usdz is a zip archive; a git-lfs pointer left behind by a clone
-    /// that skipped `git lfs pull` is ~130 bytes of this exact text. Checking
-    /// the prefix is enough — no legitimate usdz starts with it.
+    /// A git-lfs pointer left behind by a clone that skipped `git lfs pull`
+    /// is ~130 bytes of this exact text where an image or a sound should be.
+    /// Checking the prefix is enough — no legitimate asset starts with it.
+    ///
+    /// This repository does not use LFS any more (2026-08-29), so nothing it
+    /// ships can be a pointer. A package somebody imports still can, and that
+    /// is the path this now guards.
     private static let lfsPointerPrefix = "version https://git-lfs.github.com/spec/v1"
 
     /// Copies `bundledPackage` to `intoAvatarsDirectory/<package name>` unless
@@ -167,7 +171,7 @@ enum AvatarInstaller {
 
     /// Scans the top level of `package` for a file whose content is a Git LFS
     /// pointer instead of real data. A pointer file is tiny (well under any
-    /// real usdz/wav), so reading a small prefix is cheap even for a large
+    /// real png/wav), so reading a small prefix is cheap even for a large
     /// asset that's actually real.
     private static func firstUnpulledLFSPointerFile(in package: URL) -> String? {
         guard let entries = try? FileManager.default.contentsOfDirectory(at: package, includingPropertiesForKeys: nil) else {

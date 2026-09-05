@@ -12,7 +12,8 @@ import CoreGraphics
 extension AppDelegate {
     // MARK: - Avatar appearance (Settings size slider, 2026-07-29)
 
-    /// Called from AvatarManagementView when the size slider changes.
+    /// Called when the size slider changes (the menu bar's quick view), and
+    /// whenever the pet is resized to fit its island.
     /// `avatarHitboxSize` must be recomputed too (its click-through geometry
     /// has to track what's actually rendered), and the character's position
     /// has to be re-pushed through CharacterBody so the ground-point offset
@@ -20,6 +21,16 @@ extension AppDelegate {
     /// otherwise the pet stays at its old screen position until the next
     /// state transition happens to move it.
     func applyLiveAvatarScale(_ scale: Double) {
+        // Logged when it settles somewhere new, not on every frame of a trip:
+        // the pet is resized dozens of times a second while it crosses
+        // between the desktop and its island, and what is worth knowing is
+        // where it ended up. Without this, "the pet keeps getting smaller"
+        // has no record at all -- the size is derived, never stored, so
+        // nothing else can be asked what it was.
+        if abs(scale - lastLoggedAvatarScale) > 0.02 {
+            lastLoggedAvatarScale = scale
+            AppLogger.shared.log(.info, String(format: "avatar scale -> %.3f", scale))
+        }
         avatar?.updateScale(scale)
         // The drawn size, not the manifest's numbers times a scale: the
         // two parted company when the renderer moved to a standard height,

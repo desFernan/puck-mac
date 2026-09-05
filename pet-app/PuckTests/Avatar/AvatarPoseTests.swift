@@ -85,18 +85,6 @@ final class AvatarPoseTests: XCTestCase {
         XCTAssertEqual(restored[.climbingRightWall].quarterTurns, 3)
     }
 
-    /// A flip is a negative scale, and two of them are not a rotation: the
-    /// transform has to say which axes were turned over.
-    func testTheTransformFlipsTheAxesItSaysItDoes() {
-        var adjustment = AvatarPoseAdjustment()
-        adjustment.flipsHorizontally = true
-
-        let transform = adjustment.transform()
-
-        XCTAssertEqual(transform.a, -1, accuracy: 0.0001)
-        XCTAssertEqual(transform.d, 1, accuracy: 0.0001)
-    }
-
     // MARK: - Finding the picture
 
     private func manifest(clips: [String: ClipReference]) -> AvatarManifest {

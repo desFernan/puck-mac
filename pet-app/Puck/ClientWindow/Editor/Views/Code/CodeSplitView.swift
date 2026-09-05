@@ -29,14 +29,13 @@ struct CodeSplitView: View {
     /// here is how to put it away".
     var onCollapse: (() -> Void)?
 
-
-    /// ⌘L's field, and what is typed into it. Held here rather than in the
-    /// store: where the caret should go is the store's business, but whether
-    /// a one-line prompt is on screen is this view's.
     /// Where the caret is in the file being edited, for the status line.
     /// Cleared when the tab changes: it belongs to one file.
     @State private var cursor: CursorPosition.Position?
     @State private var isOpenQuicklyShowing = false
+    /// ⌘L's field, and what is typed into it. Held here rather than in the
+    /// store: where the caret should go is the store's business, but whether
+    /// a one-line prompt is on screen is this view's.
     @State private var isGoToLineShowing = false
     @State private var goToLineDraft = ""
     @FocusState private var isGoToLineFocused: Bool

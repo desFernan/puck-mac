@@ -3,9 +3,10 @@
 //  Puck
 //
 //  owner: 박해영 (Haeyoung Park)
-//  2026-07-29 2D switch: primary AvatarPlayable implementation. Loads one PNG
-//  per clip (same file-stem manifest convention usdz used) and shows it on a
-//  CALayer parented into SpriteLayerView's contentLayer.
+//  2026-07-29 2D switch: the AvatarPlayable implementation. Loads one PNG per
+//  clip (the same file-stem manifest convention the 3D renderer it replaced
+//  used) and shows it on a CALayer parented into SpriteLayerView's
+//  contentLayer.
 //
 //  No mesh/animation to manage -- "playing a clip" is just swapping which
 //  cached CGImage the layer shows. Whatever motion the pet has beyond a
@@ -127,8 +128,8 @@ final class SpriteAvatar: AvatarPlayable {
         currentClip = clip
         guard let fileName = AvatarLoader.resolvedClipName(for: clip, in: loadResult) else { return }
         // A load failure (missing/corrupt file) leaves whatever was already
-        // showing rather than blanking the pet -- same "don't strand the
-        // caller with nothing" reasoning USDZAvatar's animation-less-file path uses.
+        // showing rather than blanking the pet: nothing is a worse answer
+        // than the last thing that worked.
         guard let image = loadedImage(named: fileName) else { return }
         show(image)
     }
@@ -139,13 +140,13 @@ final class SpriteAvatar: AvatarPlayable {
 
     func setScreenPosition(_ position: CGPoint) {
         // SpriteLayerView is isFlipped (top-left origin, Y down), the same
-        // convention GlobalScreenSpace/StateContext already use -- unlike
-        // USDZAvatar/ScreenSpaceMapper, no world<->screen conversion needed.
+        // convention GlobalScreenSpace/StateContext already use -- so there is
+        // no world<->screen conversion to do here.
         //
         // `position` is the character's ground/feet point -- the one
         // convention every other piece of the FSM already assumes (WalkState's
         // targets sit at roamableArea.maxY, LandingSurfaceResolver returns a
-        // surface's top edge, USDZAvatar's rig has its root bone at the feet).
+        // surface's top edge).
         // CALayer's own `position` is its *center*, so without this offset the
         // sprite floats half its height above wherever the FSM thinks it's
         // standing -- visible as the pet hanging in empty space instead of
@@ -179,12 +180,6 @@ final class SpriteAvatar: AvatarPlayable {
         return JumpFlourish.offset(elapsed: now() - jumpStartedAt)
     }
 
-    /// Mirrors the artwork, on top of whichever way the pet is facing.
-    ///
-    /// Multiplied into the same scaleX the turn animation uses rather than
-    /// swapping what `left` and `right` mean: the pet still turns to face
-    /// where it is going, and this only decides which way round the drawing
-    /// is while it does.
     /// Draws a white edge around the character, sticker-fashion.
     ///
     /// Clears the cache, because the outline is baked into the images rather
@@ -225,6 +220,12 @@ final class SpriteAvatar: AvatarPlayable {
         return facing == .left ? .walkingLeft : .walkingRight
     }
 
+    /// Mirrors the artwork, on top of whichever way the pet is facing.
+    ///
+    /// Multiplied into the same scaleX the turn animation uses rather than
+    /// swapping what `left` and `right` mean: the pet still turns to face
+    /// where it is going, and this only decides which way round the drawing
+    /// is while it does.
     func setMirrored(_ isMirrored: Bool) {
         guard isMirrored != self.isMirrored else { return }
         self.isMirrored = isMirrored
@@ -320,7 +321,7 @@ final class SpriteAvatar: AvatarPlayable {
     /// OverlayWindowController tears down and recreates every window+SpriteLayerView
     /// on a real display change (monitor plug/unplug, resolution change) --
     /// callers must re-parent to the rebuilt view's contentLayer or the
-    /// sprite is left attached to an orphaned layer (mirrors USDZAvatar.reparent).
+    /// sprite is left attached to an orphaned layer.
     func reparent(to newParent: CALayer) {
         spriteLayer.removeFromSuperlayer()
         // Reparenting is exactly when the pet can cross between a 1x and a 2x
@@ -472,8 +473,7 @@ final class SpriteAvatar: AvatarPlayable {
 
     /// Only caches on a successful load -- caching a failure would make a
     /// transient error (e.g. file briefly locked during an avatar import)
-    /// permanent for the rest of the process, mirroring USDZAvatar's
-    /// loadedEntity(named:) precedent.
+    /// permanent for the rest of the process.
     private func loadedImage(named fileName: String) -> CGImage? {
         if let cached = loadedImages[fileName] {
             return cached

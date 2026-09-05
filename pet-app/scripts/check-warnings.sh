@@ -41,3 +41,20 @@ if [ "$count" != "0" ]; then
     exit 1
 fi
 rm -f /tmp/puck-warnings.$$
+
+# And how much of the tree this build actually looked at, because a pass does
+# not mean the same thing on an incremental build as on a clean one -- the
+# compiler reports warnings only for files it recompiled, so a green gate here
+# can mean "no warnings" or "nothing was compiled". Reported rather than
+# enforced: rebuilding everything on every run would cost ten minutes to say
+# something a clean CI build already says.
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+seen=$(grep -oE "pet-app/(Puck|PuckClient|PuckTests|PuckClientTests)/[^ ]*\.swift" "$LOG" \
+    | sort -u | wc -l | tr -d ' ')
+total=$(find "$ROOT/pet-app/Puck" "$ROOT/pet-app/PuckClient" \
+    "$ROOT/pet-app/PuckTests" "$ROOT/pet-app/PuckClientTests" \
+    -name '*.swift' | wc -l | tr -d ' ')
+if [ "$seen" -lt "$total" ]; then
+    echo "note: this build compiled $seen of $total sources; warnings in the rest were not re-checked."
+    echo "      Delete DerivedData for a build that checks all of them."
+fi

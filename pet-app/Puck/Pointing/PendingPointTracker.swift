@@ -11,7 +11,7 @@
 //  callback -- silently dropping it left that tool_dispatch hanging until
 //  ToolExecutor's 15s timeout instead of getting a reply. This class only
 //  tracks state and reports what needs to happen; it has no side effects of
-//  its own, so it's fully testable without RealityKit/AppKit.
+//  its own, so it's fully testable without AppKit.
 
 import CoreGraphics
 import Foundation

@@ -61,10 +61,6 @@ enum AvatarManifestEditor {
         return updated
     }
 
-    /// Settings' emotion mapping: copies `sourceFile` in as `{emotion}.png`
-    /// (overwriting any previous image for that key) and points
-    /// manifest.emotions[emotion] at it.
-    @discardableResult
     /// Replaces the avatar's base drawing.
     ///
     /// `idle` and nothing else: every other clip already falls back to it
@@ -73,6 +69,7 @@ enum AvatarManifestEditor {
     /// and this is the picture. Writing all the clips instead would make an
     /// avatar that cannot later be given a walk of its own without clearing
     /// them by hand.
+    @discardableResult
     static func setBaseImage(sourceFile: URL, directory: URL) throws -> AvatarManifest {
         let existing = try loadManifest(directory: directory)
 
@@ -98,6 +95,10 @@ enum AvatarManifestEditor {
         return updated
     }
 
+    /// Settings' emotion mapping: copies `sourceFile` in as `{emotion}.png`
+    /// (overwriting any previous image for that key) and points
+    /// manifest.emotions[emotion] at it.
+    @discardableResult
     static func setEmotionImage(named emotion: String, sourceFile: URL, directory: URL) throws -> AvatarManifest {
         guard isValidEmotionName(emotion) else {
             throw AvatarManifestEditorError.invalidEmotionName(emotion)
