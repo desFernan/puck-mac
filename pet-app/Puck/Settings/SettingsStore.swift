@@ -33,6 +33,7 @@ final class SettingsStore {
         static let isAvatarOutlined = "Puck.isAvatarOutlined"
         static let avatarPoseAdjustments = "Puck.avatarPoseAdjustments"
         static let hasRequestedAccessibility = "Puck.hasRequestedAccessibility"
+        static let petAnnouncesRuns = "Puck.petAnnouncesRuns"
     }
 
     private let defaults: UserDefaults
@@ -118,6 +119,25 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: Keys.notchPanelEnabled) }
     }
 
+    /// Whether the pet says anything about a run that finished while the chat
+    /// window was not the one being looked at -- and whether it comes to the
+    /// pointer when a run has stopped for an approval.
+    ///
+    /// On. A run that ended, or one that is waiting on an answer, is
+    /// otherwise something you find out about the next time you happen to
+    /// look at the window -- and for an approval that means the agent sits
+    /// doing nothing until you do. It only ever speaks while the window is
+    /// behind something else, so it cannot talk over a transcript you are
+    /// already reading.
+    ///
+    /// Read through `object(forKey:)` rather than `bool(forKey:)`: the latter
+    /// cannot tell "switched off" from "never touched", so turning it off
+    /// would be undone by its own default on the next launch.
+    var petAnnouncesRuns: Bool {
+        get { defaults.object(forKey: Keys.petAnnouncesRuns) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.petAnnouncesRuns) }
+    }
+
     /// "포커스 창 위로 안 올라감" wander option (F3).
     var avoidClimbingFocusedWindow: Bool {
         get { defaults.object(forKey: Keys.avoidClimbingFocusedWindow) as? Bool ?? true }
@@ -134,9 +154,6 @@ final class SettingsStore {
         set { defaults.set(newValue, forKey: Keys.isMuteComplaintEnabled) }
     }
 
-    /// Which installed avatar (a folder name under AvatarCatalogue.avatars-
-    /// Directory) is currently active. "dummy" is the bundled default,
-    /// always seeded on first run (see AvatarInstaller).
     /// Draws the avatar the other way round.
     ///
     /// Which way a character faces is decided by whoever drew it, and the app
@@ -198,6 +215,9 @@ final class SettingsStore {
 
     var onAvatarPoseAdjustmentsChanged: ((AvatarPoseAdjustments) -> Void)?
 
+    /// Which installed avatar (a folder name under
+    /// AvatarCatalogue.avatarsDirectory) is currently active. "dummy" is the
+    /// bundled default, always seeded on first run (see AvatarInstaller).
     var selectedAvatarName: String {
         get { defaults.string(forKey: Keys.selectedAvatarName) ?? "dummy" }
         set {

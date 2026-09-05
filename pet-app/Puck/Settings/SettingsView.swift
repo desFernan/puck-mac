@@ -68,11 +68,16 @@ struct SettingsView: View {
     @State private var isMuteComplaintEnabled: Bool
     @State private var avoidClimbingFocusedWindow: Bool
     @State private var notchPanelEnabled: Bool
+    @State private var petAnnouncesRuns: Bool
     @State private var isAvatarMirrored: Bool
     @State private var isAvatarOutlined: Bool
     @State private var avatarScale: Double
     @State private var poseAdjustments: AvatarPoseAdjustments
-    @State private var category: SettingsCategory = .avatar
+    /// Which page is open. Stored rather than held: the window builds a
+    /// fresh view on every show (see showSettingsWindow), and a page that
+    /// reset to the first one each time would send somebody back through the
+    /// list for the setting they were just looking at.
+    @AppStorage("Puck.settingsCategory") private var category: SettingsCategory = .avatar
     @State private var toyScale: Double
     @State private var walkSpeedMultiplier: Double
     @State private var toysOut: Set<String>
@@ -113,6 +118,7 @@ struct SettingsView: View {
         _isMuteComplaintEnabled = State(initialValue: store.isMuteComplaintEnabled)
         _avoidClimbingFocusedWindow = State(initialValue: store.avoidClimbingFocusedWindow)
         _notchPanelEnabled = State(initialValue: store.isNotchPanelEnabled)
+        _petAnnouncesRuns = State(initialValue: store.petAnnouncesRuns)
         _isAvatarMirrored = State(initialValue: store.isAvatarMirrored)
         _isAvatarOutlined = State(initialValue: store.isAvatarOutlined)
         _poseAdjustments = State(initialValue: store.avatarPoseAdjustments)
@@ -134,7 +140,7 @@ struct SettingsView: View {
         Strings.text(key, language: localization.language)
     }
 
-    /// Which half of the split this instance draws.
+    /// One block of settings, drawn wherever it is asked for.
     ///
     /// The split used to live in `body` alone, and the caller had to guess
     /// which callbacks that implied. It guessed wrong once -- the window drew
@@ -163,17 +169,12 @@ struct SettingsView: View {
         case actions
     }
 
-    /// Which half of the split this instance draws.
+    /// Which sections this instance draws.
     ///
     /// The window is where things are *configured*, so it holds everything
-    /// that can be: the avatar included, which used to be reachable only from
-    /// a menu bar popover you had to keep open while looking at it. The
-    /// popover keeps what you reach for without wanting a window -- the toys,
-    /// mute, the volume, and the way out.
+    /// that can be: the avatar manager included, which used to be reachable
+    /// only from a popover you had to keep open while looking at it.
     ///
-    /// Volume is in both on purpose. It is the one setting people change
-    /// mid-sentence, and sending them to a window for it is the reason it was
-    /// worth splitting these at all.
     /// The popover is a quick view, so it holds the handful of things worth
     /// changing without opening anything: the toys, mute and volume, how big
     /// the pet is, and which way the theme goes. Everything that is read
@@ -286,8 +287,6 @@ struct SettingsView: View {
         }
     }
 
-    /// The reference opens with its mark and name; ours is the pumpkin that
-    /// is already the app icon and the pet's toy.
     /// The menu bar's quick view: one column, fixed size, nothing to choose
     /// between.
     private var popover: some View {
@@ -404,17 +403,6 @@ struct SettingsView: View {
         }
     }
 
-    /// Mute alone, in the panel.
-    ///
-    /// The rest of the sound settings are set once and left, which is what
-    /// moved them to the window; mute is the one that gets reached for while
-    /// something is playing, and a toggle two clicks and a window away is a
-    /// toggle nobody uses. So it sits with the other live controls.
-    ///
-    /// Here and *only* here, deliberately. The window is kept between opens
-    /// rather than rebuilt, so a second switch over there would hold whatever
-    /// `store.isMuted` was when the window was first built and show the wrong
-    /// state the moment this one is used.
     /// The size slider on its own, without the manager around it.
     ///
     /// Writes through the same store property and the same live-apply
@@ -468,6 +456,16 @@ struct SettingsView: View {
         }
     }
 
+    /// Mute and the volume, in both surfaces.
+    ///
+    /// The rest of the sound settings are set once and left, which is what
+    /// moved them to the window; these two get reached for while something is
+    /// playing, and a toggle two clicks and a window away is a toggle nobody
+    /// uses. So they sit with the other live controls as well.
+    ///
+    /// Being in both is only safe because the window rebuilds its contents on
+    /// every show -- these switches are seeded from the store at init, and a
+    /// window kept across opens showed the state it was first built with.
     private var quickSoundSection: some View {
         SettingsSection(title: text(.tabSound)) {
             SettingsRow(label: text(.muteLabel)) {
@@ -528,6 +526,12 @@ struct SettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .onChange(of: isAvatarOutlined) { _, newValue in store.isAvatarOutlined = newValue }
+            }
+            SettingsRow(label: text(.petAnnouncesLabel)) {
+                Toggle("", isOn: $petAnnouncesRuns)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: petAnnouncesRuns) { _, newValue in store.petAnnouncesRuns = newValue }
             }
             SettingsRow(label: text(.notchPanelLabel)) {
                 Toggle("", isOn: $notchPanelEnabled)

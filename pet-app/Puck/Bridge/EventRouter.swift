@@ -75,6 +75,21 @@ struct EventReaction: Equatable {
     /// that is held just as long, and a caption that expires first leaves the
     /// pet standing over code with nothing said about it.
     var bubbleHoldsForRun: Bool = false
+    /// Said only while the pet is out on the desktop.
+    ///
+    /// The transcript is the real answer and it is better than anything a
+    /// bubble can hold -- but only if it is on screen. When the chat window
+    /// is not the one being looked at, the pet standing on the desktop is the
+    /// only thing that can say a run finished at all, and the alternative is
+    /// finding out the next time you happen to look.
+    var bubbleWhenAwayOnly: Bool = false
+    /// The pet walks to the pointer before it says anything.
+    ///
+    /// For the one thing that cannot wait to be noticed: a run stopped on an
+    /// approval. The banner is in a window that is behind something else, and
+    /// until it is answered the agent is doing nothing at all -- so the pet
+    /// brings the question to where the user is looking instead.
+    var comesToCursor: Bool = false
     /// The run this event belongs to has ended, whether it succeeded or not.
     /// The pet holds things on a run's behalf -- a point_at with a long
     /// `hold_seconds`, the tour's raised walking speed -- and this is when it
@@ -83,6 +98,31 @@ struct EventReaction: Equatable {
 }
 
 enum EventRouter {
+    /// What the pet does while a tool runs.
+    ///
+    /// Every tool but code_editor used to `point`, which was the right answer
+    /// when the only other tools acted on something on screen -- the pet
+    /// pointing at where the action is. It stopped being right as the agent
+    /// grew tools that are it working on its own: a `run_shell`, a terminal
+    /// it started, a file it is reading. There is nothing on screen to point
+    /// at during those, so the pet stood there with its arm out at nothing.
+    ///
+    /// Two postures, then. Pointing is for a tool whose whole purpose is a
+    /// place on the screen; typing is for the pet being busy with something
+    /// of its own. Anything unknown points, which is what everything did
+    /// before and is the safer of the two to be wrong about -- a pet pointing
+    /// is looking at something, a pet typing claims to be working.
+    static func posture(forTool tool: String) -> StateKind {
+        Self.workingTools.contains(tool) ? .type : .point
+    }
+
+    /// The tools that are the agent working rather than showing.
+    static let workingTools: Set<String> = [
+        "run_shell", "run_applescript",
+        "terminal_start", "terminal_read", "terminal_send", "terminal_stop",
+        "read_file", "list_files",
+    ]
+
     /// Maps a protocol 3.2 event to a reaction, per the F3 table
     /// ("소켓 이벤트 -> 반응 매핑").
     ///
@@ -105,11 +145,8 @@ enum EventRouter {
             return EventReaction()
 
         case .toolCall(_, let tool, _, let detail):
-            // code_editor gets a dedicated typing reaction; every other tool
-            // (run_shell, run_applescript, and anything else) points at wherever
-            // the action is happening — the "run_shell 계열" row in the table.
             guard tool == "code_editor" else {
-                return EventReaction(stateTransition: .point)
+                return EventReaction(stateTransition: Self.posture(forTool: tool))
             }
             let path = codeEditorPath(from: detail)
             let pathChanged = previousCodeEditorPath != nil && path != nil && path != previousCodeEditorPath
@@ -120,10 +157,20 @@ enum EventRouter {
                 ? EventReaction()
                 : EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad")
 
-        case .awaitApproval:
-            return EventReaction(stateTransition: .point, sfxKey: "await_approval", emotion: "thinking")
+        case .awaitApproval(let summary, _):
+            // The pet comes to the pointer for this one, and only for this
+            // one. Everything else it has to say can wait to be looked at; a
+            // run stopped on an approval cannot, because nothing else is
+            // going to happen until it is answered.
+            return EventReaction(
+                sfxKey: "await_approval",
+                bubbleText: bubbleSummary(from: summary),
+                emotion: "thinking",
+                bubbleWhenAwayOnly: true,
+                comesToCursor: true
+            )
 
-        case .agentDone(let ok, _):
+        case .agentDone(let ok, let summary):
             // Only agent_done(ok=true) is specified; a failed run is already
             // signaled via toolResult(ok=false).
             //
@@ -134,9 +181,26 @@ enum EventRouter {
             // moment. A code tour's caption (petSays) is a different thing and
             // keeps its bubble: it is said while pointing at code, and there
             // is nothing else on screen saying it.
+            // The bubble is `bubbleWhenAwayOnly`, which is what the note
+            // above is really about: with the window in front the answer is
+            // already on screen in full, and a bubble repeats a line of it
+            // over the top. With the window behind something else there is no
+            // transcript to read, and "it finished" is worth knowing.
             return ok
-                ? EventReaction(sfxKey: "task_success", jump: true, emotion: "happy", runFinished: true)
-                : EventReaction(runFinished: true)
+                ? EventReaction(
+                    sfxKey: "task_success",
+                    jump: true,
+                    bubbleText: bubbleSummary(from: summary),
+                    emotion: "happy",
+                    bubbleWhenAwayOnly: true,
+                    runFinished: true
+                )
+                : EventReaction(
+                    bubbleText: bubbleSummary(from: summary),
+                    emotion: "sad",
+                    bubbleWhenAwayOnly: true,
+                    runFinished: true
+                )
 
         case .petSays(let text):
             // Speech and nothing else. A code tour's stop has already put the

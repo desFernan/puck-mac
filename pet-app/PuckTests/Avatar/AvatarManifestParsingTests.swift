@@ -134,7 +134,7 @@ final class AvatarManifestParsingTests: XCTestCase {
     func test_load_withMissingIdle_throwsMissingRequiredClips() {
         let json = """
         {
-          "schema_version": 1, "name": "no-idle", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "no-idle", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": { "walk": "walk" },
           "sounds": {}
@@ -151,7 +151,7 @@ final class AvatarManifestParsingTests: XCTestCase {
     func test_load_withUnsupportedSchemaVersion_throws() {
         let json = """
         {
-          "schema_version": 2, "name": "future", "type": "usdz", "scale": 1.0,
+          "schema_version": 2, "name": "future", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": { "idle": "idle", "walk": "walk" },
           "sounds": {}
@@ -162,6 +162,31 @@ final class AvatarManifestParsingTests: XCTestCase {
                 return XCTFail("expected .unsupportedSchemaVersion, got \(error)")
             }
             XCTAssertEqual(version, 2)
+        }
+    }
+
+    /// A package this build has no renderer for is refused with a reason.
+    ///
+    /// It used to load: the type decoded, the clip keys were there, and then
+    /// SpriteAvatar went looking for a PNG per clip that a usdz package does
+    /// not have. What that produced was a pet that had silently vanished, and
+    /// nothing in the log naming the cause.
+    func test_load_withATypeThisBuildCannotDraw_throws() {
+        for type in ["usdz", "video"] {
+            let json = """
+            {
+              "schema_version": 1, "name": "legacy", "type": "\(type)", "scale": 1.0,
+              "hitbox": { "width": 100, "height": 100 },
+              "clips": { "idle": "idle" },
+              "sounds": {}
+            }
+            """
+            XCTAssertThrowsError(try AvatarLoader.load(manifestData: Data(json.utf8))) { error in
+                guard case AvatarLoaderError.unsupportedAvatarType(let reported) = error else {
+                    return XCTFail("expected .unsupportedAvatarType, got \(error)")
+                }
+                XCTAssertEqual(reported, type)
+            }
         }
     }
 
@@ -194,7 +219,7 @@ final class AvatarManifestParsingTests: XCTestCase {
     func test_resolvedClipName_fallsBackToIdle_whenClipMissing() throws {
         let json = """
         {
-          "schema_version": 1, "name": "minimal", "type": "usdz", "scale": 1.0,
+          "schema_version": 1, "name": "minimal", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": { "idle": "idle", "walk": "walk" },
           "sounds": {}
@@ -206,12 +231,12 @@ final class AvatarManifestParsingTests: XCTestCase {
 
     func test_resolvedClipName_returnsNil_whenIdleIsNotAStringNamedClip() throws {
         // idle/walk are both present (satisfies the required-clip check), but as
-        // video-style {in,out} time ranges rather than usdz/sprites clip names —
-        // resolvedClipName only understands the .name case, so idle can't be used
-        // as a fallback target here even though the key technically exists.
+        // {in,out} time ranges rather than clip names — resolvedClipName only
+        // understands the .name case, so idle can't be used as a fallback
+        // target here even though the key technically exists.
         let json = """
         {
-          "schema_version": 1, "name": "video-avatar", "type": "video", "scale": 1.0,
+          "schema_version": 1, "name": "time-ranges", "type": "sprites", "scale": 1.0,
           "hitbox": { "width": 100, "height": 100 },
           "clips": { "idle": {"in": 0, "out": 1}, "walk": {"in": 1, "out": 2} },
           "sounds": {}

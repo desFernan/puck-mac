@@ -8,16 +8,18 @@
 
 /// A value in the clips table.
 ///
-/// For `type: usdz`, `.name(String)` is the file stem of a **single-animation**
-/// usdz living alongside manifest.json (e.g. "idle" -> Avatars/{name}/idle.usdz)
-/// — NOT an animation name to look up inside one shared model. RealityKit
-/// effectively only plays a usdz's first animation regardless of how many
-/// `availableAnimations` entries it reports, so one avatar with 10 named clips
-/// baked into a single usdz does not work; each clip needs its own file. See
-/// the avatar package spec for the full external-creator requirements.
+/// `.name(String)` is a file stem beside manifest.json, one file per clip:
+/// "idle" means Avatars/{name}/idle.png. A stem rather than an animation name
+/// inside one shared model, which is what the 3D renderer this format was
+/// written for could not have made work -- it played only a model's first
+/// animation however many it declared -- and what the sprite renderer that
+/// replaced it kept.
 ///
-/// `type: sprites` reuses the same file-stem convention. `type: video` uses
-/// a {"in":sec,"out":sec} time range instead (`.timeRange`).
+/// `.timeRange` is the other shape the format allows, `{"in":sec,"out":sec}`,
+/// for a kind of avatar that is one file played in pieces. Nothing draws one
+/// today: `AvatarLoader` accepts `type: sprites` alone, and a sprite has no
+/// timeline to cut up. It decodes so a package written for a renderer this
+/// build does not have is refused by name rather than as bad JSON.
 enum ClipReference: Equatable {
     case name(String)
     case timeRange(in: Double, out: Double)
@@ -53,9 +55,18 @@ extension ClipReference: Codable {
 }
 
 struct AvatarManifest: Equatable, Codable {
+    /// What is supposed to draw the character.
+    ///
+    /// `sprites` is the only one this build has a renderer for -- see
+    /// `AvatarLoaderError.unsupportedAvatarType`. The other two are kept
+    /// because a package on somebody's disk may still declare them, and
+    /// decoding one is what lets the loader say so.
     enum AvatarType: String, Codable {
+        /// The 3D renderer, removed in the 2026-07-29 2D switch.
         case usdz
+        /// Never built.
         case video
+        /// One PNG per clip. The only kind that draws.
         case sprites
     }
 
@@ -68,10 +79,10 @@ struct AvatarManifest: Equatable, Codable {
     let name: String
     let type: AvatarType
     let scale: Double
-    /// 2026-07-29 2D switch, sprites-only: 0.0-1.0 multiplier for the
-    /// procedural squash-and-stretch "bounce" motion pet-app applies on top
-    /// of a static illustration (no animation frames to play). nil means
-    /// pet-app's own default; has no effect for usdz/video avatars.
+    /// 2026-07-29 2D switch: 0.0-1.0 multiplier for the procedural
+    /// squash-and-stretch "bounce" motion pet-app applies on top of a static
+    /// illustration (no animation frames to play). nil means pet-app's own
+    /// default.
     let bounceIntensity: Double?
     let hitbox: Hitbox
     let clips: [String: ClipReference]
@@ -80,11 +91,16 @@ struct AvatarManifest: Equatable, Codable {
     /// is fine for a base-image-only avatar.
     let emotions: [String: ClipReference]?
     let sounds: [String: String]
+    /// What this character says, keyed by the moment -- see AvatarLines for
+    /// the names and for why only the pet's own speech can be replaced.
+    /// Absent entirely is the ordinary case: the app's own wording is used
+    /// for every line a package does not carry.
+    let lines: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case bounceIntensity = "bounce_intensity"
-        case name, type, scale, hitbox, clips, emotions, sounds
+        case name, type, scale, hitbox, clips, emotions, sounds, lines
     }
 
     /// Written out rather than synthesised so `scale` and `sounds` may be left
@@ -106,6 +122,7 @@ struct AvatarManifest: Equatable, Codable {
         clips = try container.decode([String: ClipReference].self, forKey: .clips)
         emotions = try container.decodeIfPresent([String: ClipReference].self, forKey: .emotions)
         sounds = try container.decodeIfPresent([String: String].self, forKey: .sounds) ?? [:]
+        lines = try container.decodeIfPresent([String: String].self, forKey: .lines)
     }
 
     init(
@@ -117,7 +134,8 @@ struct AvatarManifest: Equatable, Codable {
         hitbox: Hitbox,
         clips: [String: ClipReference],
         emotions: [String: ClipReference]?,
-        sounds: [String: String]
+        sounds: [String: String],
+        lines: [String: String]? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.name = name
@@ -128,5 +146,6 @@ struct AvatarManifest: Equatable, Codable {
         self.clips = clips
         self.emotions = emotions
         self.sounds = sounds
+        self.lines = lines
     }
 }

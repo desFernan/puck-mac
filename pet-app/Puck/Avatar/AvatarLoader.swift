@@ -20,6 +20,16 @@ enum AvatarLoaderError: Error, Equatable {
     /// while meaning something different (fields reinterpreted, new required
     /// semantics) — silently trusting it as v1 would misload it with no error.
     case unsupportedSchemaVersion(Int)
+    /// A package declaring a kind of avatar this build has no renderer for.
+    ///
+    /// `sprites` is the only one there is. The 3D renderer the `usdz` type
+    /// named was removed in the 2026-07-29 2D switch and `video` was never
+    /// built, but the type went on decoding -- so a package declaring either
+    /// loaded successfully and then drew nothing at all, because SpriteAvatar
+    /// went looking for a PNG per clip and a usdz package has none. An
+    /// invisible pet with nothing in the log is the worst of the three
+    /// possible answers; this is the second worst, and it says why.
+    case unsupportedAvatarType(String)
 }
 
 /// Result of a manifest load: the parsed manifest, plus recommended clips
@@ -67,6 +77,14 @@ enum AvatarLoader {
             throw AvatarLoaderError.unsupportedSchemaVersion(manifest.schemaVersion)
         }
 
+        // Before the clip checks, not after: which files a package is expected
+        // to carry follows from its type, so "idle is missing" is the wrong
+        // thing to say about a package whose clips were never going to be
+        // looked for as PNGs in the first place.
+        guard manifest.type == .sprites else {
+            throw AvatarLoaderError.unsupportedAvatarType(manifest.type.rawValue)
+        }
+
         let missingRequired = requiredClips.filter { manifest.clips[$0] == nil }
         guard missingRequired.isEmpty else {
             throw AvatarLoaderError.missingRequiredClips(missingRequired)
@@ -76,11 +94,11 @@ enum AvatarLoader {
         return AvatarLoadResult(manifest: manifest, missingRecommendedClips: missingRecommended)
     }
 
-    /// Returns the requested clip's file stem (e.g. "idle" for idle.usdz) if
+    /// Returns the requested clip's file stem (e.g. "idle" for idle.png) if
     /// present in the manifest, otherwise falls back to idle's, otherwise nil
-    /// if idle itself isn't a string-named file (usdz/sprites case only — see
-    /// ClipReference's doc comment for why manifest clip values are file
-    /// stems, not animation names, under the usdz one-file-per-clip design).
+    /// if idle itself isn't a string-named file — see ClipReference's doc
+    /// comment for why a manifest's clip values are file stems rather than
+    /// animation names.
     static func resolvedClipName(for clip: String, in result: AvatarLoadResult) -> String? {
         if case .name(let name) = result.manifest.clips[clip] {
             return name

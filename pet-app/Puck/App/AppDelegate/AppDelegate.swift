@@ -34,7 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Held for the process's lifetime -- see AppDelegate+Language, which is
     /// the only thing that sets it.
     var languageObserver: NSObjectProtocol?
+    /// What the installed character says -- see AvatarLines. Replaced when
+    /// the avatar is, and the app's own wording until one is loaded.
+    var avatarLines = AvatarLines.none
     var avatarHitboxSize: CGSize = .zero
+    /// The last size written to the log -- see applyLiveAvatarScale, which
+    /// reports where the pet settled rather than every frame of getting there.
+    var lastLoggedAvatarScale: Double = .nan
     /// Unscaled manifest.hitbox -- recomputes avatarHitboxSize when Settings'
     /// size slider live-applies a new scale (applyLiveAvatarScale).
     var baseHitboxSize: CGSize = .zero
@@ -47,10 +53,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// `overlayController?.window` at each of its call sites.
     var overlayWindow: NSWindow? { overlayController?.window }
 
-    /// Every display's work area, in that window's coordinates -- one rect
-    /// per display, the Dock and menu bar already taken off. Kept on the
-    /// controller as `roamableAreas`; this is where it is measured.
-    /// Empty before the overlay exists.
     /// The settings the menu bar panel does not carry -- see
     /// showSettingsWindow(). Kept after closing so it reopens where it was.
     var settingsWindow: NSWindow?
@@ -95,6 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         }
     }
 
+    /// Every display's work area, in the overlay window's coordinates -- one
+    /// rect per display, the Dock and menu bar already taken off. Kept on the
+    /// controller as `roamableAreas`; this is where it is measured. Empty
+    /// before the overlay exists.
     var screenWorkAreas: [CGRect] {
         guard let window = overlayWindow, let space = screenManager?.current else { return [] }
         let origin = space.normalized(fromAppKit: CGPoint(x: window.frame.minX, y: window.frame.maxY))
@@ -131,7 +137,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// AppDelegate+Tank -- see TankResidency.
     var tank = TankResidency()
     let petHomeDecider = PetHomeDecider()
-    /// The tank the client last reported, in overlay-local coordinates. Nil
     /// The roamable areas the pet had before it went home, so coming out
     /// restores the desktop it actually had rather than a recomputed guess.
     /// Nil is also the answer to "is the pet out on the desktop right now".
@@ -191,8 +196,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// Runs only while the hotkeys are waiting for Accessibility to be
     /// granted; cleared by the retry itself once the tap is live.
     var accessibilityRetryTimer: Timer?
-    /// The tank's size as the client last reported it, kept so the pet can be
-    /// The scale the trip in progress is heading for. Held here rather than
     var voiceInputController: VoiceInputController?
     var stateBeforeListen: StateHandler?
 
@@ -237,6 +240,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
             NSApp.terminate(nil)
             return
         }
+
+        // Before anything opens a file, which is everything below -- see
+        // FileDescriptorLimit for what a GUI app is handed and why 256 is not
+        // enough for the window's watchers and a coding agent's child.
+        FileDescriptorLimit.raise()
 
         // Before anything that builds UI text: the menu bar, Settings and the
         // pet's own bubbles all read `Strings` at construction.

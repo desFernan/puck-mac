@@ -7,6 +7,7 @@
 //  character/sfx/avatar and notice bubbles.
 //
 
+import AppKit
 import Foundation
 
 extension AppDelegate {
@@ -40,7 +41,7 @@ extension AppDelegate {
             // up and stayed lit over a microphone that was never open.
             _ = self.bridgeServer?.send(.voiceListening(controller.isListening), to: .gui)
             if listening, !controller.isListening {
-                self.showNoticeBubble(Strings.text(.voicePermissionNeeded), for: 4)
+                self.showNoticeBubble(self.avatarLines.text(.voicePermissionNeeded), for: 4)
             }
         }
         // Workspace/session creation is answered in-process as of 2026-08-15
@@ -107,7 +108,7 @@ extension AppDelegate {
         }
         server.onMessage = { message, connection in
             // Delivered on BridgeServer's background queue. The router hops to
-            // main before touching anything (RealityKit, NSWorkspace,
+            // main before touching anything (the layer tree, NSWorkspace,
             // WindowListWatcher) — do not add main-thread work here.
             router.handle(message) { reply in connection.send(reply) }
         }
@@ -146,9 +147,50 @@ extension AppDelegate {
         if reaction.jump {
             characterBody?.triggerJump()
         }
+        if reaction.comesToCursor, shouldAnnounceAway {
+            walkToCursor()
+        }
         if let bubbleText = reaction.bubbleText {
+            // `bubbleWhenAwayOnly` is the whole of the announcement policy:
+            // with the chat window in front the answer is already on screen
+            // in full, and a bubble repeats a line of it over the top. See
+            // SettingsStore.petAnnouncesRuns for the switch that turns the
+            // other case off.
+            guard !reaction.bubbleWhenAwayOnly || shouldAnnounceAway else { return }
             showAgentSummaryBubble(bubbleText, holdsForRun: reaction.bubbleHoldsForRun)
         }
+    }
+
+    /// Whether the pet should say something the window would otherwise have
+    /// said.
+    ///
+    /// Only while it is out on the desktop, which is exactly "the chat window
+    /// is not the one being looked at" -- the pet lives in that window's
+    /// island whenever it is in front (see AppDelegate+Tank). So this needs no
+    /// second source of truth about focus: where the pet is standing already
+    /// is one.
+    private var shouldAnnounceAway: Bool {
+        settingsStore.petAnnouncesRuns && desktopRoamableAreas == nil && !isCharacterHidden
+    }
+
+    /// Brings the pet to the pointer, so what it is about to say is where the
+    /// user is already looking.
+    ///
+    /// `moveTo` rather than a teleport: the walk is what makes it read as the
+    /// pet coming over rather than as a notification appearing. It lands
+    /// beside the cursor, not under it -- a pet on top of the pointer is a pet
+    /// in the way of whatever was being done.
+    private func walkToCursor() {
+        guard let controller = characterController else { return }
+        cancelWander()
+        let cursor = windowLocalPoint(fromGlobalAppKit: NSEvent.mouseLocation)
+        let area = controller.area(at: cursor)
+        states.moveTo.target = CGPoint(
+            x: min(max(cursor.x, area.minX), area.maxX),
+            y: area.maxY
+        )
+        states.moveTo.nextState = .idle
+        controller.transition(to: .moveTo)
     }
 
     /// Ends whatever the pet is currently saying. Called when a run ends, so
@@ -271,7 +313,7 @@ extension AppDelegate {
         pinCharacter()
         avatar?.showEmotion("angry")
 
-        showNoticeBubble(Strings.text(.bubbleMutedComplaint), for: Self.mutedComplaintDuration) { [weak self] in
+        showNoticeBubble(avatarLines.text(.muted), for: Self.mutedComplaintDuration) { [weak self] in
             // Falling is also what puts the face back: entering Fall plays the
             // fall clip, so the sulk ends without anyone having to remember
             // which expression the pet was wearing before it. The pin
