@@ -27,6 +27,10 @@ extension AppDelegate {
         executor.register(PointAtHandler(coordinator: self))
         executor.register(ClickElementHandler())
         executor.register(FindUIElementHandler())
+        executor.register(AppSnapshotHandler())
+        executor.register(TypeTextHandler())
+        executor.register(PressKeyHandler())
+        executor.register(ScrollHandler())
         toolExecutor = executor
     }
 }

@@ -75,6 +75,16 @@ enum UIElementInspector {
     /// Comfortably inside find_ui_element's 15s registry timeout.
     static let searchBudget: TimeInterval = 5
 
+    /// An `AXUIElement` seen as an `AXNode`, for a caller that walks the tree
+    /// itself rather than searching it -- see UIElementOutline.
+    ///
+    /// The node type is private because nothing outside should be building
+    /// one from scratch; this is the one way in, and it takes the element the
+    /// caller already has.
+    static func node(for element: AXUIElement) -> AXNode {
+        AXUIElementNode(element: element)
+    }
+
     /// Finds the first element of `pid`'s app matching the query.
     /// Frames come back in global Quartz coordinates, as protocol section 4
     /// expects for anything that later feeds point_at or click_element.
