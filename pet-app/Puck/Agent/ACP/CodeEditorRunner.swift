@@ -56,6 +56,43 @@ final class LiveAgentProcesses {
     }
 }
 
+/// Notes that the agent is still doing something.
+///
+/// A deadline on an agent has to be an *idle* deadline. A coding CLI that is
+/// working -- reading files, running a build, editing -- can go a long time
+/// between one answer and the next, and a total budget cuts off exactly the
+/// runs that were going well: "180초 안에 답하지 않아 중단했어요" arrived on a turn
+/// that was three minutes into real work. What a timeout is actually for is a
+/// child that has stopped talking altogether, and that is what this measures.
+///
+/// A counter rather than a timestamp: the deadline asks "has anything happened
+/// since I last asked", which a count answers without either side needing a
+/// clock.
+///
+/// `@unchecked Sendable`: both members are touched only under `lock`. The
+/// agent's notifications arrive on the connection's reader queue and the
+/// deadline ticks on its own task, so the two genuinely meet here.
+final class AgentProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private var noted = 0
+    private var seen = 0
+
+    func note() {
+        lock.lock()
+        noted += 1
+        lock.unlock()
+    }
+
+    /// Whether anything was noted since the last call, and forgets it.
+    func consume() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let moved = noted != seen
+        seen = noted
+        return moved
+    }
+}
+
 /// Runs `work` under a deadline. Returns nil when the deadline won.
 ///
 /// The loser is abandoned rather than awaited -- a task group would wait for
@@ -68,9 +105,10 @@ final class LiveAgentProcesses {
 /// one of its copies.
 func withDeadline<Value>(
     seconds: TimeInterval,
+    progress: AgentProgress? = nil,
     work: @escaping () async -> Value
 ) async -> Value? {
-    await withDeadline(seconds: seconds, suspendedWhile: { false }, work: work)
+    await withDeadline(seconds: seconds, suspendedWhile: { false }, progress: progress, work: work)
 }
 
 /// How long the deadline may be held off by one uninterrupted stretch of
@@ -79,7 +117,8 @@ func withDeadline<Value>(
 /// because a person who never answers is the case this bound exists for.
 let maximumSuspension: TimeInterval = 15 * 60
 
-/// The same deadline, but one that does not run while `suspendedWhile` holds.
+/// The same deadline, but one that does not run while `suspendedWhile` holds,
+/// and that starts over whenever `progress` reports the agent said something.
 ///
 /// A CLI chat turn calls Puck's tools through an MCP server, and a tool can
 /// sit on an approval prompt for as long as the user takes to read it. Charged
@@ -89,6 +128,7 @@ let maximumSuspension: TimeInterval = 15 * 60
 func withDeadline<Value>(
     seconds: TimeInterval,
     suspendedWhile isSuspended: @escaping () -> Bool,
+    progress: AgentProgress? = nil,
     work: @escaping () async -> Value
 ) async -> Value? {
     let outcome = FirstOutcome<Value?>()
@@ -106,6 +146,10 @@ func withDeadline<Value>(
             while spent < seconds {
                 try? await Task.sleep(nanoseconds: UInt64(tick * 1_000_000_000))
                 if outcome.isResolved { return }
+                // Anything the agent said puts the clock back to zero: this
+                // is a deadline on silence, not on how long a turn may take.
+                // See AgentProgress.
+                if progress?.consume() == true { spent = 0 }
                 if isSuspended() {
                     suspended += tick
                     // Bounded, because "serving a tool call" is not the same
@@ -272,11 +316,12 @@ actor CodeEditorRunner {
         liveProcesses.endAll()
     }
 
+    /// Ends the agent, and does not return until it is actually gone.
+    ///
     /// The one way a run's agent is ended: SIGTERM, a moment to leave on its
     /// own, then SIGKILL. `terminate()` alone is a request, not a guarantee,
     /// and the transport is released as soon as the run finishes, so nothing
     /// would be left to escalate afterwards.
-    /// Ends the agent, and does not return until it is actually gone.
     ///
     /// Awaited rather than fired and forgotten wherever the file list is
     /// taken afterwards: the snapshot is what tells the user which files the
@@ -319,10 +364,16 @@ actor CodeEditorRunner {
         }
         liveProcesses.add(process)
 
+        // Every update the agent sends puts the deadline back to the start --
+        // a run that is editing files is not a run that has stopped answering.
+        let progress = AgentProgress()
         let session = AcpCodeEditorSession(
             connection: process.connection,
             projectPath: projectPath,
-            onUpdate: { [onUpdate] update in onUpdate(requestId, workspaceId, update) },
+            onUpdate: { [onUpdate] update in
+                progress.note()
+                onUpdate(requestId, workspaceId, update)
+            },
             resolvePermission: resolvePermission,
             stderrTail: { [weak process] in process?.currentStderrTail() ?? "" }
         )
@@ -337,7 +388,11 @@ actor CodeEditorRunner {
             return .cancelled(changedFiles: tracker.finish())
         }
 
-        guard var result = await withDeadline(seconds: timeoutSeconds, work: { await session.run(task: task) }) else {
+        guard var result = await withDeadline(
+            seconds: timeoutSeconds,
+            progress: progress,
+            work: { await session.run(task: task) }
+        ) else {
             session.cancel()
             // Awaited: the file list below is taken from the disk this agent
             // was writing to a moment ago.
@@ -347,7 +402,7 @@ actor CodeEditorRunner {
                 summary: String(format: Strings.text(.toolCodeEditTimedOutFormat), "\(Int(timeoutSeconds))"),
                 changedFiles: tracker.finish(),
                 error: "timeout",
-                detail: "code_editor exceeded \(Int(timeoutSeconds))s"
+                detail: "code_editor sent nothing for \(Int(timeoutSeconds))s"
             )
         }
         await shutDown(process, cancelGrace: 0)

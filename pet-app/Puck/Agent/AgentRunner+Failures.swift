@@ -38,8 +38,14 @@ extension AgentRunner {
     }
 
     /// Everything the error knew, for the log.
+    ///
+    /// The *raw* thing, which for a login failure is not what the user is
+    /// shown: `notLoggedIn` renders as an instruction and carries the
+    /// provider's own status text along for exactly this, since the status
+    /// code is what the next person debugging it needs.
     static func rawFailureDescription(for error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        if case CodingAgentCLIError.notLoggedIn(_, let detail) = error { return detail }
+        return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
     /// ⌘, opens Settings in both apps (ClientMainMenu binds it), so naming the

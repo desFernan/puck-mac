@@ -432,4 +432,53 @@ final class CodeEditorRunnerTests: XCTestCase {
         }
         return condition()
     }
+
+    // MARK: - The deadline is on silence, not on length
+
+    /// A turn that keeps reporting progress is a turn that is working, and a
+    /// budget for the whole turn cut off exactly those: a coding CLI three
+    /// minutes into real work was stopped with "180초 안에 답하지 않아".
+    func testAnAgentThatKeepsTalkingIsNotTimedOut() async {
+        let progress = AgentProgress()
+        let done = expectation(description: "work finished")
+
+        let result = await withDeadline(seconds: 0.3, progress: progress) { () async -> String in
+            // Six ticks of work, each one shorter than the deadline but four
+            // times it in total.
+            for _ in 0..<6 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                progress.note()
+            }
+            done.fulfill()
+            return "finished"
+        }
+
+        await fulfillment(of: [done], timeout: 5)
+        XCTAssertEqual(result, "finished")
+    }
+
+    /// And one that has genuinely stopped talking is still given up on --
+    /// which is the whole reason there is a deadline.
+    func testAnAgentThatGoesQuietIsStillTimedOut() async {
+        let progress = AgentProgress()
+
+        let result: String? = await withDeadline(seconds: 0.2, progress: progress) {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            return "should not arrive"
+        }
+
+        XCTAssertNil(result)
+    }
+
+    /// The counter answers "since you last asked", so a burst of updates is
+    /// one reset rather than a credit to spend later.
+    func testProgressIsReportedOncePerAsk() {
+        let progress = AgentProgress()
+
+        XCTAssertFalse(progress.consume(), "nothing has happened yet")
+        progress.note()
+        progress.note()
+        XCTAssertTrue(progress.consume())
+        XCTAssertFalse(progress.consume(), "the same two notes must not count twice")
+    }
 }

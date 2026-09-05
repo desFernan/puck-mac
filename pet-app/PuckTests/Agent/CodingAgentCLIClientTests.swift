@@ -198,9 +198,12 @@ final class CodingAgentCLIClientTests: XCTestCase {
         let agent = ScriptedAgent()
         agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
         agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
-        agent.errorReplies["session/prompt"] = (code: -32000, message: "Authentication required")
+        // Deliberately not an authentication failure: that one is classified
+        // and rewritten into an instruction (see the tests below), so using it
+        // here would test the rewrite rather than the stderr tail.
+        agent.errorReplies["session/prompt"] = (code: -32000, message: "Session ended unexpectedly")
         let transport = FakeTransport(connection: agent.connection)
-        transport.stderr = "claude: Not logged in. Run `claude login`."
+        transport.stderr = "claude: ENOSPC: no space left on device"
         let client = CodingAgentCLIClient(
             configuration: { cliConfiguration() },
             startAgent: { _, _ in transport }
@@ -211,8 +214,8 @@ final class CodingAgentCLIClientTests: XCTestCase {
             XCTFail("an ACP error must fail the turn")
         } catch {
             let described = (error as? LocalizedError)?.errorDescription ?? ""
-            XCTAssertTrue(described.contains("Authentication required"), described)
-            XCTAssertTrue(described.contains("claude login"), described)
+            XCTAssertTrue(described.contains("Session ended unexpectedly"), described)
+            XCTAssertTrue(described.contains("ENOSPC"), described)
         }
     }
 
@@ -638,5 +641,86 @@ final class CodingAgentCLIClientTests: XCTestCase {
         let allowed = await CodingAgentCLIClient.resolvePermission(request)
 
         XCTAssertFalse(allowed)
+    }
+
+    // MARK: - A login that has gone
+
+    /// What the CLI actually reports when its OAuth token has been revoked --
+    /// a JSON-RPC internal error wrapping the provider's own 401. Every word
+    /// of it is true and none of it says what to do, and the fix is one
+    /// command in a terminal.
+    func test_aRevokedLoginIsReportedAsSomethingToDo() async {
+        let agent = ScriptedAgent()
+        agent.replies["initialize"] = { _ in .object(["protocolVersion": .number(1)]) }
+        agent.replies["session/new"] = { _ in .object(["sessionId": .string("s-1")]) }
+        agent.errorReplies["session/prompt"] = (
+            code: -32603,
+            message: "Internal error: Failed to authenticate. API Error: 401 OAuth access token has been revoked."
+        )
+        let transport = FakeTransport(connection: agent.connection)
+        let client = CodingAgentCLIClient(
+            configuration: { cliConfiguration() },
+            startAgent: { _, _ in transport }
+        )
+
+        do {
+            _ = try await client.send(messages: [.user("hi")], tools: [])
+            XCTFail("a revoked login must fail the turn")
+        } catch {
+            guard case CodingAgentCLIError.notLoggedIn(let kind, let detail) = error else {
+                return XCTFail("expected .notLoggedIn, got \(error)")
+            }
+            XCTAssertEqual(kind, .claude)
+            XCTAssertTrue(detail.contains("401"), "the raw status has to survive for the log")
+            let described = (error as? LocalizedError)?.errorDescription ?? ""
+            XCTAssertTrue(described.contains("claude"), described)
+            XCTAssertFalse(described.contains("-32603"), "a JSON-RPC code is not an instruction: \(described)")
+        }
+    }
+
+    /// The log still gets the whole thing -- the status code is what the next
+    /// person debugging this needs, and the sentence shown to the user has
+    /// deliberately dropped it.
+    func test_aRevokedLoginStillWritesTheRawReasonToTheLog() {
+        let error = CodingAgentCLIError.notLoggedIn(
+            kind: .claude,
+            detail: "ACP error -32603: Internal error: Failed to authenticate. API Error: 401"
+        )
+
+        let raw = AgentRunner.rawFailureDescription(for: error)
+
+        XCTAssertTrue(raw.contains("-32603"), raw)
+        XCTAssertTrue(raw.contains("401"), raw)
+    }
+
+    /// Both halves have to be there. An agent that merely mentions
+    /// authentication while doing something else is not a login problem, and
+    /// reporting it as one sends the user to re-log in for nothing.
+    func test_whatCountsAsALoginFailureAndWhatDoesNot() {
+        let auth = [
+            "ACP error -32603: Internal error: Failed to authenticate. API Error: 401 OAuth access token has been revoked.",
+            "API Error: 401 {\"type\":\"authentication_error\"}",
+            "codex: not logged in",
+            "Authentication required",
+        ]
+        for detail in auth {
+            XCTAssertNotNil(
+                CodingAgentCLIError.authenticationFailure(in: detail, kind: .claude),
+                "should have been read as a login failure: \(detail)"
+            )
+        }
+
+        let notAuth = [
+            "ACP error -32603: Internal error: ENOSPC: no space left on device",
+            "the file at src/auth/login.ts could not be parsed",
+            "403 Forbidden: this repository is archived",
+            "",
+        ]
+        for detail in notAuth {
+            XCTAssertNil(
+                CodingAgentCLIError.authenticationFailure(in: detail, kind: .claude),
+                "should not have been read as a login failure: \(detail)"
+            )
+        }
     }
 }

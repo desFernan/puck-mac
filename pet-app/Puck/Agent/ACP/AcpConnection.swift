@@ -53,6 +53,7 @@ final class AcpConnection {
 
     /// Feeds raw bytes in. Splits on newlines and tolerates a chunk that ends
     /// mid-line, which is the normal case on a pipe.
+    ///
     /// Locked, because two threads genuinely arrive here: the FileHandle's
     /// readability handler on its own queue, and the drain that runs when the
     /// process exits -- clearing a readability handler does not wait for a

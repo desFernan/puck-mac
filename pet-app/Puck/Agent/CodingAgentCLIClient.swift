@@ -49,6 +49,11 @@ enum CodingAgentCLIError: LocalizedError, Equatable {
     /// The turn started and then failed. Carries the ACP error plus whatever
     /// the CLI wrote to stderr, which is usually the only real explanation.
     case failed(String)
+    /// The CLI is installed and running, and its login is not usable: expired,
+    /// revoked, or never completed. Told apart from `failed` because it is the
+    /// one failure the user can fix in a minute, and the raw text does not say
+    /// how -- see `CodingAgentCLIError.authenticationFailure(in:kind:)`.
+    case notLoggedIn(kind: CodingAgentKind, detail: String)
     case timedOut(seconds: Int)
     /// The turn ended cleanly but said nothing at all.
     case emptyReply(stopReason: String)
@@ -58,10 +63,46 @@ enum CodingAgentCLIError: LocalizedError, Equatable {
         switch self {
         case .unavailable(let summary): return summary
         case .failed(let detail): return String(format: Strings.text(.cliErrorFormat), detail)
+        case .notLoggedIn(let kind, _):
+            return String(format: Strings.text(.cliNotLoggedInFormat), kind.displayName, kind.vendorCLIName)
         case .timedOut(let seconds): return String(format: Strings.text(.cliTimedOutFormat), "\(seconds)")
         case .emptyReply(let stopReason): return String(format: Strings.text(.cliNoAnswerFormat), stopReason)
         case .cancelled: return Strings.text(.agentCancelled)
         }
+    }
+
+    /// Whether a failed turn failed for want of a login, and the error to
+    /// throw when it did.
+    ///
+    /// What the CLI reports is a JSON-RPC internal error wrapping the
+    /// provider's own HTTP status:
+    ///
+    ///     ACP error -32603: Internal error: Failed to authenticate.
+    ///     API Error: 401 OAuth access token has been revoked.
+    ///
+    /// Every word of which is true and none of which says what to do. The
+    /// login belongs to the vendor CLI -- Puck is reusing a session the user
+    /// created by running it themselves -- so the fix is a command in a
+    /// terminal, and that is what this turns it into.
+    ///
+    /// Matched on the provider's own vocabulary rather than on the -32603,
+    /// which is JSON-RPC's catch-all and covers every other internal failure
+    /// too. Both a 401 and the words around it, because an agent that merely
+    /// mentions authentication while doing something else must not be
+    /// reported as a login problem.
+    ///
+    /// The raw text is carried along rather than discarded: it goes to the
+    /// log, where the next person debugging this needs the status code.
+    static func authenticationFailure(in detail: String, kind: CodingAgentKind) -> CodingAgentCLIError? {
+        let text = detail.lowercased()
+        let saysAuth = ["failed to authenticate", "authentication_error", "unauthorized",
+                        "invalid api key", "oauth token", "oauth access token",
+                        "please run `claude login`", "not logged in", "login required",
+                        "authentication required"]
+            .contains { text.contains($0) }
+        let saysUnauthorized = text.contains("401") || text.contains("403")
+        guard saysAuth || (saysUnauthorized && text.contains("token")) else { return nil }
+        return .notLoggedIn(kind: kind, detail: detail)
     }
 }
 
@@ -83,10 +124,21 @@ final class CodingAgentCLIClient: AgentLLMClient {
     /// address nothing answers.
     private let invokeTool: AgentToolInvocation?
 
-    /// Long enough for a real answer on a cold CLI start (the vendor binary is
-    /// ~256MB and the first turn pays for loading it), short enough that a
-    /// wedged child does not hold the chat until the app is quit.
-    static let defaultTimeoutSeconds: TimeInterval = 180
+    /// How long the CLI may go **without saying anything** before the turn is
+    /// given up on.
+    ///
+    /// Silence, not length. This was a budget for the whole turn, and 180s of
+    /// it -- which is a fair wait for a cold start, and no wait at all for
+    /// real work. A CLI that uses tools heavily spends most of a turn inside
+    /// them, so the runs it cut off were the ones going well: three minutes
+    /// in, mid-edit, "코딩 CLI가 180초 안에 답하지 않아 중단했어요". What a timeout
+    /// is for is a child that has stopped talking, and every ACP update now
+    /// puts this clock back to the start (see AgentProgress).
+    ///
+    /// Five minutes of complete silence, because one tool call the agent runs
+    /// itself -- a build, a test suite -- reports when it starts and then says
+    /// nothing until it ends, and that alone can take minutes.
+    static let defaultTimeoutSeconds: TimeInterval = 300
 
     init(
         configuration: @escaping () -> AgentConfiguration,
@@ -173,10 +225,14 @@ final class CodingAgentCLIClient: AgentLLMClient {
             throw CodingAgentCLIError.unavailable(error.summary(purpose: Strings.text(.cliConversationPurpose), kind: kind))
         }
 
+        // Every update the agent sends puts the deadline back to the start:
+        // the turn is bounded by silence, not by how long the work takes.
+        let progress = AgentProgress()
         let session = AcpTurnSession(
             connection: process.connection,
             cwd: cwd,
             mcpServers: mcpServers,
+            onUpdate: { _ in progress.note() },
             resolvePermission: Self.resolvePermission,
             stderrTail: { [weak process] in process?.currentStderrTail() ?? "" }
         )
@@ -189,6 +245,7 @@ final class CodingAgentCLIClient: AgentLLMClient {
             // and it may be sitting on an approval prompt the user has not
             // read yet. See withDeadline(seconds:suspendedWhile:work:).
             suspendedWhile: { server?.isServingToolCall ?? false },
+            progress: progress,
             work: { await session.run(prompt: prompt) }
         ) else {
             session.cancel()
@@ -201,7 +258,10 @@ final class CodingAgentCLIClient: AgentLLMClient {
         case .cancelled:
             throw CodingAgentCLIError.cancelled
         case .failed(let failure):
-            throw CodingAgentCLIError.failed(failure.text)
+            // A login that has gone is the one failure with an answer, so it
+            // is told apart from every other internal error and given one.
+            throw CodingAgentCLIError.authenticationFailure(in: failure.text, kind: kind)
+                ?? CodingAgentCLIError.failed(failure.text)
         case .completed(let completion):
             guard !completion.text.isEmpty else {
                 throw CodingAgentCLIError.emptyReply(stopReason: completion.stopReason)

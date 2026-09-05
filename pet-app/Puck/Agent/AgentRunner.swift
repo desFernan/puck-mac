@@ -68,6 +68,13 @@ typealias AgentCodeTourStop = (
     _ path: String, _ startLine: Int, _ endLine: Int, _ caption: String
 ) async -> DispatchedToolResult
 
+/// Runs one of the agent's own terminal tools -- start, read, send, stop --
+/// against the session store that owns them. One closure for the four,
+/// because they are one capability: a host that can offer any of them can
+/// offer all of them, and three more closures would be three more places to
+/// forget one.
+typealias AgentTerminalDelegation = (_ tool: String, _ arguments: JSONValue) async -> DispatchedToolResult
+
 /// Lists the active workspace's project files, optionally only those whose
 /// path contains a given string. Which project is a property of the run, not
 /// something the model chooses -- but *which files* has to be, or the answer
@@ -120,21 +127,24 @@ final class AgentRunner {
     /// Offered on the same terms as read_file: a tour is only possible where
     /// there is a project bound and an editor pane to show it in.
     private let delegateShowCode: AgentCodeTourStop?
+    /// The agent's own long-running shells. Offered on the same terms as the
+    /// file tools -- a terminal starts in the project's directory, so a
+    /// workspace with no project has nowhere to run one.
+    private let delegateTerminal: AgentTerminalDelegation?
     /// protocol section 7's `src: "agent"` lines. Without them a failed call
     /// is an opaque uuid in pet-app's log with no tool name and no reason.
     private let logger: ToolExecutionLogging?
     private let toolSpecs: [GPTToolSpec]
 
-    /// Conversation memory, one stack per chat. In-memory only by design --
-    /// persistence is explicitly後순위.
+    /// What the model has been told, per chat -- see AgentConversations.
     ///
-    /// Was a single stack shared by every chat this app ever opened, because
+    /// In-memory only by design; persistence is deliberately left for later.
+    /// It was one stack shared by every chat this app ever opened, because
     /// there is one AgentRunner for the whole process and nothing ever cleared
     /// it. A new chat therefore started with the previous one's conversation
     /// already in it: asked about a project, the model repeated an earlier
     /// chat's "No project folder is bound to it, so there are no files to read
     /// or list" -- a line that had been true of a different workspace.
-    /// What the model has been told, per chat -- see AgentConversations.
     private let conversations = AgentConversations(systemPrompt: AgentRunner.systemPrompt)
 
     /// Guards every stored property below. `run` is async and this is a plain
@@ -185,6 +195,13 @@ final class AgentRunner {
         conversations.trim(key)
     }
 
+    /// Hands a chat read off disk what was said in it, so continuing it is
+    /// continuing it -- see AgentConversations.seedIfEmpty.
+    @discardableResult
+    func restoreConversation(_ history: [(isUser: Bool, text: String)], to sessionId: String) -> Bool {
+        conversations.seedIfEmpty(history, to: sessionId)
+    }
+
     /// Drops a deleted chat's conversation. The user threw it away; the model
     /// should not still be holding it.
     func forgetSession(_ sessionId: String) {
@@ -207,6 +224,7 @@ final class AgentRunner {
         delegateReadFile: AgentFileDelegation? = nil,
         delegateOpenInEditor: AgentFileDelegation? = nil,
         delegateListFiles: AgentFileListing? = nil,
+        delegateTerminal: AgentTerminalDelegation? = nil,
         delegateShowCode: AgentCodeTourStop? = nil,
         logger: ToolExecutionLogging? = nil
     ) {
@@ -222,6 +240,7 @@ final class AgentRunner {
         self.delegateOpenInEditor = delegateOpenInEditor
         self.delegateListFiles = delegateListFiles
         self.delegateShowCode = delegateShowCode
+        self.delegateTerminal = delegateTerminal
         toolSpecs = Self.petToolSpecs
             + (delegateCodeEditor == nil ? [] : [Self.codeEditorSpec])
             + (self.openTaskSession == nil ? [] : [Self.openTaskSessionSpec])
@@ -229,6 +248,7 @@ final class AgentRunner {
             + (delegateOpenInEditor == nil ? [] : [Self.openInEditorSpec])
             + (delegateListFiles == nil ? [] : [Self.listFilesSpec])
             + (delegateShowCode == nil ? [] : [Self.showCodeSpec])
+            + (delegateTerminal == nil ? [] : Self.terminalSpecs)
     }
 
     /// Forgets every chat. Nothing in the app calls this -- chats are kept
@@ -573,6 +593,9 @@ final class AgentRunner {
             guard case .object(let args) = arguments, case .string(let task)? = args["task"], !task.isEmpty else {
                 return DispatchedToolResult(ok: false, data: nil, error: "execution_failed", detail: Strings.text(.toolTaskIsEmpty))            }
             return await delegateCodeEditor(task)
+        }
+        if Self.terminalToolNames.contains(name), let delegateTerminal {
+            return await delegateTerminal(name, arguments)
         }
         if name == Self.readFileToolName, let delegateReadFile {
             guard let path = Self.pathArgument(from: arguments) else {

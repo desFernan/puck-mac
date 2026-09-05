@@ -125,7 +125,7 @@ enum L10nKey: String, CaseIterable, Hashable {
     // MARK: - Client window (PuckClient)
 
     /// Shared by more than one surface, so they cannot drift apart.
-    case commonCancel, commonDelete, commonCreate, commonChoose, commonClose
+    case commonCancel, commonDelete, commonCreate, commonChoose, commonClose, commonDone
 
     /// Labels only a screen reader ever reads. Two kinds: a control that is
     /// an icon and nothing else (a mouse gets a tooltip, VoiceOver got the
@@ -226,6 +226,27 @@ enum L10nKey: String, CaseIterable, Hashable {
     case acpNeedsNodeFormat, acpCLINotFoundFormat, acpAgentNotBundledFormat, acpCouldNotStart
 
     case cliErrorFormat, cliTimedOutFormat, cliNoAnswerFormat
+    /// The CLI's own login has expired or been revoked. Takes the agent's
+    /// display name and the command that logs it back in.
+    case cliNotLoggedInFormat
+    /// The agent's own long-running shells -- see AgentTerminals.
+    case terminalUnknownFormat, terminalEndedFormat, terminalTooManyFormat, terminalCouldNotStartFormat
+    case terminalNeedsAProject, terminalNeedsAnId, terminalNeedsText, terminalNeedsACommand
+    /// Whether the pet speaks up about a run while the window is behind
+    /// something else -- see SettingsStore.petAnnouncesRuns.
+    case petAnnouncesLabel
+    /// The change review -- what the agent edited, before you keep it.
+    case reviewTitle, reviewCountFormat, reviewRefresh, reviewNothingChanged
+    case reviewNothingChangedDetail, reviewBinaryFile, reviewNoContentChange
+    case reviewRenamedFromFormat, reviewRevert, reviewRevertHelp, reviewOpenFormat
+    /// Scheduled agent runs -- see AgentSchedule.
+    case scheduleEveryMinutesFormat, scheduleDailyFormat, scheduleWeeklyFormat
+    case schedulesHeader, schedulesExplanation, schedulesNew, schedulesPromptPlaceholder
+    case schedulesWhen, schedulesAdd, scheduleEveryLabel, scheduleDailyLabel
+    case scheduleWeeklyLabel, scheduleAtLabel, scheduleDaysLabel
+    /// A sent message folded down because it was too long to draw -- see
+    /// LongMessage. Takes the number of lines and a human size.
+    case chatLongMessageFormat, chatExpandMessage, chatCollapseMessage, chatOpenMessageAsFile
     case cliNoToolsFallbackFormat, cliConversationPurpose
 
     case providerNoAPIKey, providerAPIErrorFormat, providerUndecodableFormat
@@ -448,6 +469,7 @@ enum Strings {
         .a11yPetSaysFormat: "펫: %1$@",
         .a11yApprovalNeededFormat: "승인이 필요해요: %1$@",
         .commonCancel: "취소",
+        .commonDone: "완료",
         .commonDelete: "삭제",
         .commonCreate: "만들기",
         .commonChoose: "선택…",
@@ -588,7 +610,7 @@ enum Strings {
         .toolShowCodeNeedsEverything: "show_code는 path, start_line, end_line, caption이 모두 필요해요.",
         .toolPathIsRelativeHint: " 경로는 프로젝트 루트 기준 상대 경로여야 해요 (예: src/App/main.swift).",
         .toolListFilesHint: " 정확한 경로를 모르면 list_files로 확인한 뒤 다시 부르세요.",
-        .toolCodeEditTimedOutFormat: "코드 편집이 %1$@초 안에 끝나지 않아 중단했어요.",
+        .toolCodeEditTimedOutFormat: "코드 편집 에이전트가 %1$@초 동안 아무 말이 없어서 중단했어요.",
         .toolCodeEditPurpose: "코드 편집",
 
         .acpAborted: "중단됨",
@@ -601,7 +623,46 @@ enum Strings {
         .acpCouldNotStart: "코딩 에이전트를 시작하지 못했습니다.",
 
         .cliErrorFormat: "코딩 CLI 오류: %1$@",
-        .cliTimedOutFormat: "코딩 CLI가 %1$@초 안에 답하지 않아 중단했어요.",
+        .cliNotLoggedInFormat: "%1$@ 로그인이 만료됐어요. 터미널에서 `%2$@` 를 실행해 다시 로그인한 뒤 보내주세요.",
+        .terminalUnknownFormat: "그런 터미널이 없어요 (%1$@).",
+        .terminalEndedFormat: "이미 끝난 터미널이에요 (%1$@).",
+        .terminalTooManyFormat: "터미널을 %1$@개까지만 띄울 수 있어요. 쓰던 것을 먼저 정리해 주세요.",
+        .terminalCouldNotStartFormat: "터미널을 시작하지 못했어요: %1$@",
+        .terminalNeedsAProject: "이 워크스페이스에는 프로젝트 폴더가 없어서 터미널을 열 곳이 없어요.",
+        .terminalNeedsAnId: "어느 터미널인지 id가 필요해요.",
+        .terminalNeedsText: "보낼 내용이 필요해요.",
+        .terminalNeedsACommand: "실행할 명령이 필요해요.",
+        .petAnnouncesLabel: "창이 가려져 있을 때 펫이 알려주기",
+        .reviewTitle: "변경 사항 검토",
+        .reviewCountFormat: "%1$@개 파일 · +%2$@ −%3$@",
+        .reviewRefresh: "다시 읽기",
+        .reviewNothingChanged: "바뀐 것이 없어요",
+        .reviewNothingChangedDetail: "이 프로젝트에 커밋되지 않은 변경이 없습니다.",
+        .reviewBinaryFile: "바이너리 파일이라 내용은 보여줄 수 없어요.",
+        .reviewNoContentChange: "내용은 그대로예요 (이름이나 권한만 바뀜).",
+        .reviewRenamedFromFormat: "← %1$@",
+        .reviewRevert: "되돌리기",
+        .reviewRevertHelp: "이 파일을 마지막 커밋 상태로 되돌립니다. 새로 만들어진 파일은 지워집니다.",
+        .reviewOpenFormat: "%1$@개 파일 변경 — 검토하기",
+        .scheduleEveryMinutesFormat: "%1$@분마다",
+        .scheduleDailyFormat: "매일 %1$@",
+        .scheduleWeeklyFormat: "%1$@ %2$@",
+        .schedulesHeader: "예약 실행",
+        .schedulesExplanation: "정해진 때에 지금 워크스페이스로 보낼 말입니다. Puck이 켜져 있을 때만 실행되고, 꺼져 있는 동안 지난 것은 다시 켤 때 한 번 실행됩니다.",
+        .schedulesNew: "보낼 말",
+        .schedulesPromptPlaceholder: "예: CI 확인해서 깨졌으면 알려줘",
+        .schedulesWhen: "언제",
+        .schedulesAdd: "예약 추가",
+        .scheduleEveryLabel: "간격(분)",
+        .scheduleDailyLabel: "매일",
+        .scheduleWeeklyLabel: "요일마다",
+        .scheduleAtLabel: "시각",
+        .scheduleDaysLabel: "요일",
+        .chatLongMessageFormat: "%1$@줄 · %2$@",
+        .chatExpandMessage: "전체 보기",
+        .chatCollapseMessage: "접기",
+        .chatOpenMessageAsFile: ".txt로 열기",
+        .cliTimedOutFormat: "코딩 CLI가 %1$@초 동안 아무 말이 없어서 중단했어요.",
         .cliNoAnswerFormat: "코딩 CLI가 답을 주지 않았어요. (%1$@)",
         .cliNoToolsFallbackFormat: "MCP 서버를 열지 못해 도구 없이 대화합니다: %1$@",
         .cliConversationPurpose: "대화",
@@ -813,6 +874,7 @@ enum Strings {
         .a11yPetSaysFormat: "Puck says: %1$@",
         .a11yApprovalNeededFormat: "Approval needed: %1$@",
         .commonCancel: "Cancel",
+        .commonDone: "Done",
         .commonDelete: "Delete",
         .commonCreate: "Create",
         .commonChoose: "Choose…",
@@ -953,7 +1015,7 @@ enum Strings {
         .toolShowCodeNeedsEverything: "show_code needs all of path, start_line, end_line and caption.",
         .toolPathIsRelativeHint: " Paths are relative to the project root (for example src/App/main.swift).",
         .toolListFilesHint: " If you are unsure of the exact path, check with list_files and call again.",
-        .toolCodeEditTimedOutFormat: "Code editing didn't finish within %1$@s, so it was stopped.",
+        .toolCodeEditTimedOutFormat: "The code-editing agent went quiet for %1$@s, so it was stopped.",
         .toolCodeEditPurpose: "Code editing",
 
         .acpAborted: "Aborted",
@@ -966,7 +1028,46 @@ enum Strings {
         .acpCouldNotStart: "Couldn't start the coding agent.",
 
         .cliErrorFormat: "Coding CLI error: %1$@",
-        .cliTimedOutFormat: "The coding CLI didn't answer within %1$@s, so it was stopped.",
+        .cliNotLoggedInFormat: "Your %1$@ login has expired. Run `%2$@` in a terminal to sign in again, then send this once more.",
+        .terminalUnknownFormat: "No such terminal (%1$@).",
+        .terminalEndedFormat: "That terminal has already ended (%1$@).",
+        .terminalTooManyFormat: "Only %1$@ terminals can run at once. Stop one of the others first.",
+        .terminalCouldNotStartFormat: "The terminal could not be started: %1$@",
+        .terminalNeedsAProject: "This workspace has no project folder, so there is nowhere to open a terminal.",
+        .terminalNeedsAnId: "Which terminal? An id is needed.",
+        .terminalNeedsText: "There is nothing to send.",
+        .terminalNeedsACommand: "There is no command to run.",
+        .petAnnouncesLabel: "Let the pet speak up when the window is hidden",
+        .reviewTitle: "Review changes",
+        .reviewCountFormat: "%1$@ files · +%2$@ −%3$@",
+        .reviewRefresh: "Read again",
+        .reviewNothingChanged: "Nothing changed",
+        .reviewNothingChangedDetail: "This project has no uncommitted changes.",
+        .reviewBinaryFile: "A binary file, so there is nothing to show.",
+        .reviewNoContentChange: "The contents are unchanged (a rename or a mode change).",
+        .reviewRenamedFromFormat: "← %1$@",
+        .reviewRevert: "Revert",
+        .reviewRevertHelp: "Puts this file back to the last commit. A newly created file is deleted.",
+        .reviewOpenFormat: "%1$@ files changed — review",
+        .scheduleEveryMinutesFormat: "every %1$@ min",
+        .scheduleDailyFormat: "daily at %1$@",
+        .scheduleWeeklyFormat: "%1$@ at %2$@",
+        .schedulesHeader: "Scheduled runs",
+        .schedulesExplanation: "Something to send to this workspace at a set time. Only while Puck is running; one whose time passed while it was closed runs once when it comes back.",
+        .schedulesNew: "What to send",
+        .schedulesPromptPlaceholder: "e.g. check CI and tell me if it broke",
+        .schedulesWhen: "When",
+        .schedulesAdd: "Add",
+        .scheduleEveryLabel: "Every (min)",
+        .scheduleDailyLabel: "Daily",
+        .scheduleWeeklyLabel: "Weekly",
+        .scheduleAtLabel: "At",
+        .scheduleDaysLabel: "Days",
+        .chatLongMessageFormat: "%1$@ lines · %2$@",
+        .chatExpandMessage: "Show all",
+        .chatCollapseMessage: "Collapse",
+        .chatOpenMessageAsFile: "Open as .txt",
+        .cliTimedOutFormat: "The coding CLI went quiet for %1$@s, so it was stopped.",
         .cliNoAnswerFormat: "The coding CLI gave no answer. (%1$@)",
         .cliNoToolsFallbackFormat: "Couldn't open the MCP server, so this turn runs without tools: %1$@",
         .cliConversationPurpose: "Conversation",
