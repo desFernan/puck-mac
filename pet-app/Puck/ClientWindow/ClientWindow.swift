@@ -67,5 +67,15 @@ extension NSWindow {
         styleMask.insert(.fullSizeContentView)
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
+        // No hairline under the titlebar, ever. `.automatic` draws one as soon
+        // as AppKit decides scrollable content sits directly beneath it, which
+        // is a rule for a window with a titlebar strip -- and this window is
+        // one continuous backdrop with the toolbar's own material hidden
+        // (ClientWindowView). Where it showed up was with the island folded:
+        // open, the island is a non-scrolling strip under the toolbar and the
+        // line stayed away; folded, it gets out of the way and the pane behind
+        // it becomes what is under the titlebar, so a line appeared across the
+        // window that nothing in the design puts there.
+        titlebarSeparatorStyle = .none
     }
 }

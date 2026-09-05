@@ -192,10 +192,18 @@ struct PetTankView: View {
     /// band stays centred on however far it grows past them.
     static let toolbarRowHeight: CGFloat = 28
 
-    /// How tall the pet stands on the band. Small enough that the band reads
-    /// as a line the pet walks along rather than as a short island, big
-    /// enough to still be the pet rather than a speck moving along it.
-    static let collapsedPetHeight: Double = 26
+    /// How tall the pet stands on the band: all of it, less the two edges the
+    /// band is drawn with.
+    ///
+    /// It was 26 against a 38pt band, which left a third of the band empty
+    /// above the pet's head -- and a band is short enough already that the
+    /// empty part reads as the pet having shrunk rather than as headroom.
+    /// Filling it is what makes the folded island still show a pet.
+    ///
+    /// Exactly the reported height is allowed -- pet-app refuses a tank
+    /// *shorter* than the pet, not one the same size -- but the two edges are
+    /// drawn inside that rect, so the pet stops short of them.
+    static let collapsedPetHeight: Double = Double(collapsedHeight) - 2
 
     /// Its own key, not the background's: how tall someone wants the shelf is
     /// not which mood they picked, and one changing should not reset the
@@ -646,15 +654,23 @@ struct PetTankView: View {
 
     /// The folded island, up in the toolbar's own row beside its buttons.
     ///
-    /// Not in a row of its own below them, which is where it landed first: the
-    /// band is a line the pet walks along, the toolbar is already a band with
-    /// nothing in the half past its buttons, and two thin rows stacked on each
-    /// other is a thicker top than the island it replaced.
+    /// Not in a row of its own below them, which is where it landed first --
+    /// and where it landed again, briefly, when the overlap below was "fixed"
+    /// by giving it a real row. The band is a line the pet walks along, the
+    /// toolbar is already a band with nothing in the half past its buttons,
+    /// and a second thin row under them is a thicker top than the island it
+    /// replaced. It sits on the line the open island's raised shoulder
+    /// reaches, so folding and unfolding do not move the top edge of the
+    /// pet's world, and it costs the layout nothing.
     ///
-    /// It sits exactly where the open island's raised shoulder sits -- the
-    /// same line, so folding and unfolding do not move the top edge of the
-    /// pet's world. Zero height in the layout, so the conversation gets the
-    /// whole strip back rather than being pushed down by a line.
+    /// Drawn *above* what comes after it, which is the part that was missing.
+    /// A view drawn outside its own bounds is still drawn in its sibling
+    /// order, and the next sibling here is the whole rest of the window: the
+    /// transcript scrolled straight over the band, and with the editor open
+    /// the split view's columns -- AppKit views with layers of their own --
+    /// cut it off at each column edge. The open island shows neither fault
+    /// because it has height: it is what the panes are laid out *under*
+    /// rather than something they are laid out over.
     private var foldedBand: some View {
         GeometryReader { proxy in
             island
@@ -664,6 +680,10 @@ struct PetTankView: View {
         }
         .frame(height: Self.bandRaise, alignment: .top)
         .padding(.top, -Self.bandRaise)
+        // Above the panes rather than behind them -- see the note above. The
+        // band's shadow rides up with it, so it fades out over the pane
+        // instead of being cut off at the pane's top edge.
+        .zIndex(1)
     }
 
     /// How far above the pane the folded band is drawn.

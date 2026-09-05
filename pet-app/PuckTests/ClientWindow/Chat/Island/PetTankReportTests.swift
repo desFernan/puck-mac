@@ -72,4 +72,53 @@ final class PetTankReportTests: XCTestCase {
         XCTAssertTrue(store.windowIsOpen)
         XCTAssertEqual(store.tankFrame, frame)
     }
+
+    // MARK: - The folded band
+
+    /// Folded, the pet stands the whole height of the band.
+    ///
+    /// It was 26 in a 38pt band, which left a third of it empty over the
+    /// pet's head -- and a band that short reads as the pet having shrunk
+    /// rather than as headroom. Two points short of the band, which is the
+    /// two edges it is drawn with.
+    func test_theFoldedPetFillsTheBand() {
+        XCTAssertEqual(
+            PetTankView.collapsedPetHeight,
+            Double(PetTankView.collapsedHeight) - 2,
+            accuracy: 0.0001
+        )
+        XCTAssertLessThanOrEqual(
+            CGFloat(PetTankView.collapsedPetHeight),
+            PetTankView.collapsedHeight,
+            "pet-app refuses a tank shorter than the pet standing in it"
+        )
+        XCTAssertGreaterThan(
+            CGFloat(PetTankView.collapsedPetHeight) / PetTankView.collapsedHeight,
+            0.9,
+            "a pet that fills the band is the point of folding it rather than hiding it"
+        )
+    }
+
+    /// The folded band sits on the line the open island's shoulder reaches --
+    /// in the toolbar's own row, beside its buttons -- and costs the layout
+    /// nothing, so folding gives the whole strip back.
+    func test_theFoldedBandSitsOnTheToolbarsLine() {
+        XCTAssertEqual(
+            PetTankView.bandRaise,
+            PetTankView.shoulderRise + PetTankView.baseLift
+                + (PetTankView.collapsedHeight - PetTankView.toolbarRowHeight) / 2
+        )
+        XCTAssertGreaterThanOrEqual(
+            PetTankView.bandRaise,
+            PetTankView.shoulderRise,
+            "the band has to reach at least as high as the shoulder it replaces"
+        )
+    }
+
+    /// And folding still has to be worth doing.
+    func test_foldingGivesTheStripBack() {
+        let open = PetTankView.stripHeight(island: PetTankView.islandHeight)
+
+        XCTAssertGreaterThan(open, PetTankView.collapsedHeight * 4)
+    }
 }
