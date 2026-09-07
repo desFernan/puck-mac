@@ -20,6 +20,9 @@ import SwiftUI
 
 struct SettingsView: View {
     let store: SettingsStore
+    /// Nil in the popover and in tests: the update section is the settings
+    /// window's, and nothing else owns a checker to show.
+    let updates: UpdateChecker?
     var onAvatarScaleChanged: ((Double) -> Void)?
 
     /// Which toys are out when the panel opens. The panel is rebuilt on every
@@ -97,9 +100,11 @@ struct SettingsView: View {
         onOpenSettings: (() -> Void)? = nil,
         onNotchPanelChanged: ((Bool) -> Void)? = nil,
         onQuit: (() -> Void)? = nil,
-        showsOnlyLiveControls: Bool = false
+        showsOnlyLiveControls: Bool = false,
+        updates: UpdateChecker? = nil
     ) {
         self.store = store
+        self.updates = updates
         self.onAvatarScaleChanged = onAvatarScaleChanged
         self.initialToysOut = initialToysOut
         self.onToggleToy = onToggleToy
@@ -614,6 +619,12 @@ struct SettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            // Last in General, and only in the window: the popover is the
+            // things you reach for while the pet is in front of you, and
+            // which version you are on is not one of them.
+            if let updates {
+                UpdateSettingsSection(updates: updates)
+            }
         }
     }
 

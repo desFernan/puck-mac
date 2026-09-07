@@ -65,6 +65,11 @@ final class AvatarLinesTests: XCTestCase {
         XCTAssertEqual(names, [
             "muted", "permissionNeeded", "voicePermissionNeeded",
             "clientOffline", "runFinished", "approvalNeeded",
+            // A newer Puck being out is the pet passing on news, not the app
+            // asserting anything a package could lie about: the version in it
+            // comes from the release, and the link is Settings', not the
+            // bubble's.
+            "updateAvailable",
         ])
     }
 

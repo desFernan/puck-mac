@@ -126,8 +126,25 @@ extension AppDelegate {
             onNotchPanelChanged: { [weak self] _ in
                 guard let self, let controller = self.characterController else { return }
                 self.applyScreenNotches(to: controller)
-            }
+            },
+            updates: updateChecker
         )
+    }
+
+    /// The daily look at what has been released, and the pet saying so.
+    ///
+    /// Said once per version and then left in Settings: a notice repeated
+    /// every launch is one people learn to look past, and the pet is the
+    /// wrong place to keep a message anyone might want to come back to.
+    func setUpUpdateChecking() {
+        updateChecker.onFound = { [weak self] release in
+            guard let self else { return }
+            self.showNoticeBubble(
+                self.avatarLines.text(.updateAvailable, release.version.description),
+                for: 6
+            )
+        }
+        updateChecker.start()
     }
 
     /// Hides/shows the pet without quitting the

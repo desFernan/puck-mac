@@ -50,6 +50,11 @@ is refused as coming from an unidentified developer: right-click the app →
 the microphone, speech recognition and screen recording as you use the features
 that need them.
 
+Nothing updates itself. Once a day Puck asks GitHub whether a newer release
+has been published and the pet says so if there is one; the version and the
+link stay in Settings → General, and the dragging is still yours. Switch the
+check off in the same place.
+
 ## Build
 
 ```sh

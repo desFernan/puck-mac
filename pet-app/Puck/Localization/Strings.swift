@@ -244,6 +244,11 @@ enum L10nKey: String, CaseIterable, Hashable {
     case schedulesHeader, schedulesExplanation, schedulesNew, schedulesPromptPlaceholder
     case schedulesWhen, schedulesAdd, scheduleEveryLabel, scheduleDailyLabel
     case scheduleWeeklyLabel, scheduleAtLabel, scheduleDaysLabel
+    /// Being told a newer Puck exists -- see UpdateCheck. The bubble and the
+    /// button take the version as `%1$@`.
+    case updateBubbleFormat, updateAvailableFormat, updateCurrentFormat, updateSectionHeader
+    case updateChecksLabel, updateCheckNow, updateChecking, updateUpToDateFormat
+    case updateGet, updateSkip, updateFailed
     /// A sent message folded down because it was too long to draw -- see
     /// LongMessage. Takes the number of lines and a human size.
     case chatLongMessageFormat, chatExpandMessage, chatCollapseMessage, chatOpenMessageAsFile
@@ -658,6 +663,17 @@ enum Strings {
         .scheduleWeeklyLabel: "요일마다",
         .scheduleAtLabel: "시각",
         .scheduleDaysLabel: "요일",
+        .updateBubbleFormat: "새 버전 %1$@ 나왔어요!",
+        .updateAvailableFormat: "새 버전 %1$@",
+        .updateCurrentFormat: "현재 버전 %1$@",
+        .updateSectionHeader: "업데이트",
+        .updateChecksLabel: "새 버전 확인하기",
+        .updateCheckNow: "지금 확인",
+        .updateChecking: "확인하는 중…",
+        .updateUpToDateFormat: "최신 버전이에요 (%1$@)",
+        .updateGet: "받으러 가기",
+        .updateSkip: "이 버전 건너뛰기",
+        .updateFailed: "확인하지 못했어요. 잠시 뒤에 다시 시도해 주세요.",
         .chatLongMessageFormat: "%1$@줄 · %2$@",
         .chatExpandMessage: "전체 보기",
         .chatCollapseMessage: "접기",
@@ -1063,6 +1079,17 @@ enum Strings {
         .scheduleWeeklyLabel: "Weekly",
         .scheduleAtLabel: "At",
         .scheduleDaysLabel: "Days",
+        .updateBubbleFormat: "Version %1$@ is out!",
+        .updateAvailableFormat: "Version %1$@ available",
+        .updateCurrentFormat: "Version %1$@",
+        .updateSectionHeader: "Updates",
+        .updateChecksLabel: "Check for new versions",
+        .updateCheckNow: "Check now",
+        .updateChecking: "Checking…",
+        .updateUpToDateFormat: "Up to date (%1$@)",
+        .updateGet: "Get it",
+        .updateSkip: "Skip this version",
+        .updateFailed: "Could not check. Try again in a little while.",
         .chatLongMessageFormat: "%1$@ lines · %2$@",
         .chatExpandMessage: "Show all",
         .chatCollapseMessage: "Collapse",

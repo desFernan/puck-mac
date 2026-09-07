@@ -21,6 +21,12 @@ Localization
 # lives up in App because deciding is wiring.
 Bridge
 
+# Whether there is a newer Puck than this one. Knows the releases index and
+# the version it is, and nothing about the app it is part of -- the settings
+# window is what shows it, which is why this sits below Settings and not
+# beside it.
+Updates
+
 # Things the pet or the window is made of, none of which know about each
 # other.
 Customisation

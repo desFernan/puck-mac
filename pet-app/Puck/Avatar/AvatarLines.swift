@@ -44,6 +44,8 @@ enum AvatarLine: String, CaseIterable {
     case runFinished
     /// A run stopped for an approval, said with the request as `%1$@`.
     case approvalNeeded
+    /// A newer Puck has been published, said with its version as `%1$@`.
+    case updateAvailable
 
     /// The app's own wording, used for every line a package does not carry.
     var fallback: String {
@@ -52,6 +54,7 @@ enum AvatarLine: String, CaseIterable {
         case .permissionNeeded: return Strings.text(.permissionNeededBubble)
         case .voicePermissionNeeded: return Strings.text(.voicePermissionNeeded)
         case .clientOffline: return Strings.text(.bubbleClientOffline)
+        case .updateAvailable: return Strings.text(.updateBubbleFormat)
         // These two are the summary itself today. A package that wants to
         // wrap it -- "다 했어요! %1$@" -- can; one that does not gets what the
         // pet already said.

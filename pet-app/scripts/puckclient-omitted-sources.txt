@@ -38,3 +38,8 @@ Puck/Settings/AvatarPosePreview.swift
 
 # Draws one of the pet's own sprites. The chat window has no avatar.
 Puck/Settings/AvatarSpriteThumbnail.swift
+
+# Whether there is a newer Puck. One app checks, and it is the one that is
+# always running -- two processes asking GitHub the same question on the same
+# day is one question too many, and the pet is what says the answer out loud.
+Puck/Settings/UpdateSettingsSection.swift

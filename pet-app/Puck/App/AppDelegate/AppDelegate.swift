@@ -37,6 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
     /// What the installed character says -- see AvatarLines. Replaced when
     /// the avatar is, and the app's own wording until one is loaded.
     var avatarLines = AvatarLines.none
+    /// Asks GitHub, once a day, whether there is a newer Puck -- see
+    /// UpdateCheck. Held here because the pet is what says so and the
+    /// settings window is where it stays.
+    lazy var updateChecker = UpdateChecker()
     var avatarHitboxSize: CGSize = .zero
     /// The last size written to the log -- see applyLiveAvatarScale, which
     /// reports where the pet settled rather than every frame of getting there.
@@ -271,6 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, IdleWanderDelegate, Pe
         setUpGlobalHotkeys()
         setUpFrameLoop()
         setUpSpaceChangeObserving()
+        setUpUpdateChecking()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
