@@ -361,11 +361,10 @@ final class SpriteAvatar: AvatarPlayable {
         // facing is a fact, and this is the animation between two of them.
         let turning = FlipAnimation.horizontalScale(atAngle: currentFlipAngle)
             * (pose?.facing == .left ? -1 : 1)
-        var transform = CGAffineTransform(
+        var transform = orientation.composed(
             scaleX: CGFloat(currentBounce.scaleX) * orientation.scaleX * turning,
-            y: CGFloat(currentBounce.scaleY) * orientation.scaleY
+            scaleY: CGFloat(currentBounce.scaleY) * orientation.scaleY
         )
-        transform = transform.rotated(by: orientation.rotation)
         // After the climb turn, so the preset's rocking is relative to
         // however the sprite is already oriented rather than to the screen --
         // a climbing pet leans off its own upright, not off vertical.

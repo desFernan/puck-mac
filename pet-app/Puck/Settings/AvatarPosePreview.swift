@@ -109,10 +109,13 @@ struct AvatarPoseThumbnail: View {
                     .resizable()
                     .scaledToFit()
                     .padding(6)
-                    // Composed in the one place the renderer composes it, so
-                    // the picture here is the pet on the screen.
-                    .scaleEffect(x: orientation.scaleX, y: orientation.scaleY)
+                    // Turn first, flips on top of the result: the order the
+                    // renderer composes in, which is what makes the picture
+                    // here the pet on the screen. Written the other way round
+                    // it was a different pet -- see
+                    // AvatarPoseOrientation.composed(scaleX:scaleY:).
                     .rotationEffect(.radians(Double(orientation.rotation)))
+                    .scaleEffect(x: orientation.scaleX, y: orientation.scaleY)
             } else {
                 Image(systemName: "questionmark")
                     .foregroundStyle(.secondary)

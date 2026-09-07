@@ -139,8 +139,32 @@ struct AvatarPoseAdjustments: Equatable, Codable {
 struct AvatarPoseOrientation: Equatable {
     var scaleX: CGFloat
     var scaleY: CGFloat
-    /// Radians, applied after the scale.
+    /// Radians. Composed *before* the flips -- see `composed(scaleX:scaleY:)`
+    /// for why the order is written down rather than left to each caller.
     var rotation: CGFloat
+
+    /// The two parts as one matrix: the artwork is turned, and the flips act
+    /// on the result.
+    ///
+    /// Written down here because the order is not a detail. Rotating a
+    /// mirrored sprite turns it the other way, so a pet climbing a wall on
+    /// its left -- mirrored and quarter-turned at once -- comes out upside
+    /// down under one order and right way up under the other. The renderer
+    /// composed it this way and the settings preview composed it the other,
+    /// which is how the picture in the window stopped being the pet on the
+    /// screen.
+    ///
+    /// - Parameters:
+    ///   - scaleX: the orientation's own `scaleX`, times anything the caller
+    ///     has of its own -- the renderer multiplies in the bounce and the
+    ///     turn it is partway through.
+    ///   - scaleY: likewise for `scaleY`.
+    func composed(scaleX: CGFloat, scaleY: CGFloat) -> CGAffineTransform {
+        CGAffineTransform(scaleX: scaleX, y: scaleY).rotated(by: rotation)
+    }
+
+    /// The same composition with nothing multiplied in.
+    var transform: CGAffineTransform { composed(scaleX: scaleX, scaleY: scaleY) }
 
     static func of(
         _ pose: AvatarPose?,

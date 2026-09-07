@@ -247,6 +247,46 @@ final class AvatarPoseTests: XCTestCase {
         XCTAssertEqual(climbing.rotation, .pi / 2, accuracy: 0.0001)
     }
 
+    /// The order the two halves go together in, which is the whole of the
+    /// preview being a picture of the pet rather than of a different one.
+    ///
+    /// A pet climbing the wall on its left is mirrored and quarter-turned at
+    /// once, and rotating a mirrored sprite turns it the other way: composed
+    /// the wrong way round, the corner that should ride up the wall goes down
+    /// it instead. The settings window used to compose it the wrong way
+    /// round.
+    func testTheTurnIsComposedBeforeTheFlipsAndNotAfter() {
+        let climbingLeft = AvatarPoseOrientation.of(.climbingLeftWall, adjustment: .none, isMirrored: false)
+        XCTAssertEqual(climbingLeft.scaleX, -1, "a pet facing left is mirrored")
+
+        let corner = CGPoint(x: 10, y: 0).applying(climbingLeft.transform)
+        let theOtherWayRound = CGPoint(x: 10, y: 0).applying(
+            CGAffineTransform(scaleX: climbingLeft.scaleX, y: climbingLeft.scaleY)
+                .concatenating(CGAffineTransform(rotationAngle: climbingLeft.rotation))
+        )
+
+        XCTAssertEqual(corner.y, 10, accuracy: 0.0001)
+        XCTAssertEqual(theOtherWayRound.y, -10, accuracy: 0.0001, "the order is not a detail")
+    }
+
+    /// What the preview's SwiftUI modifiers add up to, written as a matrix:
+    /// `.rotationEffect` and then `.scaleEffect` turns the artwork first and
+    /// flips the result, which is what the renderer does. Swapping those two
+    /// lines in AvatarPosePreview is what this catches.
+    func testThePreviewsOrderOfModifiersMatchesTheRenderers() {
+        for pose in AvatarPose.allCases {
+            var adjustment = AvatarPoseAdjustment()
+            adjustment.flipsHorizontally = true
+            adjustment.rotate()
+            let orientation = AvatarPoseOrientation.of(pose, adjustment: adjustment, isMirrored: true)
+
+            let asThePreviewApplies = CGAffineTransform(rotationAngle: orientation.rotation)
+                .concatenating(CGAffineTransform(scaleX: orientation.scaleX, y: orientation.scaleY))
+
+            XCTAssertEqual(asThePreviewApplies, orientation.transform, "\(pose)")
+        }
+    }
+
     /// The ceiling is two poses now, for the reason the walls are.
     func testTheTwoCeilingDirectionsAreSeparatePoses() {
         var adjustments = AvatarPoseAdjustments()
