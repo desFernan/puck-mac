@@ -161,7 +161,11 @@ final class SpriteAvatar: AvatarPlayable {
         // wrong, it pushes the whole sprite off the top of the screen.
         lastPosition = position
         let verticalOffset = isUpsideDown ? spriteLayer.bounds.height / 2 : -spriteLayer.bounds.height / 2
-        spriteLayer.position = CGPoint(x: position.x, y: position.y + verticalOffset + currentJumpOffset)
+        let gap = surfaceGap
+        spriteLayer.position = CGPoint(
+            x: position.x + gap.x,
+            y: position.y + verticalOffset + currentJumpOffset + gap.y
+        )
     }
 
     /// A short visual hop -- F3 (agent_done, code_editor
@@ -204,6 +208,44 @@ final class SpriteAvatar: AvatarPlayable {
     /// applied. Worked out from what is already known rather than pushed in
     /// by the movement states: a pose is a clip and a direction, and both are
     /// already here.
+    /// How far off the surface the drawing sits, as a fraction of the pet's
+    /// own drawn height.
+    ///
+    /// A gap rather than none at all: artwork drawn right to its bottom edge
+    /// read as a pet welded to the Dock, and one clinging to a window looked
+    /// like it had been pushed into it. Two percent is a couple of points on
+    /// a pet of the usual size -- enough to read as standing on something
+    /// rather than embedded in it, small enough that nobody would call it
+    /// floating.
+    ///
+    /// Proportional, so it stays the same gap to the eye when the size slider
+    /// is moved. A fixed number of points looks tight on a large pet and
+    /// looks like hovering on a small one.
+    static let surfaceGapFraction: CGFloat = 0.02
+
+    /// The gap as an offset, pointing away from whatever the pet is standing
+    /// on.
+    ///
+    /// Taken from the pose's own feet direction rather than from the vertical
+    /// -- the whole of this working on a wall and under the ceiling as well
+    /// as on the floor. A pet on a wall is pushed off it sideways, one under
+    /// the ceiling is pushed down, and a character whose climb is corrected
+    /// the other way up is pushed the other way with it.
+    ///
+    /// Only the drawing moves. `position` is still the point the FSM put the
+    /// pet at and still the point every ground, edge and collision test uses:
+    /// a pet that stopped two points short of the screen edge because of a
+    /// visual gap would be one that could not reach its own corner.
+    private var surfaceGap: CGPoint {
+        let feet = AvatarPoseOrientation.of(
+            currentPose,
+            adjustment: currentPose.map { poseAdjustments[$0] } ?? .none,
+            isMirrored: isMirrored
+        ).feetDirection
+        let distance = spriteLayer.bounds.height * Self.surfaceGapFraction
+        return CGPoint(x: -feet.x * distance, y: -feet.y * distance)
+    }
+
     private var currentPose: AvatarPose? {
         // Which way along the ceiling, for the reason the walls are two
         // poses: upside down, a character drawn to face one way is wrong the
@@ -452,9 +494,15 @@ final class SpriteAvatar: AvatarPlayable {
         // `point` is relative to the ground point; the layer's own origin sits
         // half a width to the left of it and a full height above -- or below,
         // hanging from a ceiling, where setScreenPosition flips the offset.
+        //
+        // Less the gap the drawing is held off the surface by: what is being
+        // clicked is the pet as drawn, and a mask that stayed where the FSM
+        // thinks the pet is would miss it by exactly that gap along the top
+        // or bottom edge.
+        let gap = surfaceGap
         let layerPoint = isUpsideDown
-            ? CGPoint(x: point.x + size.width / 2, y: point.y)
-            : CGPoint(x: point.x + size.width / 2, y: point.y + size.height)
+            ? CGPoint(x: point.x + size.width / 2 - gap.x, y: point.y - gap.y)
+            : CGPoint(x: point.x + size.width / 2 - gap.x, y: point.y + size.height - gap.y)
 
         guard let unit = SpriteHitTest.unitPoint(
             forLayerPoint: layerPoint,

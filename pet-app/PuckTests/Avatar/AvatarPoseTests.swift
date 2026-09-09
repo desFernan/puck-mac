@@ -287,6 +287,33 @@ final class AvatarPoseTests: XCTestCase {
         }
     }
 
+    /// Which way the artwork's feet point, which is what anything holding
+    /// the pet off a surface has to follow.
+    func test_feetPointDownStandingSidewaysOnAWallAndUpUnderTheCeiling() {
+        func feet(_ pose: AvatarPose, _ adjustment: AvatarPoseAdjustment = .none) -> CGPoint {
+            AvatarPoseOrientation.of(pose, adjustment: adjustment, isMirrored: false).feetDirection
+        }
+
+        XCTAssertEqual(feet(.walkingRight).y, 1, accuracy: 0.0001)
+        XCTAssertEqual(feet(.walkingLeft).y, 1, accuracy: 0.0001)
+        XCTAssertEqual(feet(.onTheCeilingFacingRight).y, -1, accuracy: 0.0001)
+
+        // Sideways on a wall, and opposite sides for the two of them.
+        XCTAssertEqual(feet(.climbingRightWall).y, 0, accuracy: 0.0001)
+        XCTAssertEqual(feet(.climbingLeftWall).x, -feet(.climbingRightWall).x, accuracy: 0.0001)
+    }
+
+    /// And a correction takes the feet with it: a character corrected to
+    /// climb the other way up is held off the wall on the other side.
+    func test_aCorrectionTurnsTheFeetWithTheArtwork() {
+        var upsideDown = AvatarPoseAdjustment()
+        upsideDown.flipsVertically = true
+
+        let corrected = AvatarPoseOrientation.of(.walkingRight, adjustment: upsideDown, isMirrored: false)
+
+        XCTAssertEqual(corrected.feetDirection.y, -1, accuracy: 0.0001)
+    }
+
     /// The ceiling is two poses now, for the reason the walls are.
     func testTheTwoCeilingDirectionsAreSeparatePoses() {
         var adjustments = AvatarPoseAdjustments()

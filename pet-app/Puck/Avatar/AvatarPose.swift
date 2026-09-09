@@ -166,6 +166,21 @@ struct AvatarPoseOrientation: Equatable {
     /// The same composition with nothing multiplied in.
     var transform: CGAffineTransform { composed(scaleX: scaleX, scaleY: scaleY) }
 
+    /// Which way the artwork's own feet point, on screen.
+    ///
+    /// Down for a pet standing on something, sideways for one on a wall, up
+    /// for one under the ceiling -- and whatever a pose correction makes it,
+    /// which is the point of taking it from the transform rather than from a
+    /// table of six answers. A character corrected to climb the other way up
+    /// has its feet the other way up here too, and anything that puts a gap
+    /// between the pet and what it is standing on follows it without being
+    /// told.
+    ///
+    /// A unit vector in screen space: Y grows downward.
+    var feetDirection: CGPoint {
+        CGPoint(x: 0, y: 1).applying(transform)
+    }
+
     static func of(
         _ pose: AvatarPose?,
         adjustment: AvatarPoseAdjustment,

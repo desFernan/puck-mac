@@ -65,6 +65,84 @@ final class SpriteAvatarTests: XCTestCase {
         return try AvatarLoader.load(manifestData: Data(json.utf8))
     }
 
+    // MARK: - The gap between the pet and what it is standing on
+
+    /// A pet drawn right to the bottom of its artwork read as welded to the
+    /// Dock. The drawing is held a little off whatever it is standing on --
+    /// and only the drawing.
+    func test_setScreenPosition_holdsTheDrawingOffTheFloor() throws {
+        let avatar = try standingAvatar()
+
+        avatar.setScreenPosition(CGPoint(x: 100, y: 500))
+
+        let height = avatar.spriteLayer.bounds.height
+        XCTAssertEqual(
+            avatar.spriteLayer.position.y,
+            500 - height / 2 - height * SpriteAvatar.surfaceGapFraction,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(avatar.spriteLayer.position.x, 100, accuracy: 0.001, "the floor is below, not beside")
+    }
+
+    /// Under the ceiling the same gap points down, because that is where the
+    /// pet's feet are.
+    func test_setScreenPosition_underTheCeilingTheGapPointsDown() throws {
+        let avatar = try standingAvatar()
+        avatar.setUpsideDown(true)
+
+        avatar.setScreenPosition(CGPoint(x: 100, y: 20))
+
+        let height = avatar.spriteLayer.bounds.height
+        XCTAssertEqual(
+            avatar.spriteLayer.position.y,
+            20 + height / 2 + height * SpriteAvatar.surfaceGapFraction,
+            accuracy: 0.001
+        )
+    }
+
+    /// On a wall it points sideways, and the other way for the other wall --
+    /// the whole reason the direction is taken from the pose rather than
+    /// from the vertical.
+    func test_setScreenPosition_onAWallTheGapPointsSideways() throws {
+        let avatar = try standingAvatar(clips: ["idle": "idle", "climb": "idle"])
+        avatar.updateBounce(clip: "climb", elapsed: 0, intensity: 0)
+
+        avatar.setScreenPosition(CGPoint(x: 100, y: 300))
+        let facingRight = avatar.spriteLayer.position.x
+
+        avatar.setFacing(.left)
+        avatar.setScreenPosition(CGPoint(x: 100, y: 300))
+        let facingLeft = avatar.spriteLayer.position.x
+
+        let height = avatar.spriteLayer.bounds.height
+        let gap = height * SpriteAvatar.surfaceGapFraction
+        XCTAssertEqual(abs(facingRight - 100), gap, accuracy: 0.001)
+        XCTAssertEqual(facingLeft - 100, -(facingRight - 100), accuracy: 0.001, "the two walls are opposite sides")
+    }
+
+    /// The gap is the drawing's, not the pet's: everything that decides where
+    /// the pet may go still works from the position the FSM set, or a pet
+    /// would stop short of its own screen edge.
+    func test_theGapDoesNotMoveWhatTheMovementCodeSees() throws {
+        let avatar = try standingAvatar()
+
+        let before = avatar.visualBounds
+        avatar.setScreenPosition(CGPoint(x: 100, y: 500))
+
+        XCTAssertEqual(avatar.visualBounds, before)
+    }
+
+    private func standingAvatar(clips: [String: String] = ["idle": "idle"]) throws -> SpriteAvatar {
+        try writePNG(named: "idle", color: .red)
+        let avatar = SpriteAvatar(
+            avatarDirectory: packageDirectory,
+            loadResult: try makeLoadResult(clips: clips),
+            parent: CALayer()
+        )
+        avatar.play(clip: "idle", loop: true)
+        return avatar
+    }
+
     // MARK: - Implicit animations
 
     /// A CALayer that isn't a view's backing layer animates position/transform
@@ -192,10 +270,13 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.setScreenPosition(CGPoint(x: 42, y: 99))
 
         // Center = ground point minus half the rendered height, so the
-        // sprite's bottom edge lands exactly on the ground point.
+        // sprite's bottom edge lands on the ground point -- less the small
+        // gap the drawing is held off a surface by, which is the same
+        // conversion with one more term.
+        let height = avatar.spriteLayer.bounds.height
         XCTAssertEqual(
             avatar.spriteLayer.position,
-            CGPoint(x: 42, y: 99 - avatar.spriteLayer.bounds.height / 2)
+            CGPoint(x: 42, y: 99 - height / 2 - height * SpriteAvatar.surfaceGapFraction)
         )
     }
 
@@ -215,9 +296,12 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.setUpsideDown(true)
         avatar.setScreenPosition(CGPoint(x: 42, y: 0))
 
+        // Downward, and the gap goes down with it: under a ceiling that is
+        // the direction the pet's feet point.
+        let height = avatar.spriteLayer.bounds.height
         XCTAssertEqual(
             avatar.spriteLayer.position,
-            CGPoint(x: 42, y: avatar.spriteLayer.bounds.height / 2)
+            CGPoint(x: 42, y: height / 2 + height * SpriteAvatar.surfaceGapFraction)
         )
     }
 
@@ -236,9 +320,10 @@ final class SpriteAvatarTests: XCTestCase {
         avatar.setScreenPosition(CGPoint(x: 42, y: 0))
         avatar.setUpsideDown(true)
 
+        let height = avatar.spriteLayer.bounds.height
         XCTAssertEqual(
             avatar.spriteLayer.position,
-            CGPoint(x: 42, y: avatar.spriteLayer.bounds.height / 2)
+            CGPoint(x: 42, y: height / 2 + height * SpriteAvatar.surfaceGapFraction)
         )
     }
 
@@ -482,9 +567,10 @@ final class SpriteAvatarTests: XCTestCase {
         // height, and pinning the number instead made this break every time
         // the drawn height changed for a reason that had nothing to do with
         // the ground offset.
+        let height = avatar.spriteLayer.bounds.height
         XCTAssertEqual(
             avatar.spriteLayer.position,
-            CGPoint(x: 100, y: 200 - avatar.spriteLayer.bounds.height / 2)
+            CGPoint(x: 100, y: 200 - height / 2 - height * SpriteAvatar.surfaceGapFraction)
         )
     }
 
