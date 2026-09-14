@@ -99,6 +99,10 @@ final class AgentRunner {
     /// force when the tool is about to run -- the same rule
     /// CodingAgentCLIClient.resolvePermission follows for the other gate.
     private let permissions: () -> AgentPermissionMode
+    /// Whether this tool has already been allowed for good in the project
+    /// the run belongs to. The runner has no notion of a workspace, so the
+    /// answer comes from whoever started the run -- see ToolTrustStore.
+    private let isPreapproved: (String) -> Bool
     private let sink: AgentEventSink
 
     /// Every event names the chat it belongs to. `key` is the run's own
@@ -217,6 +221,7 @@ final class AgentRunner {
         client: any AgentLLMClient,
         dispatcher: PetToolDispatcher,
         approve: @escaping AgentApprovalGate,
+        isPreapproved: @escaping (String) -> Bool = { _ in false },
         permissions: @escaping () -> AgentPermissionMode = { AgentConfiguration.permissionMode() },
         emit: @escaping AgentEventSink,
         delegateCodeEditor: AgentCodeEditorDelegation? = nil,
@@ -233,6 +238,7 @@ final class AgentRunner {
         self.dispatcher = dispatcher
         self.approve = approve
         self.permissions = permissions
+        self.isPreapproved = isPreapproved
         self.sink = emit
         self.delegateCodeEditor = delegateCodeEditor
         self.openTaskSession = delegateCodeEditor == nil ? nil : openTaskSession
@@ -560,12 +566,18 @@ final class AgentRunner {
         // no prompt is emitted at all, rather than one emitted and answered
         // for them -- a banner that appears and resolves itself is a banner
         // the chat would leave sitting there unanswerable.
-        if ToolRegistry.tool(named: name)?.requiresApproval == true, !permissions().approvesWithoutAsking {
+        // `isPreapproved` is the user having said "stop asking me about this
+        // one, in this project" -- see ToolTrust. Consulted *before* the
+        // event is emitted, not after: a card that appears and answers itself
+        // is a card the chat leaves sitting there looking unanswered.
+        if ToolRegistry.tool(named: name)?.requiresApproval == true,
+           !permissions().approvesWithoutAsking,
+           !isPreapproved(name) {
             let summary = Self.approvalSummary(
                 tool: name,
                 arguments: argumentsText ?? arguments.jsonText ?? ""
             )
-            emit(.awaitApproval(summary: summary, approvalId: callId), to: key)
+            emit(.awaitApproval(summary: summary, approvalId: callId, tool: name), to: key)
             guard await approve(summary, callId) else {
                 // Refusal is the model's to hear about, not an error to abort
                 // on -- it should say so and offer something else. The code

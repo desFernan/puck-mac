@@ -63,6 +63,7 @@ struct StoredChatEntry: Codable, Equatable {
         case toolResult
         case approvalRequested
         case done
+        case plan
     }
 
     let kind: Kind
@@ -77,6 +78,9 @@ struct StoredChatEntry: Codable, Equatable {
     var detail: String?
     var approvalId: String?
     var summary: String?
+    /// The agent's plan, for the one row that carries one. Kept whole: it is
+    /// a handful of short strings, and half a checklist is worse than none.
+    var plan: AgentPlan?
 }
 
 /// Reads and writes the window's chats.
@@ -167,10 +171,13 @@ final class ChatArchive {
             guard let approvalId = stored.approvalId, let summary = stored.summary,
                   let id = UUID(uuidString: stored.id)
             else { return nil }
-            return .approvalRequested(id: id, approvalId: approvalId, summary: summary)
+            return .approvalRequested(id: id, approvalId: approvalId, summary: summary, tool: stored.tool)
         case .done:
             guard let ok = stored.ok, let id = UUID(uuidString: stored.id) else { return nil }
             return .done(id: id, ok: ok, summary: stored.summary ?? "")
+        case .plan:
+            guard let plan = stored.plan, let id = UUID(uuidString: stored.id) else { return nil }
+            return .plan(id: id, plan: plan)
         }
     }
 
@@ -226,15 +233,18 @@ final class ChatArchive {
             return StoredChatEntry(kind: .toolCall, id: id, tool: tool, args: args)
         case .toolResult(let id, let ok, _, let error, let detail):
             return StoredChatEntry(kind: .toolResult, id: id, ok: ok, error: error, detail: detail)
-        case .approvalRequested(let id, let approvalId, let summary):
+        case .approvalRequested(let id, let approvalId, let summary, let tool):
             return StoredChatEntry(
                 kind: .approvalRequested,
                 id: id.uuidString,
+                tool: tool,
                 approvalId: approvalId,
                 summary: summary
             )
         case .done(let id, let ok, let summary):
             return StoredChatEntry(kind: .done, id: id.uuidString, ok: ok, summary: summary)
+        case .plan(let id, let plan):
+            return StoredChatEntry(kind: .plan, id: id.uuidString, plan: plan)
         }
     }
 

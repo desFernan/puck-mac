@@ -151,6 +151,11 @@ final class AgentHost {
         _ userMessage: String
     ) -> Void)?
 
+    /// Which tools this machine has been told to stop asking about, set by
+    /// the delegate that owns the store -- see ToolTrust. Weak-free and
+    /// optional because AgentHost is built before the window's stores are.
+    var trustedTools: ToolTrustStore?
+
     init(
         broadcast: @escaping (BridgeMessage) -> Bool,
         resolveProjectPath: @escaping (String) -> String?,
@@ -231,6 +236,10 @@ final class AgentHost {
             dispatcher: dispatcher,
             approve: { [weak self] _, approvalId in
                 await self?.awaitApproval(id: approvalId) ?? false
+            },
+            isPreapproved: { [weak self] tool in
+                guard let self else { return false }
+                return self.trustedTools?.isTrusted(tool: tool, workspaceId: self.activeWorkspaceId) ?? false
             },
             emit: { [weak self] event, sessionId in
                 guard let self else { return }
@@ -353,7 +362,11 @@ final class AgentHost {
             let approvalId = UUID().uuidString
             let summary = request.toolName.map { "코드 편집: \($0)" } ?? "코딩 에이전트가 승인을 요청했어요."
             self.emit(
-                .awaitApproval(summary: summary, approvalId: approvalId),
+                // No tool name: this is the CLI asking to do something of
+                // its own, not one of Puck's tools, so there is nothing for
+                // "always allow" to remember. AgentPermissionMode is the
+                // switch that covers these.
+                .awaitApproval(summary: summary, approvalId: approvalId, tool: nil),
                 workspaceId: self.activeWorkspaceId,
                 sessionId: self.activeSessionId
             )

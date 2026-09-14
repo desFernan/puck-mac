@@ -130,7 +130,7 @@ final class ChatTimelineGroupingTests: XCTestCase {
         // the run all belong to the turn that produced them.
         XCTAssertFalse(ChatTimelineEntry.toolCall(id: "t1", tool: "read_file", args: nil).startsNewTurn)
         XCTAssertFalse(ChatTimelineEntry.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil).startsNewTurn)
-        XCTAssertFalse(ChatTimelineEntry.approvalRequested(id: UUID(), approvalId: "a1", summary: "쉘 실행").startsNewTurn)
+        XCTAssertFalse(ChatTimelineEntry.approvalRequested(id: UUID(), approvalId: "a1", summary: "쉘 실행", tool: nil).startsNewTurn)
         XCTAssertFalse(ChatTimelineEntry.done(id: UUID(), ok: true, summary: "완료").startsNewTurn)
     }
 }

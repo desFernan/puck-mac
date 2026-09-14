@@ -109,7 +109,7 @@ final class ChatArchiveTests: XCTestCase {
     /// A run and an approval belong to a process that has gone.
     func test_nothingComesBackStillRunningOrStillWaiting() {
         let chat = session()
-        chat.apply(.awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1"))
+        chat.apply(.awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1", tool: nil))
         chat.markWaitingForAgent()
         XCTAssertTrue(chat.isRunning)
         XCTAssertNotNil(chat.pendingApproval)
@@ -219,5 +219,26 @@ final class ChatArchiveTests: XCTestCase {
             "a chat that already has a conversation is not seeded again"
         )
         XCTAssertEqual(conversations.messages(in: "s1").count, 2)
+    }
+
+    /// A plan is part of the transcript and has to come back with it -- a
+    /// restored chat that lost its checklist is one where the agent's work
+    /// looks unplanned.
+    func test_aPlanComesBackWithTheTranscript() throws {
+        let archive = ChatArchive(storageURL: storageURL)
+        let session = ChatSession(id: "s1", workspaceId: "w1", title: "t", origin: .agent)
+        session.apply(.planUpdated(plan: AgentPlan(steps: [
+            AgentPlanStep(text: "하나", status: .completed),
+            AgentPlanStep(text: "둘", status: .inProgress),
+        ])))
+        archive.save([session], knownWorkspaceIds: ["w1"])
+
+        let restored = try XCTUnwrap(archive.load().first)
+
+        guard case .plan(_, let plan)? = restored.timeline.first else {
+            return XCTFail("expected the plan row, got \(restored.timeline)")
+        }
+        XCTAssertEqual(plan.steps.map(\.text), ["하나", "둘"])
+        XCTAssertEqual(plan.steps.map(\.status), [.completed, .inProgress])
     }
 }

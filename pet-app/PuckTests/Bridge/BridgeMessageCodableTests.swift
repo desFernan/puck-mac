@@ -154,7 +154,7 @@ final class BridgeMessageCodableTests: XCTestCase {
 
         XCTAssertEqual(
             message,
-            .event(.awaitApproval(summary: "rm -rf ./dist 실행 요청", approvalId: "a1"), workspaceId: "w1", sessionId: "s2")
+            .event(.awaitApproval(summary: "rm -rf ./dist 실행 요청", approvalId: "a1", tool: nil), workspaceId: "w1", sessionId: "s2")
         )
     }
 

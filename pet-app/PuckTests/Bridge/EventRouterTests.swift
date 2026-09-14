@@ -105,7 +105,7 @@ final class EventRouterTests: XCTestCase {
     /// agent does nothing at all, so this is the one thing worth interrupting
     /// for.
     func test_awaitApproval_bringsThePetOverWithTheWaitingSFX() {
-        let reaction = EventRouter.reaction(for: .awaitApproval(summary: "rm -rf ./dist", approvalId: "a1"))
+        let reaction = EventRouter.reaction(for: .awaitApproval(summary: "rm -rf ./dist", approvalId: "a1", tool: nil))
 
         XCTAssertEqual(reaction.sfxKey, "await_approval")
         XCTAssertEqual(reaction.emotion, "thinking")
@@ -280,7 +280,7 @@ final class EventRouterTests: XCTestCase {
     /// behind something else.
     func test_anApprovalBringsThePetToThePointer() {
         let reaction = EventRouter.reaction(
-            for: .awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1")
+            for: .awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1", tool: nil)
         )
 
         XCTAssertTrue(reaction.comesToCursor)

@@ -285,7 +285,7 @@ final class ChatSessionTests: XCTestCase {
 
     func test_awaitApproval_setsPendingApproval_andAppendsATimelineEntry() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "requesting to run rm -rf ./dist", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "requesting to run rm -rf ./dist", approvalId: "a1", tool: nil))
 
         XCTAssertEqual(session.pendingApproval?.approvalId, "a1")
         XCTAssertEqual(session.pendingApproval?.summary, "requesting to run rm -rf ./dist")
@@ -298,8 +298,8 @@ final class ChatSessionTests: XCTestCase {
     /// first waited until the tool timeout expired.
     func test_twoApprovalsInFlight_bothStayPending_oldestFirst() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2", tool: nil))
 
         XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1", "a2"])
         XCTAssertEqual(session.pendingApproval?.approvalId, "a1")
@@ -307,8 +307,8 @@ final class ChatSessionTests: XCTestCase {
 
     func test_answeringTheOldestApproval_promotesTheNextOne() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2", tool: nil))
 
         session.resolveApproval(approvalId: "a1")
 
@@ -320,8 +320,8 @@ final class ChatSessionTests: XCTestCase {
     /// them was pending-cleared, so a still-blocking request looked answered.
     func test_approvalState_isPerRequest() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2", tool: nil))
 
         XCTAssertEqual(session.approvalState(for: "a1"), .actionable)
         XCTAssertEqual(session.approvalState(for: "a2"), .queued)
@@ -334,16 +334,16 @@ final class ChatSessionTests: XCTestCase {
 
     func test_repeatedAwaitApprovalForTheSameId_doesNotQueueItTwice() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
 
         XCTAssertEqual(session.pendingApprovals.map(\.approvalId), ["a1"])
     }
 
     func test_agentDone_clearsEveryPendingApproval() {
         let session = makeSession()
-        session.apply(.awaitApproval(summary: "A", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "B", approvalId: "a2"))
+        session.apply(.awaitApproval(summary: "A", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "B", approvalId: "a2", tool: nil))
 
         session.apply(.agentDone(ok: false, summary: "stopped"))
 
@@ -354,7 +354,7 @@ final class ChatSessionTests: XCTestCase {
     func test_agentDone_clearsRunningAndPendingApproval_andAppendsASummaryEntry() {
         let session = makeSession()
         session.apply(.agentThinking)
-        session.apply(.awaitApproval(summary: "x", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "x", approvalId: "a1", tool: nil))
         session.apply(.agentDone(ok: true, summary: "3 tests passed"))
 
         XCTAssertFalse(session.isRunning)
@@ -407,7 +407,7 @@ final class ChatSessionTests: XCTestCase {
         session.apply(.textChunk(text: "a"))
         session.apply(.toolCall(id: "t1", tool: "run_shell", args: nil, detail: nil))
         session.apply(.toolResult(id: "t1", ok: true, data: nil, error: nil, detail: nil))
-        session.apply(.awaitApproval(summary: "x", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "x", approvalId: "a1", tool: nil))
         session.apply(.agentDone(ok: true, summary: "done"))
 
         let ids = session.timeline.map(\.id)
@@ -452,8 +452,8 @@ final class ChatSessionTests: XCTestCase {
     func test_aRebroadcastApprovalIsNotASecondCard() {
         let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
 
-        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1"))
-        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1", tool: nil))
+        session.apply(.awaitApproval(summary: "rm -rf /", approvalId: "a1", tool: nil))
 
         XCTAssertEqual(session.pendingApprovals.count, 1)
         XCTAssertEqual(session.timeline.filter { if case .approvalRequested = $0 { return true } else { return false } }.count, 1)
@@ -540,7 +540,7 @@ final class ChatSessionTests: XCTestCase {
         let session = ChatSession(id: "s", workspaceId: "w", title: "t", origin: .user)
         session.markWaitingForAgent()
         session.markWaitingForAgent()
-        session.apply(.awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1"))
+        session.apply(.awaitApproval(summary: "rm -rf 해도 될까요", approvalId: "a1", tool: nil))
 
         session.apply(.agentDone(ok: false, summary: "중단됨"))
 
@@ -567,5 +567,64 @@ final class ChatSessionTests: XCTestCase {
         session.apply(.agentDone(ok: true, summary: "또 끝"))
         session.markWaitingForAgent()
         XCTAssertTrue(session.isRunning)
+    }
+
+    // MARK: - The agent's plan
+
+    private func plan(_ steps: [(String, AgentPlanStep.Status)]) -> AgentPlan {
+        AgentPlan(steps: steps.map { AgentPlanStep(text: $0.0, status: $0.1) })
+    }
+
+    private func plans(in session: ChatSession) -> [AgentPlan] {
+        session.timeline.compactMap { if case .plan(_, let plan) = $0 { return plan } else { return nil } }
+    }
+
+    /// The agent resends the whole plan every time a step starts or finishes.
+    /// One row, rewritten -- appending would put one checklist per step into
+    /// the transcript and bury the work between them.
+    func test_aPlanThatChangesRewritesItsOwnRowRatherThanAddingAnother() {
+        let session = makeSession()
+
+        session.apply(.planUpdated(plan: plan([("하나", .inProgress), ("둘", .pending)])))
+        session.apply(.planUpdated(plan: plan([("하나", .completed), ("둘", .inProgress)])))
+
+        XCTAssertEqual(plans(in: session).count, 1)
+        XCTAssertEqual(plans(in: session).first?.completedCount, 1)
+    }
+
+    /// A second question gets its own plan. Overwriting the first would say
+    /// the finished work never had one.
+    func test_aSecondQuestionGetsItsOwnPlan() {
+        let session = makeSession()
+        session.apply(.planUpdated(plan: plan([("하나", .completed)])))
+        session.apply(.agentDone(ok: true, summary: "끝"))
+        session.appendUserMessage("그럼 이것도")
+
+        session.apply(.planUpdated(plan: plan([("둘", .inProgress)])))
+
+        XCTAssertEqual(plans(in: session).count, 2)
+        XCTAssertEqual(plans(in: session).last?.steps.first?.text, "둘")
+    }
+
+    /// A plan arriving is the agent working, the same as a thought or a
+    /// chunk -- a chat restored from disk has to show it as running again.
+    func test_aPlanMarksTheChatAsRunning() {
+        let session = makeSession()
+
+        session.apply(.planUpdated(plan: plan([("하나", .pending)])))
+
+        XCTAssertTrue(session.isRunning)
+    }
+
+    /// The plan is the agent talking to itself about how it will work, not
+    /// something said in the conversation: replaying history to a model must
+    /// not feed it back its own checklist as dialogue.
+    func test_aPlanIsNotPartOfWhatWasSaid() {
+        let session = makeSession()
+        session.appendUserMessage("고쳐줘")
+
+        session.apply(.planUpdated(plan: plan([("하나", .pending)])))
+
+        XCTAssertEqual(session.spokenHistory.map(\.text), ["고쳐줘"])
     }
 }

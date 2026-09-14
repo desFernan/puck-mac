@@ -154,8 +154,8 @@ struct ChatPaneView: View {
 
     private func chatStack(_ session: ChatSession) -> some View {
         VStack(spacing: 0) {
-            ChatTranscriptView(session: session) { approved in
-                store.respondToPendingApproval(in: session, approved: approved)
+            ChatTranscriptView(session: session) { answer in
+                store.respondToPendingApproval(in: session, answer: answer)
             }
             // No rule above the composer: the box already has an edge of its
             // own, and a full-width line over it cut the window in two.

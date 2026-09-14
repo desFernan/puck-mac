@@ -23,6 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var clientWindowStore = ClientWindowStore(sender: userInputSender, archive: ChatArchive())
     /// Things to do later, on a repeat -- see AgentSchedule.
     private let schedules = AgentScheduleStore()
+    /// The tools this machine has stopped asking about, per workspace -- see
+    /// ToolTrust.
+    private let trustedTools = ToolTrustStore()
     /// Second consumer of clientWindowStore's mutations, alongside the store
     /// itself -- see ClientChatBridge's own header comment for why this is
     /// pushed to imperatively rather than Combine-observed.
@@ -92,6 +95,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         clientWindowStore.onApprovalResolved = { [weak self] approvalId, approved in
             self?.agentHost.resolveApproval(id: approvalId, approved: approved)
+        }
+        // Before any turn can run: the gate reads it from inside the run.
+        agentHost.trustedTools = trustedTools
+        clientWindowStore.onToolTrusted = { [weak self] tool, workspaceId in
+            self?.trustedTools.trust(tool: tool, workspaceId: workspaceId)
+        }
+        clientWindowStore.onWorkspaceDeleted = { [weak self] workspaceId in
+            self?.schedules.removeAll(inWorkspace: workspaceId)
+            self?.trustedTools.revokeAll(inWorkspace: workspaceId)
         }
         clientWindowStore.onSessionDeleted = { [weak self] _, sessionId in
             self?.agentHost.forgetSession(sessionId)
@@ -416,7 +428,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             newWindow.isReleasedWhenClosed = false
             newWindow.applyGlassChrome()
-            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView(clientWindowStore: clientWindowStore, schedules: schedules))
+            newWindow.contentViewController = NSHostingController(rootView: AgentSettingsView(clientWindowStore: clientWindowStore, schedules: schedules, trustedTools: trustedTools))
             newWindow.center()
             settingsWindow = newWindow
             return newWindow

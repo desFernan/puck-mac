@@ -69,13 +69,21 @@ enum BridgeEvent: Equatable {
     case textChunk(text: String)
     case toolCall(id: String, tool: String, args: JSONValue?, detail: JSONValue?)
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
-    case awaitApproval(summary: String, approvalId: String)
+    /// `tool` is what the approval is for, so the card can offer to stop
+    /// asking about that one -- see ToolTrust. Optional because an older peer
+    /// on the other end of the socket does not send it, and a card without
+    /// the offer is still a card that works.
+    case awaitApproval(summary: String, approvalId: String, tool: String?)
     case agentDone(ok: Bool, summary: String)
     /// One line for the pet to say out of its own speech bubble, with no
     /// state change attached (2026-08-21, show_code). Distinct from
     /// agentDone's summary, which also ends the run: a code tour speaks at
     /// every stop while the run is still going.
     case petSays(text: String)
+    /// The agent's own plan, as it stands -- see AgentPlan. Sent whenever the
+    /// agent rewrites it, which it does as it learns what the work is, so the
+    /// last one received is the plan rather than one entry in a log of them.
+    case planUpdated(plan: AgentPlan)
 }
 
 /// An image attached to a user_input (e.g. pet-app's F14 drag capture).
@@ -289,6 +297,7 @@ extension BridgeMessage: Codable {
         case awaitApproval = "await_approval"
         case agentDone = "agent_done"
         case petSays = "pet_says"
+        case planUpdated = "plan"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -305,6 +314,7 @@ extension BridgeMessage: Codable {
         case origin
         case approvalId = "approval_id"
         case role
+        case plan
     }
 
     init(from decoder: Decoder) throws {
@@ -364,7 +374,8 @@ extension BridgeMessage: Codable {
             case .awaitApproval:
                 event = .awaitApproval(
                     summary: try container.decode(String.self, forKey: .summary),
-                    approvalId: try container.decode(String.self, forKey: .approvalId)
+                    approvalId: try container.decode(String.self, forKey: .approvalId),
+                    tool: try container.decodeIfPresent(String.self, forKey: .tool)
                 )
             case .agentDone:
                 event = .agentDone(
@@ -373,6 +384,8 @@ extension BridgeMessage: Codable {
                 )
             case .petSays:
                 event = .petSays(text: try container.decode(String.self, forKey: .text))
+            case .planUpdated:
+                event = .planUpdated(plan: try container.decode(AgentPlan.self, forKey: .plan))
             }
             self = .event(event, workspaceId: workspaceId, sessionId: sessionId)
 
@@ -482,10 +495,11 @@ extension BridgeMessage: Codable {
                     ToolResult(id: id, ok: ok, data: data, error: error, detail: detail),
                     into: &container
                 )
-            case .awaitApproval(let summary, let approvalId):
+            case .awaitApproval(let summary, let approvalId, let tool):
                 try container.encode(EventKey.awaitApproval, forKey: .event)
                 try container.encode(summary, forKey: .summary)
                 try container.encode(approvalId, forKey: .approvalId)
+                try container.encodeIfPresent(tool, forKey: .tool)
             case .agentDone(let ok, let summary):
                 try container.encode(EventKey.agentDone, forKey: .event)
                 try container.encode(ok, forKey: .ok)
@@ -493,6 +507,9 @@ extension BridgeMessage: Codable {
             case .petSays(let text):
                 try container.encode(EventKey.petSays, forKey: .event)
                 try container.encode(text, forKey: .text)
+            case .planUpdated(let plan):
+                try container.encode(EventKey.planUpdated, forKey: .event)
+                try container.encode(plan, forKey: .plan)
             }
 
         case .userInput(let input):

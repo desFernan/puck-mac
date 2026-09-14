@@ -35,6 +35,10 @@ struct AgentSettingsView: View {
     /// Things to do later, on a repeat -- see AgentSchedule. Owned by the app
     /// delegate, which is what actually runs them; this only lists and edits.
     @ObservedObject var schedules: AgentScheduleStore
+    /// What this machine has stopped asking about, per workspace -- see
+    /// ToolTrust. Here because a decision made mid-run to get on with it must
+    /// be findable afterwards by somebody who has forgotten making it.
+    @ObservedObject var trustedTools: ToolTrustStore
 
     /// What the "add" row is currently filled in with. Held here rather than
     /// in a sheet: a schedule is three fields, and a sheet for three fields
@@ -315,6 +319,8 @@ struct AgentSettingsView: View {
             scheduleDraft
         }
 
+        trustedToolsSection
+
         SettingsSection(title: text(.skillsHeader)) {
             if installed.isEmpty {
                 Text(text(.skillsEmpty))
@@ -334,6 +340,52 @@ struct AgentSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
         }
+    }
+
+    /// Everything "항상 허용" was pressed for, and the way back.
+    ///
+    /// Named by workspace, because that is the scope of the decision: the
+    /// same tool can be trusted in one project and asked about in the next,
+    /// and a list that only said "run_shell" would not say where.
+    @ViewBuilder
+    private var trustedToolsSection: some View {
+        let entries = trustedTools.entries
+        SettingsSection(title: text(.trustedToolsHeader)) {
+            Text(text(.trustedToolsExplanation))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            if entries.isEmpty {
+                Text(text(.trustedToolsEmpty))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, ClientTheme.Metrics.spacingSmall)
+            } else {
+                ForEach(entries, id: \.tool) { entry in
+                    SettingsRow(label: entry.tool) {
+                        Text(workspaceName(entry.workspaceId))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button(text(.commonDelete)) {
+                            trustedTools.revoke(tool: entry.tool, workspaceId: entry.workspaceId)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                SettingsActionRow(label: text(.trustedToolsRevokeAll), systemImage: "arrow.uturn.backward") {
+                    trustedTools.revokeAll()
+                }
+            }
+        }
+    }
+
+    /// What a workspace is called, falling back to its id -- a workspace that
+    /// has gone leaves no name behind, and its id is still more use than an
+    /// empty cell while the sweep catches up.
+    private func workspaceName(_ workspaceId: String) -> String {
+        clientWindowStore.workspaces.first { $0.id == workspaceId }?.name ?? workspaceId
     }
 
     private func skillRow(_ skill: Skill) -> some View {

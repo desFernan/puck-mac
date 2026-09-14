@@ -157,7 +157,7 @@ enum EventRouter {
                 ? EventReaction()
                 : EventReaction(stateTransition: .reactClick, sfxKey: "task_fail", emotion: "sad")
 
-        case .awaitApproval(let summary, _):
+        case .awaitApproval(let summary, _, _):
             // The pet comes to the pointer for this one, and only for this
             // one. Everything else it has to say can wait to be looked at; a
             // run stopped on an approval cannot, because nothing else is
@@ -201,6 +201,12 @@ enum EventRouter {
                     bubbleWhenAwayOnly: true,
                     runFinished: true
                 )
+
+        case .planUpdated:
+            // Nothing for the pet. The plan is a checklist to read, and a
+            // pet that announced every step of it would be talking over the
+            // window the checklist is already in.
+            return EventReaction()
 
         case .petSays(let text):
             // Speech and nothing else. A code tour's stop has already put the

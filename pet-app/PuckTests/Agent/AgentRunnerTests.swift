@@ -630,6 +630,7 @@ final class AgentRunnerTests: XCTestCase {
         // to auto would otherwise watch the approval tests below stop asking
         // and pass for the wrong reason.
         permissions: @escaping () -> AgentPermissionMode = { .toolsOnly },
+        isPreapproved: @escaping (String) -> Bool = { _ in false },
         emit: @escaping AgentEventSink = { _, _ in },
         delegateReadFile: AgentFileDelegation? = nil
     ) -> AgentRunner {
@@ -643,6 +644,7 @@ final class AgentRunnerTests: XCTestCase {
                 return false
             }),
             approve: approve,
+            isPreapproved: isPreapproved,
             permissions: permissions,
             emit: emit,
             delegateReadFile: delegateReadFile
@@ -696,7 +698,7 @@ final class AgentRunnerTests: XCTestCase {
         XCTAssertEqual(asked.value.count, 1)
         XCTAssertTrue(asked.value.first?.hasPrefix(String(format: Strings.text(.approvalRunShellFormat), "")) == true)
         XCTAssertTrue(events.value.contains { event in
-            if case .awaitApproval(_, let approvalId) = event { return approvalId == "c-2" }
+            if case .awaitApproval(_, let approvalId, _) = event { return approvalId == "c-2" }
             return false
         }, "the user has to see the normal in-chat approval prompt")
         XCTAssertEqual(dispatched.value.count, 1, "approved means it actually runs")
@@ -732,6 +734,78 @@ final class AgentRunnerTests: XCTestCase {
             return false
         }, "no approval banner is put in the chat")
         XCTAssertEqual(dispatched.value.count, 1, "and the tool actually ran")
+    }
+
+
+    /// "항상 허용" -- see ToolTrust. The same shape as the auto-permissions
+    /// case above and for the same reason: a card that appears and answers
+    /// itself is worse than no card, so the decision has to be taken before
+    /// the event is emitted rather than after.
+    func test_invokeTool_forAToolAlreadyTrustedHere_neitherAsksNorPutsACardUp() async {
+        let events = UncheckedBox([BridgeEvent]())
+        let asked = UncheckedBox([String]())
+        let dispatched = UncheckedBox([BridgeMessage]())
+        let runner = makeRunner(
+            dispatched: dispatched,
+            approve: { summary, _ in
+                asked.value.append(summary)
+                return true
+            },
+            isPreapproved: { $0 == "run_shell" },
+            emit: { event, _ in events.value.append(event) }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("ls")]),
+            callId: "c-trusted"
+        )
+
+        XCTAssertTrue(asked.value.isEmpty)
+        XCTAssertFalse(events.value.contains { if case .awaitApproval = $0 { return true } else { return false } })
+        XCTAssertEqual(dispatched.value.count, 1, "and it ran")
+    }
+
+    /// Trusting one tool is not trusting the next one.
+    func test_invokeTool_forAToolNotOnTheList_stillAsks() async {
+        let asked = UncheckedBox([String]())
+        let runner = makeRunner(
+            approve: { summary, _ in
+                asked.value.append(summary)
+                return true
+            },
+            isPreapproved: { $0 == "run_shell" }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_applescript",
+            arguments: .object(["script": .string("beep")]),
+            callId: "c-other"
+        )
+
+        XCTAssertEqual(asked.value.count, 1)
+    }
+
+    /// The card carries what it is about, so it can offer to stop asking
+    /// about that one.
+    func test_theApprovalCardNamesTheToolItIsAbout() async {
+        let events = UncheckedBox([BridgeEvent]())
+        let runner = makeRunner(
+            approve: { _, _ in false },
+            emit: { event, _ in events.value.append(event) }
+        )
+
+        _ = await runner.invokeTool(
+            name: "run_shell",
+            arguments: .object(["command": .string("ls")]),
+            callId: "c-named"
+        )
+
+        let named = events.value.contains { event in
+            if case .awaitApproval(_, _, let tool) = event { return tool == "run_shell" }
+            return false
+        }
+        XCTAssertTrue(named)
     }
 
     /// Every other mode leaves that prompt exactly where it was -- including

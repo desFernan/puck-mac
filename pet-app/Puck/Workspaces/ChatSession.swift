@@ -28,8 +28,17 @@ enum ChatTimelineEntry: Equatable {
     case notice(id: UUID, text: String)
     case toolCall(id: String, tool: String, args: JSONValue?)
     case toolResult(id: String, ok: Bool, data: JSONValue?, error: ToolErrorCode?, detail: String?)
-    case approvalRequested(id: UUID, approvalId: String, summary: String)
+    /// `tool` is what is being asked about, so the card can offer to stop
+    /// asking about that one. Nil for an approval that arrived without it --
+    /// an older pet-app across the socket, or a code_editor permission, which
+    /// is the CLI's own request rather than one of Puck's tools.
+    case approvalRequested(id: UUID, approvalId: String, summary: String, tool: String?)
     case done(id: UUID, ok: Bool, summary: String)
+    /// The agent's own plan for this turn -- see AgentPlan. One row that is
+    /// rewritten in place: the agent sends the whole plan every time it
+    /// changes, and a transcript with six copies of the same checklist in it
+    /// is a transcript nobody can read.
+    case plan(id: UUID, plan: AgentPlan)
 }
 
 extension ChatTimelineEntry {
@@ -39,7 +48,9 @@ extension ChatTimelineEntry {
     var startsNewTurn: Bool {
         switch self {
         case .userMessage, .assistantText, .notice: return true
-        case .toolCall, .toolResult, .approvalRequested, .done: return false
+        // The plan belongs to the turn that produced it, the same way a tool
+        // call does.
+        case .toolCall, .toolResult, .approvalRequested, .done, .plan: return false
         }
     }
 }
@@ -55,7 +66,7 @@ extension ChatTimelineEntry: Identifiable {
         case .notice(let id, _): return id
         case .toolCall(let id, _, _): return "call:\(id)"
         case .toolResult(let id, _, _, _, _): return "result:\(id)"
-        case .approvalRequested(let id, _, _): return id
+        case .approvalRequested(let id, _, _, _): return id
         // Was a fixed "done" on the assumption that agent_done happens once
         // per session. It doesn't: a session takes as many prompts as the
         // user types, and every run ends with one. Two rows sharing an id in
@@ -63,6 +74,7 @@ extension ChatTimelineEntry: Identifiable {
         // practice was throw the scroll position to the top of the list the
         // moment a second run finished.
         case .done(let id, _, _): return id
+        case .plan(let id, _): return id
         }
     }
 }
@@ -73,6 +85,8 @@ extension ChatTimelineEntry: Identifiable {
 struct PendingApproval: Equatable, Identifiable {
     let approvalId: String
     let summary: String
+    /// The tool this is about, when it is one of Puck's own -- see ToolTrust.
+    var tool: String?
 
     var id: String { approvalId }
 }
@@ -206,7 +220,7 @@ final class ChatSession: ObservableObject, Identifiable {
                 return text.isEmpty ? nil : (true, text)
             case .assistantText(_, let text):
                 return text.isEmpty ? nil : (false, text)
-            case .notice, .toolCall, .toolResult, .approvalRequested, .done:
+            case .notice, .toolCall, .toolResult, .approvalRequested, .done, .plan:
                 return nil
             }
         }
@@ -359,6 +373,18 @@ final class ChatSession: ObservableObject, Identifiable {
         runsInFlight = 1
     }
 
+    /// Whether the plan row at `index` belongs to the turn that is running
+    /// now, rather than to an earlier one.
+    ///
+    /// A second question sent in the same chat gets its own plan, and
+    /// overwriting the first one would erase what the agent did before --
+    /// the transcript would say the finished work never had a plan. Anything
+    /// that starts a new exchange between here and the end of the timeline
+    /// means this plan is from before it.
+    private func isPlanStillThisTurn(at index: Int) -> Bool {
+        !timeline[(index + 1)...].contains { $0.startsNewTurn }
+    }
+
     /// Folds one BridgeEvent into the timeline. Caller (ClientWindowStore) is
     /// responsible for routing the event to the right session by
     /// workspace_id/session_id first -- this type has no notion of "is this
@@ -387,14 +413,14 @@ final class ChatSession: ObservableObject, Identifiable {
         case .toolResult(let id, let ok, let data, let error, let detail):
             timeline.append(.toolResult(id: id, ok: ok, data: data, error: error, detail: detail))
 
-        case .awaitApproval(let summary, let approvalId):
+        case .awaitApproval(let summary, let approvalId, let tool):
             // Re-broadcast of an id already queued is not a second request --
             // and it is not a second card either. The transcript printed the
             // same approval twice while only one of them could be answered,
             // which reads as a second thing to decide.
             guard !pendingApprovals.contains(where: { $0.approvalId == approvalId }) else { break }
-            pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary))
-            timeline.append(.approvalRequested(id: UUID(), approvalId: approvalId, summary: summary))
+            pendingApprovals.append(PendingApproval(approvalId: approvalId, summary: summary, tool: tool))
+            timeline.append(.approvalRequested(id: UUID(), approvalId: approvalId, summary: summary, tool: tool))
             // The run is stopped until this is answered, and the banner it is
             // waiting behind arrives without taking focus -- so behind a
             // screen reader the turn simply goes quiet. High priority because
@@ -425,6 +451,21 @@ final class ChatSession: ObservableObject, Identifiable {
             // what the model is already saying in text_chunk, so putting it in
             // the timeline too would print every tour stop twice.
             break
+
+        case .planUpdated(let plan):
+            noteRunStartedElsewhere()
+            isRunning = true
+            // Rewritten where it already is rather than appended. The agent
+            // resends the whole plan whenever a step starts or finishes, so
+            // appending would put one checklist per step into the transcript
+            // and bury the work between them.
+            if let index = timeline.lastIndex(where: { if case .plan = $0 { return true } else { return false } }),
+               case .plan(let entryId, _) = timeline[index],
+               isPlanStillThisTurn(at: index) {
+                timeline[index] = .plan(id: entryId, plan: plan)
+            } else {
+                timeline.append(.plan(id: UUID(), plan: plan))
+            }
         }
     }
 

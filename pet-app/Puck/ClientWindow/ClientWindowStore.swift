@@ -90,6 +90,13 @@ final class ClientWindowStore: ObservableObject {
     /// Same reason: approval is resolved inside this process, not by a
     /// workspace on the far side of the socket.
     var onApprovalResolved: ((_ approvalId: String, _ approved: Bool) -> Void)?
+    /// "Stop asking about this tool here" -- see ToolTrust. Separate from
+    /// `onApprovalResolved` because it is a different decision with a
+    /// different lifetime: one answers a call, the other outlives the run.
+    var onToolTrusted: ((_ tool: String, _ workspaceId: String) -> Void)?
+    /// A workspace has gone, so whatever was keyed to it should go too --
+    /// its schedules and what it was trusted with.
+    var onWorkspaceDeleted: ((_ workspaceId: String) -> Void)?
     var onRunCancelled: (() -> Void)?
 
     @Published private(set) var workspaces: [ClientWorkspace] {
@@ -550,6 +557,11 @@ final class ClientWindowStore: ObservableObject {
         workspaces.removeAll { $0.id == workspaceId }
         announceIfChanged(sessionList.removeAll(inWorkspace: workspaceId))
         pendingSessionRequests.removeValue(forKey: workspaceId)
+        // What was trusted in it goes with it: a workspace id is reused by
+        // nothing, so a decision left behind is a row nobody can find to
+        // revoke -- and were an id ever to come round again it would arrive
+        // carrying somebody else's yes.
+        onWorkspaceDeleted?(workspaceId)
         guard activeWorkspaceId == workspaceId else { return }
         // Somewhere to stand: the workspace that cannot be deleted.
         activeWorkspaceId = Self.defaultWorkspaceId
@@ -613,10 +625,17 @@ final class ClientWindowStore: ObservableObject {
     /// Answers the oldest queued approval. The answer never leaves this
     /// process -- the agent waiting on it is `onRunCancelled`'s AgentHost,
     /// right here -- so the request is always dequeued.
-    func respondToPendingApproval(in session: ChatSession, approved: Bool) {
-        guard let approvalId = session.pendingApproval?.approvalId else { return }
-        onApprovalResolved?(approvalId, approved)
-        session.resolveApproval(approvalId: approvalId)
+    func respondToPendingApproval(in session: ChatSession, answer: ApprovalAnswer) {
+        guard let pending = session.pendingApproval else { return }
+        // Remembered before the answer goes back, so the next call of the
+        // same tool in the same run already finds it trusted -- an agent that
+        // runs the build twice in a row must not ask twice because the second
+        // question was in flight while the first was being answered.
+        if answer == .allowAlways, let tool = pending.tool {
+            onToolTrusted?(tool, session.workspaceId)
+        }
+        onApprovalResolved?(pending.approvalId, answer.isApproval)
+        session.resolveApproval(approvalId: pending.approvalId)
     }
 
     func cancelActiveRun() {

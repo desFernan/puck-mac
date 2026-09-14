@@ -21,7 +21,7 @@ struct ChatTranscriptView: View {
     @ObservedObject private var localization = Localization.shared
 
     @ObservedObject var session: ChatSession
-    let onApproval: (Bool) -> Void
+    let onApproval: (ApprovalAnswer) -> Void
 
     var body: some View {
         if session.timeline.isEmpty && !session.isRunning {
@@ -111,15 +111,19 @@ struct ChatTranscriptView: View {
             // answers, which is the only thing that makes it readable.
             EmptyView()
 
-        case .approvalRequested(_, let approvalId, let summary):
+        case .approvalRequested(_, let approvalId, let summary, let tool):
             // Keyed by this row's own approvalId rather than by "is anything
             // pending": with two requests in flight, the shared flag made the
             // older one look answered while it was still waiting.
             ApprovalBanner(
                 summary: summary,
                 state: session.approvalState(for: approvalId),
+                tool: tool,
                 onApproval: onApproval
             )
+
+        case .plan(_, let plan):
+            PlanRow(plan: plan)
 
         case .done(_, let ok, let summary):
             // Only failures get a row. A successful run's summary *is* the
@@ -486,6 +490,19 @@ private struct ToolCallRow: View {
     }
 }
 
+/// What somebody pressed on an approval card.
+///
+/// Three answers rather than a bool, because "yes, and stop asking" is a
+/// different decision from "yes": one is about this call, the other is about
+/// every call of that tool in this project from now on -- see ToolTrust.
+enum ApprovalAnswer: Equatable {
+    case allowOnce
+    case allowAlways
+    case deny
+
+    var isApproval: Bool { self != .deny }
+}
+
 private struct ApprovalBanner: View {
     /// Redraws this view when the UI language changes. Needed on every
     /// view that resolves a string, not just the window root: SwiftUI
@@ -495,7 +512,11 @@ private struct ApprovalBanner: View {
 
     let summary: String
     let state: ApprovalState
-    let onApproval: (Bool) -> Void
+    /// The tool being asked about, when it is one of Puck's own. Nil hides
+    /// the "always" button rather than offering one that cannot remember
+    /// anything.
+    let tool: String?
+    let onApproval: (ApprovalAnswer) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -511,9 +532,20 @@ private struct ApprovalBanner: View {
                     .foregroundStyle(.secondary)
             case .actionable:
                 HStack {
-                    Button(Strings.text(.chatApprovalAllow)) { onApproval(true) }
+                    Button(Strings.text(.chatApprovalAllow)) { onApproval(.allowOnce) }
                         .keyboardShortcut(.defaultAction)
-                    Button(Strings.text(.chatApprovalDeny), role: .cancel) { onApproval(false) }
+                    Button(Strings.text(.chatApprovalDeny), role: .cancel) { onApproval(.deny) }
+                    if let tool {
+                        Spacer(minLength: 0)
+                        // Last, and quiet. It is the most useful button in a
+                        // long run and the one worth a second's thought, so
+                        // it sits away from the one the return key presses.
+                        Button(String(format: Strings.text(.chatApprovalAlwaysFormat), tool)) {
+                            onApproval(.allowAlways)
+                        }
+                        .buttonStyle(.link)
+                        .help(Strings.text(.chatApprovalAlwaysHelp))
+                    }
                 }
             }
         }

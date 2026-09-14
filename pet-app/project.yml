@@ -185,6 +185,8 @@ targets:
       - path: Puck/Tools/ToolExecutionLogger.swift
       - path: Puck/Resources/Assets.xcassets
       - path: Puck/Bridge/BridgeMessages.swift
+      # What the agent said it would do, which the window draws and stores.
+      - path: Puck/Bridge/AgentPlan.swift
       - path: Puck/Bridge/JSONValue.swift
       - path: Puck/Bridge/BridgeConnection.swift
       - path: Puck/Bridge/BridgeSocketPath.swift

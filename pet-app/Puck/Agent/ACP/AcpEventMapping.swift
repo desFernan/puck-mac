@@ -39,7 +39,13 @@ enum AcpEventMapping {
         case .agentThoughtChunk:
             return .agentThinking
 
-        case .plan, .none:
+        case .plan:
+            // The one update in the stream that answers "how much of this is
+            // left". Dropped until now, which is why a ten-minute run showed
+            // a spinner and a pile of tool rows.
+            return AgentPlan.from(update: update.raw).map { .planUpdated(plan: $0) }
+
+        case .none:
             return nil
         }
     }

@@ -246,6 +246,11 @@ enum L10nKey: String, CaseIterable, Hashable {
     case scheduleWeeklyLabel, scheduleAtLabel, scheduleDaysLabel
     /// Being told a newer Puck exists -- see UpdateCheck. The bubble and the
     /// button take the version as `%1$@`.
+    /// The agent's own plan, shown in the transcript -- see PlanRow.
+    case planHeader
+    /// Saying yes to a tool for good, in this project -- see ToolTrust.
+    case chatApprovalAlwaysFormat, chatApprovalAlwaysHelp
+    case trustedToolsHeader, trustedToolsExplanation, trustedToolsEmpty, trustedToolsRevokeAll
     case updateBubbleFormat, updateAvailableFormat, updateCurrentFormat, updateSectionHeader
     case updateChecksLabel, updateCheckNow, updateChecking, updateUpToDateFormat
     case updateGet, updateSkip, updateFailed
@@ -663,6 +668,13 @@ enum Strings {
         .scheduleWeeklyLabel: "요일마다",
         .scheduleAtLabel: "시각",
         .scheduleDaysLabel: "요일",
+        .planHeader: "계획",
+        .chatApprovalAlwaysFormat: "%1$@는 항상 허용",
+        .chatApprovalAlwaysHelp: "이 워크스페이스에서는 이 도구를 다시 묻지 않습니다. 설정에서 되돌릴 수 있어요.",
+        .trustedToolsHeader: "묻지 않기로 한 도구",
+        .trustedToolsExplanation: "승인 카드에서 \"항상 허용\"을 누른 것들입니다. 워크스페이스마다 따로 기억합니다.",
+        .trustedToolsEmpty: "아직 없습니다. 매번 물어봅니다.",
+        .trustedToolsRevokeAll: "전부 다시 묻기",
         .updateBubbleFormat: "새 버전 %1$@ 나왔어요!",
         .updateAvailableFormat: "새 버전 %1$@",
         .updateCurrentFormat: "현재 버전 %1$@",
@@ -1079,6 +1091,13 @@ enum Strings {
         .scheduleWeeklyLabel: "Weekly",
         .scheduleAtLabel: "At",
         .scheduleDaysLabel: "Days",
+        .planHeader: "Plan",
+        .chatApprovalAlwaysFormat: "Always allow %1$@",
+        .chatApprovalAlwaysHelp: "This workspace stops asking about this tool. Undo it in settings.",
+        .trustedToolsHeader: "Tools that stopped asking",
+        .trustedToolsExplanation: "What \"always allow\" was pressed for. Remembered per workspace.",
+        .trustedToolsEmpty: "Nothing yet. Everything still asks.",
+        .trustedToolsRevokeAll: "Ask about everything again",
         .updateBubbleFormat: "Version %1$@ is out!",
         .updateAvailableFormat: "Version %1$@ available",
         .updateCurrentFormat: "Version %1$@",

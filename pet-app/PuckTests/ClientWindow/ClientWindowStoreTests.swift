@@ -543,14 +543,14 @@ final class ClientWindowStoreTests: XCTestCase {
         let (store, _) = makeStore()
         var answered: [(String, Bool)] = []
         store.onApprovalResolved = { approvalId, approved in answered.append((approvalId, approved)) }
-        store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1"), workspaceId: "default", sessionId: "default")
-        store.handleChatEvent(.awaitApproval(summary: "B", approvalId: "a2"), workspaceId: "default", sessionId: "default")
+        store.handleChatEvent(.awaitApproval(summary: "A", approvalId: "a1", tool: nil), workspaceId: "default", sessionId: "default")
+        store.handleChatEvent(.awaitApproval(summary: "B", approvalId: "a2", tool: nil), workspaceId: "default", sessionId: "default")
         guard let session = store.session(workspaceId: "default", sessionId: "default") else {
             return XCTFail("the default session is seeded at init")
         }
 
-        store.respondToPendingApproval(in: session, approved: true)
-        store.respondToPendingApproval(in: session, approved: false)
+        store.respondToPendingApproval(in: session, answer: .allowOnce)
+        store.respondToPendingApproval(in: session, answer: .deny)
 
         XCTAssertEqual(answered.map(\.0), ["a1", "a2"])
         XCTAssertEqual(answered.map(\.1), [true, false])
@@ -568,7 +568,7 @@ final class ClientWindowStoreTests: XCTestCase {
             return XCTFail("the default session is seeded at init")
         }
 
-        store.respondToPendingApproval(in: session, approved: true)
+        store.respondToPendingApproval(in: session, answer: .allowOnce)
 
         XCTAssertEqual(answered, 0)
     }
@@ -644,5 +644,71 @@ final class ClientWindowStoreTests: XCTestCase {
         store.sendMessage("아무거나", source: .text)
 
         XCTAssertNoThrow(store.saveNow())
+    }
+
+    /// "항상 허용" is two things at once: the answer to this call, and a
+    /// decision that outlives the run. Both have to happen, and the
+    /// remembering has to happen first -- the same tool called again while
+    /// the first answer is still in flight must already find it trusted.
+    func test_allowingAToolAlwaysBothAnswersAndRemembers() {
+        let (store, _) = makeStore()
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+        store.handleChatEvent(
+            .awaitApproval(summary: "쉘 실행", approvalId: "a1", tool: "run_shell"),
+            workspaceId: "default",
+            sessionId: "default"
+        )
+        var remembered: [(tool: String, workspaceId: String)] = []
+        var answered: [(String, Bool)] = []
+        store.onToolTrusted = { remembered.append((tool: $0, workspaceId: $1)) }
+        store.onApprovalResolved = { answered.append(($0, $1)) }
+
+        store.respondToPendingApproval(in: session, answer: .allowAlways)
+
+        XCTAssertEqual(remembered.map(\.tool), ["run_shell"])
+        XCTAssertEqual(remembered.map(\.workspaceId), ["default"])
+        XCTAssertEqual(answered.map(\.1), [true])
+    }
+
+    /// A plain 허용 is about this call and nothing else.
+    func test_allowingOnceRemembersNothing() {
+        let (store, _) = makeStore()
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+        store.handleChatEvent(
+            .awaitApproval(summary: "쉘 실행", approvalId: "a1", tool: "run_shell"),
+            workspaceId: "default",
+            sessionId: "default"
+        )
+        var remembered = 0
+        store.onToolTrusted = { _, _ in remembered += 1 }
+
+        store.respondToPendingApproval(in: session, answer: .allowOnce)
+
+        XCTAssertEqual(remembered, 0)
+    }
+
+    /// An approval that arrived without a tool name -- the coding CLI asking
+    /// to do something of its own -- has nothing to remember, and pressing
+    /// the button that is not there cannot invent one.
+    func test_anApprovalWithNoToolNameRemembersNothing() {
+        let (store, _) = makeStore()
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+        store.handleChatEvent(
+            .awaitApproval(summary: "코드 편집", approvalId: "a1", tool: nil),
+            workspaceId: "default",
+            sessionId: "default"
+        )
+        var remembered = 0
+        store.onToolTrusted = { _, _ in remembered += 1 }
+
+        store.respondToPendingApproval(in: session, answer: .allowAlways)
+
+        XCTAssertEqual(remembered, 0)
     }
 }
