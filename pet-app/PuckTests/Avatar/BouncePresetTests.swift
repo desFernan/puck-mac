@@ -219,9 +219,8 @@ final class ClimbBouncePresetTests: XCTestCase {
     /// of the lean, tallest passing through upright. Matched frequencies
     /// would make one side droop instead.
     ///
-    /// Measured as a magnitude, because the sign carries something else: the
-    /// climb's scaleY is negative, which is half of turning the pet over to
-    /// face the wall -- see the preset. The squash is how far from 1 it is.
+    /// Measured as a magnitude, which is what a squash is: how far from 1 it
+    /// is. The sign is `stillPose`'s business, not the waddle's.
     func test_squashPeaksAtBothExtremesOfTheLean() {
         let upright = abs(preset.transform(elapsed: 0, intensity: 1).scaleY)
         let leaningRight = abs(preset.transform(elapsed: 0.125, intensity: 1).scaleY)
@@ -232,15 +231,35 @@ final class ClimbBouncePresetTests: XCTestCase {
         XCTAssertEqual(leaningLeft, leaningRight, accuracy: 0.0001, "equally short both ways")
     }
 
-    /// The climb is the one preset that turns the pet over rather than only
-    /// squashing it: a quarter turn onto the wall, and a mirror on each axis
-    /// so it climbs feet-first instead of head-first.
+    /// The climb is the one preset that puts the pet somewhere rather than
+    /// only wobbling it: a quarter turn onto the wall, and a mirror on each
+    /// axis so it climbs feet-first instead of head-first.
+    ///
+    /// On `stillPose`, not on the waddle. It is where the pet is held, not
+    /// something it does -- and while it lived in `transform` it vanished at
+    /// `intensity: 0`, so an avatar with the bounce turned off climbed the
+    /// wall upside down.
     func test_theClimbTurnsThePetOntoTheWall() {
-        let transform = preset.transform(elapsed: 0, intensity: 1)
+        let pose = preset.stillPose
 
-        XCTAssertTrue(transform.rotatesQuarterTurn)
-        XCTAssertLessThan(transform.scaleX, 0, "mirrored across")
-        XCTAssertLessThan(transform.scaleY, 0, "and over")
+        XCTAssertTrue(pose.rotatesQuarterTurn)
+        XCTAssertLessThan(pose.scaleX, 0, "mirrored across")
+        XCTAssertLessThan(pose.scaleY, 0, "and over")
+    }
+
+    /// Turning the wobble off is not asking to be put on the wall the wrong
+    /// way round.
+    func test_theClimbsPoseSurvivesTheBounceBeingTurnedOff() {
+        XCTAssertEqual(BouncePreset.climb.stillPose, BouncePreset.climb.stillPose)
+        XCTAssertTrue(BouncePreset.climb.stillPose.rotatesQuarterTurn)
+        XCTAssertEqual(preset.transform(elapsed: 0.3, intensity: 0), .identity, "and the wobble does stop")
+    }
+
+    /// Every other clip holds the pet the way it was drawn.
+    func test_noOtherPresetHoldsThePetDifferently() {
+        for other in [BouncePreset.none, .idle, .walk, .land, .pop, .kick, .wiggle, .spin] {
+            XCTAssertEqual(other.stillPose, .identity, "\(other)")
+        }
     }
 
     /// Every other preset must stay purely a scale transform.

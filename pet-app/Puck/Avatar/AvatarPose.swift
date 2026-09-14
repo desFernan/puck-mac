@@ -63,14 +63,16 @@ enum AvatarPose: String, CaseIterable, Codable {
         self == .onTheCeilingFacingRight || self == .onTheCeilingFacingLeft
     }
 
-    /// Whether the sprite is turned a quarter turn, which climbing is.
-    ///
-    /// Read from the clip's own preset rather than decided here, so the
-    /// preview turns the picture exactly when the pet does -- the two used to
-    /// each work it out and could disagree.
-    var rotatesQuarterTurn: Bool {
-        BouncePreset.preset(for: clip).transform(elapsed: 0, intensity: 1).rotatesQuarterTurn
+    /// How the clip itself holds the pet, before anything moves -- see
+    /// BouncePreset.stillPose. Read from the clip's own preset rather than
+    /// decided here, so the preview holds the picture exactly the way the pet
+    /// is held; the two used to each work it out and could disagree.
+    var stillPose: BounceTransform {
+        BouncePreset.preset(for: clip).stillPose
     }
+
+    /// Whether the sprite is turned a quarter turn, which climbing is.
+    var rotatesQuarterTurn: Bool { stillPose.rotatesQuarterTurn }
 }
 
 /// A correction applied on top of whatever the pose already does.
@@ -189,9 +191,14 @@ struct AvatarPoseOrientation: Equatable {
         let facingX: CGFloat = (pose?.facing == .left) ? -1 : 1
         let upsideDownY: CGFloat = (pose?.isUpsideDown ?? false) ? -1 : 1
         let quarterTurn: CGFloat = (pose?.rotatesQuarterTurn ?? false) ? .pi / 2 : 0
+        // How the clip holds the pet, which is part of the orientation and
+        // not of the motion: a climbing pet is mirrored on both axes so that
+        // its feet are against the wall rather than its head -- see
+        // BouncePreset.stillPose.
+        let still = pose?.stillPose ?? .identity
         return AvatarPoseOrientation(
-            scaleX: facingX * (isMirrored ? -1 : 1) * (adjustment.flipsHorizontally ? -1 : 1),
-            scaleY: upsideDownY * (adjustment.flipsVertically ? -1 : 1),
+            scaleX: CGFloat(still.scaleX) * facingX * (isMirrored ? -1 : 1) * (adjustment.flipsHorizontally ? -1 : 1),
+            scaleY: CGFloat(still.scaleY) * upsideDownY * (adjustment.flipsVertically ? -1 : 1),
             // The correction first, then the turn climbing puts on top of it:
             // the correction is fixing how the artwork was drawn, and the
             // turn is what the pet is doing with it.

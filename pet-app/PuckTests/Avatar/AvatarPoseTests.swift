@@ -256,13 +256,23 @@ final class AvatarPoseTests: XCTestCase {
     /// it instead. The settings window used to compose it the wrong way
     /// round.
     func testTheTurnIsComposedBeforeTheFlipsAndNotAfter() {
-        let climbingLeft = AvatarPoseOrientation.of(.climbingLeftWall, adjustment: .none, isMirrored: false)
-        XCTAssertEqual(climbingLeft.scaleX, -1, "a pet facing left is mirrored")
+        // Mirrored and turned at once, which is the only case the two orders
+        // disagree about. Stated as a correction rather than taken from a
+        // climbing pose, so this says what it is testing without depending on
+        // how any one clip happens to hold the pet.
+        var mirroredAndTurned = AvatarPoseAdjustment()
+        mirroredAndTurned.flipsHorizontally = true
+        mirroredAndTurned.rotate()
+        let orientation = AvatarPoseOrientation.of(
+            .walkingRight, adjustment: mirroredAndTurned, isMirrored: false
+        )
+        XCTAssertEqual(orientation.scaleX, -1)
+        XCTAssertEqual(orientation.rotation, .pi / 2, accuracy: 0.0001)
 
-        let corner = CGPoint(x: 10, y: 0).applying(climbingLeft.transform)
+        let corner = CGPoint(x: 10, y: 0).applying(orientation.transform)
         let theOtherWayRound = CGPoint(x: 10, y: 0).applying(
-            CGAffineTransform(scaleX: climbingLeft.scaleX, y: climbingLeft.scaleY)
-                .concatenating(CGAffineTransform(rotationAngle: climbingLeft.rotation))
+            CGAffineTransform(scaleX: orientation.scaleX, y: orientation.scaleY)
+                .concatenating(CGAffineTransform(rotationAngle: orientation.rotation))
         )
 
         XCTAssertEqual(corner.y, 10, accuracy: 0.0001)
@@ -301,6 +311,10 @@ final class AvatarPoseTests: XCTestCase {
         // Sideways on a wall, and opposite sides for the two of them.
         XCTAssertEqual(feet(.climbingRightWall).y, 0, accuracy: 0.0001)
         XCTAssertEqual(feet(.climbingLeftWall).x, -feet(.climbingRightWall).x, accuracy: 0.0001)
+        // And on the side the clip puts them: the climb holds the pet
+        // mirrored on both axes precisely so its feet reach the wall rather
+        // than its head -- see BouncePreset.stillPose.
+        XCTAssertEqual(feet(.climbingRightWall).x, 1, accuracy: 0.0001)
     }
 
     /// And a correction takes the feet with it: a character corrected to

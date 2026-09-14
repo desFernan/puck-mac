@@ -106,6 +106,29 @@ enum BouncePreset: Equatable {
 
     /// `elapsed`: seconds since the current clip started playing.
     /// `intensity`: the manifest's `bounce_intensity` (0...1, 0 = fully static).
+    /// How the clip holds the pet before anything moves.
+    ///
+    /// The climb is the one clip that puts the pet somewhere rather than
+    /// wobbling it: a quarter turn onto the wall and a mirror on each axis,
+    /// without which it climbs head-first. That is a *pose*, not motion, and
+    /// it used to be returned from `transform` along with the waddle -- which
+    /// made it disappear entirely at `intensity: 0`, so an avatar with the
+    /// bounce turned off climbed the wall upside down, and left the settings
+    /// window's own preview (which draws a still frame, and so had no bounce
+    /// to read it from) showing a pet turned 180 degrees from the real one.
+    ///
+    /// Separate now, and unaffected by intensity: turning the wobble off is
+    /// not the same as asking to be put on the wall the wrong way round.
+    var stillPose: BounceTransform {
+        switch self {
+        case .climb:
+            return BounceTransform(scaleX: -1, scaleY: -1, rotatesQuarterTurn: true)
+        case .none, .idle, .walk, .land, .pop, .kick, .wiggle, .spin:
+            return .identity
+        }
+    }
+
+    /// The moving part: what the clip does on top of `stillPose`.
     func transform(elapsed: TimeInterval, intensity: Double) -> BounceTransform {
         guard intensity > 0 else { return .identity }
 
@@ -185,16 +208,13 @@ enum BouncePreset: Equatable {
             let phase = sin(2 * .pi * elapsed / period)
             let lean = 8 * .pi / 180 * intensity
             let reach = 0.05 * intensity
+            // Which way round the pet is held on the wall is `stillPose`'s,
+            // not this -- see there for why. What is left here is the rock
+            // and the squash that rides on it.
             return BounceTransform(
-                // Turned over, both ways. The quarter turn alone lands the
-                // pet on the wall the wrong way round -- it went up head
-                // first -- and the two mirrors on top of it put its feet
-                // against the wall and its head toward the top of the
-                // screen, which is the way something climbing goes.
-                scaleX: -1,
-                scaleY: -(1 - reach * abs(phase)),
-                rotation: lean * phase,
-                rotatesQuarterTurn: true
+                scaleX: 1,
+                scaleY: 1 - reach * abs(phase),
+                rotation: lean * phase
             )
 
         case .spin:
