@@ -46,6 +46,11 @@ struct ChatInputBar: View {
     /// FileMention. Nil in a workspace with no project, where there is
     /// nothing to name.
     var projectRoot: String?
+    /// What the editor is showing, relative to the project. The file being
+    /// looked at is the one most likely to be talked about, and typing its
+    /// path while it is on screen beside the composer is work nobody should
+    /// have to do.
+    var openFilePath: String?
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
@@ -236,6 +241,7 @@ struct ChatInputBar: View {
     private var controlRow: some View {
         HStack(spacing: 6) {
             attachButton
+            if let openFilePath, !text.contains("@" + openFilePath) { mentionOpenFileButton(openFilePath) }
             Spacer(minLength: 0)
             // Model and effort as one control, the way the reference has it:
             // they are one question -- what should answer this -- and two
@@ -341,6 +347,35 @@ struct ChatInputBar: View {
         }
         .accessibilityLabel(Strings.text(.chatAttach))
         .help(Strings.text(.chatAttach))
+    }
+
+    /// Names the file the editor is on. Hidden once it has been named, so it
+    /// cannot be added twice and so the row goes quiet again once it has done
+    /// its job.
+    private func mentionOpenFileButton(_ path: String) -> some View {
+        let name = (path as NSString).lastPathComponent
+        return Button {
+            // Appended with its own separator rather than through the
+            // completion path: nothing is being completed here, and a half
+            // typed word elsewhere in the box is not this button's business.
+            let separator = text.isEmpty || text.hasSuffix(" ") || text.hasSuffix("\n") ? "" : " "
+            text += separator + "@" + path + " "
+            isFocused = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 10))
+                    .accessibilityHidden(true)
+                Text(name)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: Self.controlHeight)
+            .background(palette.surface, in: .rect(cornerRadius: ClientTheme.Metrics.rowCornerRadius))
+            .contentShape(.rect)
+        }
+        .accessibilityLabel(String(format: Strings.text(.chatMentionOpenFileFormat), name))
+        .help(String(format: Strings.text(.chatMentionOpenFileFormat), path))
     }
 
     private var stopButton: some View {

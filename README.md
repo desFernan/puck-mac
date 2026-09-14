@@ -24,8 +24,17 @@ A macOS desktop pet that is also an AI agent. Two Swift apps:
 Conversations are kept between launches. The agent can hold shells open that
 outlive the call that started them — a dev server, a watcher — and can be given
 something to run on a schedule ("every morning, check CI"), which runs while
-Puck is up. Before you keep what it changed, ⇧⌘R shows the diff file by file,
-and puts one back if you would rather it had not.
+Puck is up.
+
+While a turn runs you can watch its plan tick itself off, and anything you type
+waits for it to finish rather than interrupting it. `@` names a file out of the
+project so neither of you has to guess which one. A tool you are tired of
+approving can be allowed for good in that workspace, and taken back in settings.
+The agent reads the project's own `AGENTS.md` (or `CLAUDE.md`) before it works.
+
+When it is done, the run says how many files it changed and opens the diff on
+exactly those; ⇧⌘R asks the same question about the whole project. Either way a
+file can be put back the way it was.
 
 The two talk over a local socket bridge. The agent core (chat, tools,
 approvals, sessions) lives in `pet-app/Puck/Agent`.

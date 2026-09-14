@@ -183,7 +183,8 @@ struct ChatPaneView: View {
                 onCancel: { store.cancelActiveRun() },
                 isListening: store.isVoiceListening,
                 onVoiceListening: { store.setVoiceListening($0) },
-                projectRoot: activeWorkspace?.projectPath
+                projectRoot: activeWorkspace?.projectPath,
+                openFilePath: editorStore?.activeTabPath
             )
         }
     }

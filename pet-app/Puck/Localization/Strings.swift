@@ -251,6 +251,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// Typed while the agent was still working -- see
     /// ChatSession.queuedMessages.
     case queuedMessagesHeader, queuedMessageRemove, chatComposerQueuePlaceholder
+    /// Naming the file the editor is on, without typing its path -- see
+    /// FileMention.
+    case chatMentionOpenFileFormat
     /// Saying yes to a tool for good, in this project -- see ToolTrust.
     case chatApprovalAlwaysFormat, chatApprovalAlwaysHelp
     case trustedToolsHeader, trustedToolsExplanation, trustedToolsEmpty, trustedToolsRevokeAll
@@ -674,6 +677,7 @@ enum Strings {
         .planHeader: "계획",
         .queuedMessagesHeader: "이번 작업이 끝나면 보낼 말",
         .chatComposerQueuePlaceholder: "끝나면 보낼 말을 미리 적어둘 수 있어요",
+        .chatMentionOpenFileFormat: "%1$@ 붙이기",
         .queuedMessageRemove: "빼기",
         .chatApprovalAlwaysFormat: "%1$@는 항상 허용",
         .chatApprovalAlwaysHelp: "이 워크스페이스에서는 이 도구를 다시 묻지 않습니다. 설정에서 되돌릴 수 있어요.",
@@ -1100,6 +1104,7 @@ enum Strings {
         .planHeader: "Plan",
         .queuedMessagesHeader: "Sent when this finishes",
         .chatComposerQueuePlaceholder: "Type now, sent when this finishes",
+        .chatMentionOpenFileFormat: "Mention %1$@",
         .queuedMessageRemove: "Remove",
         .chatApprovalAlwaysFormat: "Always allow %1$@",
         .chatApprovalAlwaysHelp: "This workspace stops asking about this tool. Undo it in settings.",
