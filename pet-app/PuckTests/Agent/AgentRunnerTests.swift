@@ -959,4 +959,46 @@ final class AgentRunnerTests: XCTestCase {
             return pairs.map(\.1)
         }
     }
+
+    /// The project's own instructions reach the model with the line that
+    /// introduces the project, once per conversation -- see
+    /// ProjectInstructions.
+    func test_theProjectsInstructionsAreToldToTheModelOnce() async {
+        let client = RecordingLLMClient()
+        let runner = makeRunner(client: client)
+        runner.readProjectInstructions = { path in
+            path == "/tmp/project" ? "--- project instructions ---" : nil
+        }
+        let context = AgentRunner.WorkspaceContext(name: "p", projectPath: "/tmp/project")
+
+        await runner.run(command: "안녕", session: "s1", workspace: context)
+        await runner.run(command: "또 안녕", session: "s1", workspace: context)
+
+        XCTAssertEqual(
+            client.lastSystemTexts.filter { $0.contains("--- project instructions ---") }.count,
+            1,
+            "re-reading it every turn would spend the context window on something that has not changed"
+        )
+    }
+
+    /// A workspace with no project has no file to read, and must not be
+    /// asked for one.
+    func test_aChatOnlyWorkspaceIsNeverAskedForProjectInstructions() async {
+        let client = RecordingLLMClient()
+        let runner = makeRunner(client: client)
+        var asked: [String] = []
+        runner.readProjectInstructions = { path in
+            asked.append(path)
+            return "should not appear"
+        }
+
+        await runner.run(
+            command: "안녕",
+            session: "s1",
+            workspace: AgentRunner.WorkspaceContext(name: "잡담", projectPath: nil)
+        )
+
+        XCTAssertTrue(asked.isEmpty)
+        XCTAssertFalse(client.lastSystemTexts.contains { $0.contains("should not appear") })
+    }
 }

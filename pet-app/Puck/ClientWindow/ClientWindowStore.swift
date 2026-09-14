@@ -399,6 +399,36 @@ final class ClientWindowStore: ObservableObject {
         guard let session = session(workspaceId: workspaceId, sessionId: sessionId) else { return }
         session.apply(event)
         scheduleSave()
+        sendQueuedMessagesIfIdle(in: session, workspaceId: workspaceId, sessionId: sessionId)
+    }
+
+    /// Sends what was typed during the run that has just ended.
+    ///
+    /// Only once nothing is left running in that chat: a superseded turn ends
+    /// while its replacement is still going, and answering that one would
+    /// start a third on top of the second -- which is the collision the queue
+    /// exists to prevent.
+    ///
+    /// Addressed to the chat the run belonged to rather than to the active
+    /// one: a queue filled in a chat somebody has since navigated away from
+    /// is still that chat's.
+    private func sendQueuedMessagesIfIdle(in session: ChatSession, workspaceId: String, sessionId: String) {
+        guard !session.isRunning, let text = session.takeQueuedMessages() else { return }
+        session.appendUserMessage(text)
+        scheduleSave()
+        if let onUserCommand {
+            onUserCommand(text, workspaceId, sessionId)
+            session.markWaitingForAgent()
+            return
+        }
+        let delivery = sender.send(
+            text: text,
+            source: .text,
+            workspaceId: workspaceId,
+            sessionId: sessionId,
+            attachments: nil
+        )
+        if delivery == .sent { session.markWaitingForAgent() }
     }
 
     @discardableResult
@@ -473,6 +503,14 @@ final class ClientWindowStore: ObservableObject {
     @discardableResult
     func sendMessage(_ text: String, source: UserInput.Source, attachments: [Attachment]? = nil) -> UserInputDelivery {
         let target = session(workspaceId: activeWorkspaceId, sessionId: activeSessionId)
+        // A turn is already running: hold this until it is over rather than
+        // starting a second one on top of it -- see ChatSession.queuedMessages.
+        // A slash command is the exception, because it is answered here and
+        // never reaches the agent, so there is no turn for it to collide with.
+        if target?.isRunning == true, SlashCommand.parse(text) == nil {
+            target?.enqueue(Self.message(text, carrying: attachments ?? []))
+            return .sent
+        }
         // A command changes a setting and is answered here; it never reaches
         // the agent. Echoed first so the transcript reads as a conversation
         // rather than an answer to nothing.

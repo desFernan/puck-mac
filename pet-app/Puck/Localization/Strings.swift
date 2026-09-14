@@ -248,6 +248,9 @@ enum L10nKey: String, CaseIterable, Hashable {
     /// button take the version as `%1$@`.
     /// The agent's own plan, shown in the transcript -- see PlanRow.
     case planHeader
+    /// Typed while the agent was still working -- see
+    /// ChatSession.queuedMessages.
+    case queuedMessagesHeader, queuedMessageRemove, chatComposerQueuePlaceholder
     /// Saying yes to a tool for good, in this project -- see ToolTrust.
     case chatApprovalAlwaysFormat, chatApprovalAlwaysHelp
     case trustedToolsHeader, trustedToolsExplanation, trustedToolsEmpty, trustedToolsRevokeAll
@@ -669,6 +672,9 @@ enum Strings {
         .scheduleAtLabel: "시각",
         .scheduleDaysLabel: "요일",
         .planHeader: "계획",
+        .queuedMessagesHeader: "이번 작업이 끝나면 보낼 말",
+        .chatComposerQueuePlaceholder: "끝나면 보낼 말을 미리 적어둘 수 있어요",
+        .queuedMessageRemove: "빼기",
         .chatApprovalAlwaysFormat: "%1$@는 항상 허용",
         .chatApprovalAlwaysHelp: "이 워크스페이스에서는 이 도구를 다시 묻지 않습니다. 설정에서 되돌릴 수 있어요.",
         .trustedToolsHeader: "묻지 않기로 한 도구",
@@ -1092,6 +1098,9 @@ enum Strings {
         .scheduleAtLabel: "At",
         .scheduleDaysLabel: "Days",
         .planHeader: "Plan",
+        .queuedMessagesHeader: "Sent when this finishes",
+        .chatComposerQueuePlaceholder: "Type now, sent when this finishes",
+        .queuedMessageRemove: "Remove",
         .chatApprovalAlwaysFormat: "Always allow %1$@",
         .chatApprovalAlwaysHelp: "This workspace stops asking about this tool. Undo it in settings.",
         .trustedToolsHeader: "Tools that stopped asking",

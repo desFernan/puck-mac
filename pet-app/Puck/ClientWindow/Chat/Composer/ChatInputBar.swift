@@ -156,7 +156,15 @@ struct ChatInputBar: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: 6) {
             if !attachments.isEmpty { attachmentRow }
-            TextField(Strings.text(.chatComposerPlaceholder), text: $text, axis: .vertical)
+            // The box says what Return will do. While a turn is running it
+            // queues rather than sends -- see ChatSession.queuedMessages --
+            // and a placeholder that went on promising to send would make
+            // that read as a message that went missing.
+            TextField(
+                Strings.text(isRunning ? .chatComposerQueuePlaceholder : .chatComposerPlaceholder),
+                text: $text,
+                axis: .vertical
+            )
                 .textFieldStyle(.plain)
                 .font(ClientTheme.Typography.transcriptBody)
                 // Three lines' worth of room before anything is typed, so the

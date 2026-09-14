@@ -168,6 +168,13 @@ struct ChatPaneView: View {
             )
             // No rule above the composer: the box already has an edge of its
             // own, and a full-width line over it cut the window in two.
+            if !session.queuedMessages.isEmpty {
+                QueuedMessagesView(messages: session.queuedMessages) { index in
+                    session.removeQueuedMessage(at: index)
+                }
+                .frame(maxWidth: ClientTheme.Metrics.transcriptColumnWidth)
+                .padding(.horizontal, ClientTheme.Metrics.transcriptHorizontalPadding)
+            }
             ChatInputBar(
                 isRunning: session.isRunning,
                 onSend: { text, attachments in

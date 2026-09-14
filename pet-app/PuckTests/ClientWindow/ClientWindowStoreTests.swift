@@ -711,4 +711,89 @@ final class ClientWindowStoreTests: XCTestCase {
 
         XCTAssertEqual(remembered, 0)
     }
+
+    // MARK: - Typing while the agent is working
+
+    /// It used to start a second turn, which cancelled the first: the agent
+    /// was interrupted mid-edit and the half-applied work was left with
+    /// nothing saying so.
+    func test_aMessageTypedDuringARunWaitsRatherThanStartingASecondOne() {
+        let (store, _) = makeStore()
+        var started: [String] = []
+        store.onUserCommand = { text, _, _ in started.append(text) }
+        store.sendMessage("고쳐줘", source: .text)
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+
+        store.sendMessage("아 그리고 테스트도", source: .text)
+
+        XCTAssertEqual(started, ["고쳐줘"], "the second one did not start a turn")
+        XCTAssertEqual(session.queuedMessages, ["아 그리고 테스트도"])
+    }
+
+    /// And goes the moment the run is over.
+    func test_whatWasQueuedIsSentWhenTheRunEnds() {
+        let (store, _) = makeStore()
+        var started: [String] = []
+        store.onUserCommand = { text, _, _ in started.append(text) }
+        store.sendMessage("고쳐줘", source: .text)
+        store.sendMessage("아 그리고 테스트도", source: .text)
+
+        store.handleChatEvent(.agentDone(ok: true, summary: "끝"), workspaceId: "default", sessionId: "default")
+
+        XCTAssertEqual(started, ["고쳐줘", "아 그리고 테스트도"])
+        XCTAssertTrue(store.session(workspaceId: "default", sessionId: "default")?.queuedMessages.isEmpty == true)
+    }
+
+    /// Two messages during one run are two halves of one instruction far more
+    /// often than two errands, and sending them separately would make the
+    /// second interrupt the turn the first just started.
+    func test_severalQueuedMessagesGoAsOne() {
+        let (store, _) = makeStore()
+        var started: [String] = []
+        store.onUserCommand = { text, _, _ in started.append(text) }
+        store.sendMessage("고쳐줘", source: .text)
+        store.sendMessage("테스트도", source: .text)
+        store.sendMessage("커밋은 하지마", source: .text)
+
+        store.handleChatEvent(.agentDone(ok: true, summary: "끝"), workspaceId: "default", sessionId: "default")
+
+        XCTAssertEqual(started.count, 2)
+        XCTAssertEqual(started.last, "테스트도\n\n커밋은 하지마")
+    }
+
+    /// A slash command is answered here and never reaches the agent, so there
+    /// is no turn for it to collide with -- waiting for one would make
+    /// /permissions unusable exactly when it is wanted.
+    func test_aSlashCommandDuringARunIsAnsweredRatherThanQueued() {
+        let (store, _) = makeStore()
+        store.onUserCommand = { _, _, _ in }
+        store.sendMessage("고쳐줘", source: .text)
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+
+        store.sendMessage("/help", source: .text)
+
+        XCTAssertTrue(session.queuedMessages.isEmpty)
+        XCTAssertTrue(session.timeline.contains { if case .notice = $0 { return true } else { return false } })
+    }
+
+    /// Realising the first message was wrong is the usual reason for a
+    /// second one; a queue you can only add to is one people work around by
+    /// cancelling the run.
+    func test_aQueuedMessageCanBeTakenBack() {
+        let (store, _) = makeStore()
+        store.onUserCommand = { _, _, _ in }
+        store.sendMessage("고쳐줘", source: .text)
+        guard let session = store.session(workspaceId: "default", sessionId: "default") else {
+            return XCTFail("the default session is seeded at init")
+        }
+        store.sendMessage("아니 취소", source: .text)
+
+        session.removeQueuedMessage(at: 0)
+
+        XCTAssertTrue(session.queuedMessages.isEmpty)
+    }
 }

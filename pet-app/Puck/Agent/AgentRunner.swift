@@ -291,6 +291,12 @@ final class AgentRunner {
         }
     }
 
+    /// Reads the project's own instructions -- see ProjectInstructions.
+    /// Injected so a run can be tested without a repository on disk.
+    var readProjectInstructions: (String) -> String? = { path in
+        ProjectInstructions.promptSection(for: path)
+    }
+
     /// Set by the host before each run. Kept as a property rather than a `run`
     /// parameter so the many existing call sites and tests stay untouched.
     var workspaceContext: WorkspaceContext? {
@@ -325,6 +331,16 @@ final class AgentRunner {
         let context = workspace ?? workspaceContext
         if let context, markAnnounced(context, to: key) {
             append(.system(context.promptLine), to: key)
+            // Once per conversation, with the line that introduces the
+            // project -- the same moment, because both are answers to "where
+            // am I working", and re-reading the file every turn would spend
+            // the context window on something that has not changed. A file
+            // edited mid-conversation is picked up by the next chat, which is
+            // the same bargain the coding CLI makes.
+            if let projectPath = context.projectPath,
+               let instructions = readProjectInstructions(projectPath) {
+                append(.system(instructions), to: key)
+            }
         }
         append(.user(command), to: key)
         trimConversation(key)

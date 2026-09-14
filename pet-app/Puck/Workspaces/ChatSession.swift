@@ -142,6 +142,20 @@ final class ChatSession: ObservableObject, Identifiable {
     /// The request the approval buttons answer, or nil when none is waiting.
     var pendingApproval: PendingApproval? { pendingApprovals.first }
 
+    /// What was typed while the agent was still working, waiting for it to
+    /// finish.
+    ///
+    /// Typing while a turn runs used to start a second turn, which cancelled
+    /// the first: the agent was interrupted mid-edit, and the work it had
+    /// done so far was left half-applied with nothing saying so. Waiting is
+    /// almost always what was meant -- "아 그리고 테스트도 돌려줘" is a thing
+    /// to do next, not instead.
+    ///
+    /// Not written to disk with the rest of the chat. These are things to say
+    /// to a run that is happening now; a run does not survive the app being
+    /// quit, and neither should the queue waiting on it.
+    @Published private(set) var queuedMessages: [String] = []
+
     /// When this session last saw any agent event. Drives the sidebar's relative
     /// time (see RelativeTime) -- nothing else in the app tracked time before v3.
     @Published private(set) var lastActivityAt: Date?
@@ -366,6 +380,33 @@ final class ChatSession: ObservableObject, Identifiable {
     func markWaitingForAgent() {
         runsInFlight += 1
         isRunning = true
+    }
+
+    /// Holds a message until the run in flight is over.
+    func enqueue(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        queuedMessages.append(trimmed)
+    }
+
+    func removeQueuedMessage(at index: Int) {
+        guard queuedMessages.indices.contains(index) else { return }
+        queuedMessages.remove(at: index)
+    }
+
+    /// Everything waiting, as the one message to send now, and empties the
+    /// queue.
+    ///
+    /// Joined rather than sent one at a time: two messages typed during the
+    /// same run are two halves of one instruction far more often than they
+    /// are two separate errands, and sending them separately would make the
+    /// second interrupt the turn the first just started -- which is the
+    /// behaviour the queue exists to remove.
+    func takeQueuedMessages() -> String? {
+        guard !queuedMessages.isEmpty else { return nil }
+        let joined = queuedMessages.joined(separator: "\n\n")
+        queuedMessages.removeAll()
+        return joined
     }
 
     /// A run this chat never saw start -- the first thing heard from it is
