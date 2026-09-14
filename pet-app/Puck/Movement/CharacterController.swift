@@ -198,7 +198,10 @@ final class CharacterController {
     private func enterCurrentState() {
         stateElapsedTime = 0
         if !currentState.preservesUpsideDown {
-            body.isUpsideDown = false
+            // Through the body's own conversion, not by clearing the flag:
+            // the anchor means something different either side of it -- see
+            // CharacterBody.turnRightSideUp.
+            body.turnRightSideUp(drawnHeight: avatarHeight)
         }
         body.play(clip: currentState.clipKey, loop: currentState.loopsClip)
         // Use soundKey (defaults to clipKey, e.g. "walk"), not name (e.g. "Walk")

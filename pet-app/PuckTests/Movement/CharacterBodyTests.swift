@@ -101,4 +101,48 @@ final class CharacterBodyTests: XCTestCase {
 
         XCTAssertEqual(avatar.playedClips, ["walk"])
     }
+
+    // MARK: - Coming off the ceiling
+
+    /// `position` means the point the pet hangs *from* while it is upside
+    /// down and the point it stands *on* the rest of the time. Clearing the
+    /// flag on its own therefore moved the drawing a full height up the
+    /// screen: grabbing a pet off the ceiling threw it off the top, and it
+    /// only came back because the fall that followed landed it somewhere
+    /// real.
+    func test_turningRightSideUp_keepsTheDrawingWhereItWas() {
+        let body = CharacterBody(avatar: SpyAvatar(), position: CGPoint(x: 100, y: 0))
+        body.isUpsideDown = true
+
+        body.turnRightSideUp(drawnHeight: 260)
+
+        XCTAssertFalse(body.isUpsideDown)
+        // Hanging from y=0 the pet filled 0...260; standing, the same
+        // rectangle is described by its feet at 260.
+        XCTAssertEqual(body.position, CGPoint(x: 100, y: 260))
+    }
+
+    /// A pet that was already the right way up is not moved. Fall calls this
+    /// on every frame of a fall, and a conversion that ran each time would
+    /// walk the pet down the screen a height at a time.
+    func test_turningRightSideUp_whenAlreadyUpright_movesNothing() {
+        let body = CharacterBody(avatar: SpyAvatar(), position: CGPoint(x: 100, y: 500))
+
+        body.turnRightSideUp(drawnHeight: 260)
+        body.turnRightSideUp(drawnHeight: 260)
+
+        XCTAssertEqual(body.position, CGPoint(x: 100, y: 500))
+    }
+
+    /// And the flip still reaches the renderer, since the drawing has to turn
+    /// over as well as stay put.
+    func test_turningRightSideUp_tellsTheAvatar() {
+        let avatar = SpyAvatar()
+        let body = CharacterBody(avatar: avatar, position: .zero)
+        body.isUpsideDown = true
+
+        body.turnRightSideUp(drawnHeight: 260)
+
+        XCTAssertEqual(avatar.upsideDownCalls, [true, false])
+    }
 }

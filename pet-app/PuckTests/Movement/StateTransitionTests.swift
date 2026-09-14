@@ -74,15 +74,23 @@ private final class SpyState: StateHandler {
     let clipKey: String
     let loopsClip: Bool
     let restartsOnReentry: Bool
+    let preservesUpsideDown: Bool
     private(set) var enterCallCount = 0
     private(set) var exitCallCount = 0
     private(set) var lastUpdateDt: TimeInterval?
 
-    init(name: String, clipKey: String, loopsClip: Bool = false, restartsOnReentry: Bool = false) {
+    init(
+        name: String,
+        clipKey: String,
+        loopsClip: Bool = false,
+        restartsOnReentry: Bool = false,
+        preservesUpsideDown: Bool = false
+    ) {
         self.name = name
         self.clipKey = clipKey
         self.loopsClip = loopsClip
         self.restartsOnReentry = restartsOnReentry
+        self.preservesUpsideDown = preservesUpsideDown
     }
 
     func enter() { enterCallCount += 1 }
@@ -336,5 +344,38 @@ final class StateTransitionTests: XCTestCase {
         controller.transition(to: walk)
 
         XCTAssertTrue(controller.currentState === walk)
+    }
+
+    /// Grabbing a pet off the ceiling used to throw it off the top of the
+    /// screen: entering a state that does not hang cleared the flag, and the
+    /// anchor the pet hung from was read as the point it stood on -- a full
+    /// height higher. It came back only because the fall afterwards landed it
+    /// somewhere real.
+    func test_leavingTheCeiling_turnsThePetOverWithoutMovingTheDrawing() {
+        let avatar = SpyAvatarPlayable()
+        let ceiling = SpyState(name: "Ceiling", clipKey: "walk", preservesUpsideDown: true)
+        let dragged = SpyState(name: "ReactDrag", clipKey: "react_drag")
+        let body = CharacterBody(avatar: avatar, position: CGPoint(x: 100, y: 0))
+        let controller = CharacterController(initialState: ceiling, body: body, sfxPlayer: SpySFXTriggering())
+        controller.avatarHeight = 260
+        body.isUpsideDown = true
+
+        controller.transition(to: dragged)
+
+        XCTAssertFalse(body.isUpsideDown)
+        XCTAssertEqual(body.position, CGPoint(x: 100, y: 260))
+    }
+
+    /// A state change that never involved the ceiling moves nothing.
+    func test_anOrdinaryTransitionDoesNotMoveThePet() {
+        let ceiling = SpyState(name: "Idle", clipKey: "idle")
+        let walk = SpyState(name: "Walk", clipKey: "walk")
+        let body = CharacterBody(avatar: SpyAvatarPlayable(), position: CGPoint(x: 100, y: 500))
+        let controller = CharacterController(initialState: ceiling, body: body, sfxPlayer: SpySFXTriggering())
+        controller.avatarHeight = 260
+
+        controller.transition(to: walk)
+
+        XCTAssertEqual(body.position, CGPoint(x: 100, y: 500))
     }
 }

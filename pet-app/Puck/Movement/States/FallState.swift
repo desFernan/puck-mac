@@ -61,8 +61,11 @@ final class FallState: StateHandler {
         // A fall off the ceiling must land right-side up regardless of which
         // state preceded it (CeilingState is the only one that sets this, but
         // Fall shouldn't need to know that -- it just always restores normal
-        // orientation before landing).
-        context.body.isUpsideDown = false
+        // orientation before landing). Entering this state has normally done
+        // it already; this is the belt to that braces, and it goes through
+        // the same conversion so a pet that arrives here still hanging starts
+        // its fall from where it hung rather than a height above it.
+        context.body.turnRightSideUp(drawnHeight: context.avatarHeight)
 
         // Sideways first, so the landing surface is looked up under where the
         // pet is about to be rather than where it was -- thrown across the

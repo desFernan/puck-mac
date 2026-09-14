@@ -51,6 +51,30 @@ final class CharacterBody {
     /// and only Fall does anything with acceleration.
     var launchVelocity: CGPoint = .zero
 
+    /// Turns the pet back the right way up without moving the drawing.
+    ///
+    /// `position` means two different things either side of the flip. Hanging,
+    /// it is the point the pet hangs *from* -- the ceiling line, with the body
+    /// below it. Standing, it is the point the pet stands *on*, with the body
+    /// above it. So clearing the flag on its own teleports the drawing a full
+    /// height upward: grabbing a pet off the ceiling threw it off the top of
+    /// the screen, and it only came back because the fall that followed
+    /// landed it somewhere real.
+    ///
+    /// Moving the anchor down by the drawn height is the same rectangle said
+    /// the other way round, so the flip reads as the pet turning over where it
+    /// hangs -- which is what ClimbToCeilingState already does going the other
+    /// way, stopping its climb a height short of the ceiling for exactly this
+    /// reason.
+    ///
+    /// - Parameter drawnHeight: the rendered height -- CharacterController's
+    ///   `avatarHeight`, which is the sprite layer's own box.
+    func turnRightSideUp(drawnHeight: CGFloat) {
+        guard isUpsideDown else { return }
+        position.y += drawnHeight
+        isUpsideDown = false
+    }
+
     /// F3 ceiling-crawling (2026-07-29): true while CeilingState/ClimbToCeilingState
     /// own the character. Same no-op-on-unchanged guard as facing.
     var isUpsideDown: Bool = false {
