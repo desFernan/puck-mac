@@ -42,6 +42,10 @@ struct ChatInputBar: View {
     /// Asks pet-app to hold its push-to-talk down or let it up. The chat
     /// window has no microphone; see BridgeMessage.voiceListen.
     var onVoiceListening: ((Bool) -> Void)?
+    /// The project this chat is about, for naming files in it with `@` -- see
+    /// FileMention. Nil in a workspace with no project, where there is
+    /// nothing to name.
+    var projectRoot: String?
 
     @State private var text = ""
     @State private var attachments: [Attachment] = []
@@ -55,6 +59,13 @@ struct ChatInputBar: View {
     /// what the control says rather than which CLI is answering.
     @State private var permissions = AgentConfiguration.permissionMode()
     @FocusState private var isFocused: Bool
+    /// Every file in the project, for `@`. Built when a mention starts rather
+    /// than when the window opens: most messages name no files, and walking a
+    /// project nobody asked about is work for nothing.
+    @State private var fileIndex: ProjectFileIndex?
+    /// Which root the index above was built for, so switching workspaces
+    /// cannot offer the last project's files.
+    @State private var indexedRoot: String?
 
     /// The height of the controls along the bottom of the box, and of the
     /// stop button. Everything here is a hit target at arm's length rather
@@ -69,6 +80,12 @@ struct ChatInputBar: View {
             if !suggestions.isEmpty {
                 SlashSuggestionList(suggestions: suggestions) { suggestion in
                     text = suggestion.completion
+                    isFocused = true
+                }
+            }
+            if !fileSuggestions.isEmpty {
+                FileSuggestionList(paths: fileSuggestions) { path in
+                    text = FileMention.completing(text, with: path)
                     isFocused = true
                 }
             }
@@ -102,6 +119,40 @@ struct ChatInputBar: View {
         SlashCommand.suggestions(for: text)
     }
 
+    /// Offered while a file is being named -- see FileMention.
+    private var fileSuggestions: [String] {
+        guard let query = FileMention.activeQuery(in: text), let fileIndex else { return [] }
+        return fileIndex.suggestions(for: query)
+    }
+
+    /// Builds the index the first time a mention is typed in this project,
+    /// and again when the project changes. Off the main thread: a large tree
+    /// is a walk of the disk, and the composer is being typed into.
+    private func indexProjectIfNeeded() {
+        guard let projectRoot, FileMention.activeQuery(in: text) != nil else { return }
+        guard indexedRoot != projectRoot else { return }
+        indexedRoot = projectRoot
+        let root = URL(fileURLWithPath: projectRoot, isDirectory: true)
+        Task.detached(priority: .userInitiated) {
+            let index = ProjectFileIndex.build(root: root)
+            await MainActor.run {
+                // Still the same project: a workspace switched while the walk
+                // was running would otherwise land the old one's files.
+                guard indexedRoot == root.path else { return }
+                fileIndex = index
+            }
+        }
+    }
+
+    /// Completes the file being named with the first suggestion. Tab rather
+    /// than Return, which sends: the two are different intentions and the
+    /// hand is already committed by the time either lands.
+    private func completeFileMention() -> KeyPress.Result {
+        guard let first = fileSuggestions.first else { return .ignored }
+        text = FileMention.completing(text, with: first)
+        return .handled
+    }
+
     private var composer: some View {
         VStack(alignment: .leading, spacing: 6) {
             if !attachments.isEmpty { attachmentRow }
@@ -117,6 +168,15 @@ struct ChatInputBar: View {
                 // the point: the arrow was a control the eye had to find for
                 // something the hand was already doing.
                 .onSubmit(send)
+                .onKeyPress(.tab) { completeFileMention() }
+                .onChange(of: text) { _, _ in indexProjectIfNeeded() }
+                .onChange(of: projectRoot) { _, _ in
+                    // The old project's files are not this project's. Dropped
+                    // rather than rebuilt: the next `@` builds the right one,
+                    // and most workspace switches are not followed by one.
+                    fileIndex = nil
+                    indexedRoot = nil
+                }
             controlRow
         }
         .padding(.horizontal, 14)
@@ -359,6 +419,55 @@ struct SlashSuggestionList: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(palette.surface)
+        .clipShape(.rect(cornerRadius: ClientTheme.Metrics.cardCornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: ClientTheme.Metrics.cardCornerRadius)
+                .strokeBorder(palette.surfaceBorder, lineWidth: 1)
+        }
+    }
+}
+
+/// The files a mention could mean.
+///
+/// The same shape as the slash list above it and for the same reasons: above
+/// the field because the field is at the bottom of the window, and a plain
+/// list rather than a popover because a popover over a window that is mostly
+/// conversation hides the thing being talked about.
+struct FileSuggestionList: View {
+    @Environment(\.clientPalette) private var palette
+
+    let paths: [String]
+    let onPick: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(paths, id: \.self) { path in
+                Button {
+                    onPick(path)
+                } label: {
+                    HStack(spacing: 8) {
+                        // The name first and the rest of the path after it:
+                        // the name is what was typed, and a column of paths
+                        // aligned on their common prefix is a column nobody
+                        // can scan.
+                        Text((path as NSString).lastPathComponent)
+                            .font(ClientTheme.Typography.mono)
+                            .foregroundStyle(palette.textPrimary)
+                        Text((path as NSString).deletingLastPathComponent)
+                            .font(ClientTheme.Typography.sessionTitle)
+                            .foregroundStyle(palette.textSecondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)

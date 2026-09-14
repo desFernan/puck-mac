@@ -627,4 +627,40 @@ final class ChatSessionTests: XCTestCase {
 
         XCTAssertEqual(session.spokenHistory.map(\.text), ["고쳐줘"])
     }
+
+    // MARK: - What a run changed
+
+    /// The reply says what the agent thinks it did; this says what actually
+    /// moved on disk, and the two are the same often enough that nobody
+    /// checks.
+    func test_aRunThatChangedFilesLeavesAWayIntoTheReview() {
+        let session = makeSession()
+
+        session.apply(.filesChanged(paths: ["a.swift", "b.swift"]))
+
+        guard case .changedFiles(_, let paths)? = session.timeline.last else {
+            return XCTFail("expected the changed-files row, got \(session.timeline)")
+        }
+        XCTAssertEqual(paths, ["a.swift", "b.swift"])
+    }
+
+    /// Most runs change nothing, and a row saying "0개 파일" is a row in the
+    /// way.
+    func test_aRunThatChangedNothingLeavesNoRow() {
+        let session = makeSession()
+
+        session.apply(.filesChanged(paths: []))
+
+        XCTAssertTrue(session.timeline.isEmpty)
+    }
+
+    /// It is a fact about the project, not something said in the chat.
+    func test_whatChangedIsNotPartOfWhatWasSaid() {
+        let session = makeSession()
+        session.appendUserMessage("고쳐줘")
+
+        session.apply(.filesChanged(paths: ["a.swift"]))
+
+        XCTAssertEqual(session.spokenHistory.map(\.text), ["고쳐줘"])
+    }
 }

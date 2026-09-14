@@ -241,4 +241,20 @@ final class ChatArchiveTests: XCTestCase {
         XCTAssertEqual(plan.steps.map(\.text), ["하나", "둘"])
         XCTAssertEqual(plan.steps.map(\.status), [.completed, .inProgress])
     }
+
+    /// The changes outlive the restart, so the way into reviewing them has
+    /// to as well.
+    func test_theWayIntoTheReviewComesBackWithTheTranscript() throws {
+        let archive = ChatArchive(storageURL: storageURL)
+        let session = ChatSession(id: "s1", workspaceId: "w1", title: "t", origin: .agent)
+        session.apply(.filesChanged(paths: ["a.swift", "b.swift"]))
+        archive.save([session], knownWorkspaceIds: ["w1"])
+
+        let restored = try XCTUnwrap(archive.load().first)
+
+        guard case .changedFiles(_, let paths)? = restored.timeline.first else {
+            return XCTFail("expected the changed-files row, got \(restored.timeline)")
+        }
+        XCTAssertEqual(paths, ["a.swift", "b.swift"])
+    }
 }

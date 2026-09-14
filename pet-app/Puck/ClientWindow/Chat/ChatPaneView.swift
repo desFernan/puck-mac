@@ -54,6 +54,10 @@ struct ChatPaneView: View {
     /// Whether the change review is up -- see ChangeReviewView. Held here
     /// because the button that opens it is in this view's toolbar.
     @State private var isReviewShowing = false
+    /// Which files the review opens onto, when it was opened from a run's own
+    /// row rather than from the toolbar. Empty means everything, which is
+    /// what the toolbar button asks for.
+    @State private var reviewFocus: [String] = []
 
     var body: some View {
         NavigationSplitView {
@@ -88,7 +92,7 @@ struct ChatPaneView: View {
             .navigationSubtitle(activeWorkspace?.displayName ?? "")
             .toolbar { toolbarContent }
             .sheet(isPresented: $isReviewShowing) {
-                ChangeReviewView(projectPath: activeWorkspace?.projectPath)
+                ChangeReviewView(projectPath: activeWorkspace?.projectPath, focus: reviewFocus)
                     .environment(\.clientPalette, palette)
             }
         } else {
@@ -154,9 +158,14 @@ struct ChatPaneView: View {
 
     private func chatStack(_ session: ChatSession) -> some View {
         VStack(spacing: 0) {
-            ChatTranscriptView(session: session) { answer in
-                store.respondToPendingApproval(in: session, answer: answer)
-            }
+            ChatTranscriptView(
+                session: session,
+                onApproval: { answer in store.respondToPendingApproval(in: session, answer: answer) },
+                onReviewChanges: { paths in
+                    reviewFocus = paths
+                    isReviewShowing = true
+                }
+            )
             // No rule above the composer: the box already has an edge of its
             // own, and a full-width line over it cut the window in two.
             ChatInputBar(
@@ -166,7 +175,8 @@ struct ChatPaneView: View {
                 },
                 onCancel: { store.cancelActiveRun() },
                 isListening: store.isVoiceListening,
-                onVoiceListening: { store.setVoiceListening($0) }
+                onVoiceListening: { store.setVoiceListening($0) },
+                projectRoot: activeWorkspace?.projectPath
             )
         }
     }
@@ -248,6 +258,8 @@ struct ChatPaneView: View {
         if activeWorkspace?.canOpenEditor == true {
             ToolbarItem {
                 Button {
+                    // The toolbar asks about the project, not about one run.
+                    reviewFocus = []
                     isReviewShowing = true
                 } label: {
                     Label(Strings.text(.reviewTitle), systemImage: "plusminus")

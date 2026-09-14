@@ -128,4 +128,23 @@ final class AcpPlanMappingTests: XCTestCase {
 
         XCTAssertEqual(decoded, message)
     }
+
+    /// The list of what changed crosses the socket like everything else.
+    func test_whatChangedSurvivesTheWire() throws {
+        let message = BridgeMessage.event(
+            .filesChanged(paths: ["a.swift", "b/c.swift"]),
+            workspaceId: "w1",
+            sessionId: "s1"
+        )
+
+        let decoded = try JSONDecoder().decode(BridgeMessage.self, from: JSONEncoder().encode(message))
+
+        XCTAssertEqual(decoded, message)
+    }
+
+    /// The run it belongs to has already ended; agent_done is what the pet
+    /// reacts to.
+    func test_thePetDoesNotReactToWhatChanged() {
+        XCTAssertEqual(EventRouter.reaction(for: .filesChanged(paths: ["a.swift"])), EventReaction())
+    }
 }

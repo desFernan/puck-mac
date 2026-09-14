@@ -202,6 +202,11 @@ enum EventRouter {
                     runFinished: true
                 )
 
+        case .filesChanged:
+            // Nothing for the pet: the run it belongs to has already ended,
+            // and agent_done is what the pet reacts to.
+            return EventReaction()
+
         case .planUpdated:
             // Nothing for the pet. The plan is a checklist to read, and a
             // pet that announced every step of it would be talking over the

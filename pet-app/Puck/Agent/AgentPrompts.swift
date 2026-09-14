@@ -286,6 +286,9 @@ extension AgentRunner {
     - If you have show_code, use it when the user asks you to explain, review or walk through \
       code: one call per place worth looking at, then your explanation of that place. Reading a \
       file to answer a plain question does not need it.
+    - A word beginning with @ is a file the user picked out of this project by name, written \
+      relative to the project root -- they chose it deliberately, so read it before guessing at \
+      anything it might answer. It is a path, not a username.
     - When a tool fails with permission_denied, tell the user which permission to grant in System \
       Settings. When it fails with pet_app_disconnected, tell them the pet app isn't running.
     - Never claim you did something a tool did not actually report success for.

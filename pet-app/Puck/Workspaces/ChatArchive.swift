@@ -64,6 +64,7 @@ struct StoredChatEntry: Codable, Equatable {
         case approvalRequested
         case done
         case plan
+        case changedFiles
     }
 
     let kind: Kind
@@ -81,6 +82,9 @@ struct StoredChatEntry: Codable, Equatable {
     /// The agent's plan, for the one row that carries one. Kept whole: it is
     /// a handful of short strings, and half a checklist is worse than none.
     var plan: AgentPlan?
+    /// What an editing run changed. Kept so the way into the review survives
+    /// a restart: the changes themselves certainly do.
+    var paths: [String]?
 }
 
 /// Reads and writes the window's chats.
@@ -178,6 +182,9 @@ final class ChatArchive {
         case .plan:
             guard let plan = stored.plan, let id = UUID(uuidString: stored.id) else { return nil }
             return .plan(id: id, plan: plan)
+        case .changedFiles:
+            guard let paths = stored.paths, let id = UUID(uuidString: stored.id) else { return nil }
+            return .changedFiles(id: id, paths: paths)
         }
     }
 
@@ -245,6 +252,8 @@ final class ChatArchive {
             return StoredChatEntry(kind: .done, id: id.uuidString, ok: ok, summary: summary)
         case .plan(let id, let plan):
             return StoredChatEntry(kind: .plan, id: id.uuidString, plan: plan)
+        case .changedFiles(let id, let paths):
+            return StoredChatEntry(kind: .changedFiles, id: id.uuidString, paths: paths)
         }
     }
 

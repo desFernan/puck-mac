@@ -22,6 +22,9 @@ struct ChatTranscriptView: View {
 
     @ObservedObject var session: ChatSession
     let onApproval: (ApprovalAnswer) -> Void
+    /// Opens the review on what one run changed -- see ChangeReviewView. Nil
+    /// where there is nothing to open it in.
+    var onReviewChanges: (([String]) -> Void)?
 
     var body: some View {
         if session.timeline.isEmpty && !session.isRunning {
@@ -124,6 +127,9 @@ struct ChatTranscriptView: View {
 
         case .plan(_, let plan):
             PlanRow(plan: plan)
+
+        case .changedFiles(_, let paths):
+            ChangedFilesRow(paths: paths) { onReviewChanges?(paths) }
 
         case .done(_, let ok, let summary):
             // Only failures get a row. A successful run's summary *is* the
@@ -618,5 +624,37 @@ private struct RunningStatusLine: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// What a finished editing run changed, as the way into reviewing it.
+///
+/// A row rather than a line in the reply: the reply says what the agent
+/// thinks it did, and this says what actually moved on disk. The two are the
+/// same often enough that nobody checks, which is exactly why the check has
+/// to be one click and not a trip to a terminal.
+private struct ChangedFilesRow: View {
+    @ObservedObject private var localization = Localization.shared
+
+    let paths: [String]
+    let onReview: () -> Void
+
+    var body: some View {
+        Button(action: onReview) {
+            HStack(spacing: 6) {
+                Image(systemName: "plusminus")
+                    .font(.system(size: 10))
+                    .accessibilityHidden(true)
+                Text(String(format: Strings.text(.reviewOpenFormat, language: localization.language), "\(paths.count)"))
+                    .font(.system(size: 11, weight: .medium))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .background(.quaternary.opacity(0.3), in: .rect(cornerRadius: 6))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

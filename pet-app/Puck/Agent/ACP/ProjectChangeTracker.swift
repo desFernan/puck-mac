@@ -17,24 +17,11 @@
 import Foundation
 
 final class ProjectChangeTracker {
-    /// `.git` above all: a single commit rewrites hundreds of paths under it
-    /// and none of them are the agent's edit. The rest are the same shape --
-    /// directories a build tool owns, where a change is a by-product of the
-    /// work rather than the work.
-    ///
-    /// This list is what keeps the walk cheap now that hidden files are *not*
-    /// skipped wholesale. They used to be, which meant an agent asked to fix
-    /// a CI workflow, a .env or a .gitignore reported changing nothing at
-    /// all: the snapshot could not see the file, so the watcher was the only
-    /// witness, and a coalesced burst there is unrecoverable.
-    static let ignoredDirectories: Set<String> = [
-        ".git", "node_modules", ".build", ".swiftpm", "DerivedData",
-        ".next", ".venv", "__pycache__",
-    ]
-
-    /// Finder writes this into whichever folder someone looked at, which has
-    /// nothing to do with the agent.
-    static let ignoredFileNames: Set<String> = [".DS_Store"]
+    /// What a walk of a project skips -- see ProjectIgnoreList, which is
+    /// where these live now that the composer's file index walks the same
+    /// tree and has to skip the same things.
+    static let ignoredDirectories = ProjectIgnoreList.directories
+    static let ignoredFileNames = ProjectIgnoreList.fileNames
 
     private let root: URL
     private let lock = NSLock()

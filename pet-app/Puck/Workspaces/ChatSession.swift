@@ -39,6 +39,8 @@ enum ChatTimelineEntry: Equatable {
     /// changes, and a transcript with six copies of the same checklist in it
     /// is a transcript nobody can read.
     case plan(id: UUID, plan: AgentPlan)
+    /// What an editing run changed, as the way into reviewing it.
+    case changedFiles(id: UUID, paths: [String])
 }
 
 extension ChatTimelineEntry {
@@ -50,7 +52,7 @@ extension ChatTimelineEntry {
         case .userMessage, .assistantText, .notice: return true
         // The plan belongs to the turn that produced it, the same way a tool
         // call does.
-        case .toolCall, .toolResult, .approvalRequested, .done, .plan: return false
+        case .toolCall, .toolResult, .approvalRequested, .done, .plan, .changedFiles: return false
         }
     }
 }
@@ -75,6 +77,7 @@ extension ChatTimelineEntry: Identifiable {
         // moment a second run finished.
         case .done(let id, _, _): return id
         case .plan(let id, _): return id
+        case .changedFiles(let id, _): return id
         }
     }
 }
@@ -220,7 +223,7 @@ final class ChatSession: ObservableObject, Identifiable {
                 return text.isEmpty ? nil : (true, text)
             case .assistantText(_, let text):
                 return text.isEmpty ? nil : (false, text)
-            case .notice, .toolCall, .toolResult, .approvalRequested, .done, .plan:
+            case .notice, .toolCall, .toolResult, .approvalRequested, .done, .plan, .changedFiles:
                 return nil
             }
         }
@@ -451,6 +454,12 @@ final class ChatSession: ObservableObject, Identifiable {
             // what the model is already saying in text_chunk, so putting it in
             // the timeline too would print every tour stop twice.
             break
+
+        case .filesChanged(let paths):
+            // Nothing to show for a run that changed nothing, which is most
+            // of them -- a row saying "0개 파일" is a row in the way.
+            guard !paths.isEmpty else { break }
+            timeline.append(.changedFiles(id: UUID(), paths: paths))
 
         case .planUpdated(let plan):
             noteRunStartedElsewhere()

@@ -47,16 +47,45 @@ final class ChangeReviewModel: ObservableObject {
     var addedCount: Int { files.reduce(0) { $0 + $1.addedCount } }
     var removedCount: Int { files.reduce(0) { $0 + $1.removedCount } }
 
-    func reload(projectPath: String?) async {
+    /// Reads the working tree.
+    ///
+    /// - Parameter focus: when non-empty, only these paths -- the review
+    ///   opened from one run's own row is about that run, and a list that
+    ///   also carried everything the user has been editing since would make
+    ///   "did the agent do this?" unanswerable. Empty is the toolbar's
+    ///   question, which is about the whole project.
+    ///
+    ///   A focused file with nothing to show is simply absent: it has been
+    ///   reverted, or committed, or the agent touched it and put it back.
+    func reload(projectPath: String?, focus: [String] = []) async {
         guard let projectPath else {
             files = []
             hasLoaded = true
             return
         }
         isLoading = true
-        files = await read(projectPath)
+        let all = await read(projectPath)
+        files = Self.narrowed(all, to: focus)
         isLoading = false
         hasLoaded = true
+    }
+
+    /// `focus` matched against both halves of a rename, and against a
+    /// suffix: the agent reports where it wrote, which may be an absolute
+    /// path, while git reports a path relative to the repository root.
+    static func narrowed(_ files: [FileDiff], to focus: [String]) -> [FileDiff] {
+        guard !focus.isEmpty else { return files }
+        return files.filter { file in
+            focus.contains { wanted in
+                matches(wanted, file.path) || file.previousPath.map { matches(wanted, $0) } == true
+            }
+        }
+    }
+
+    private static func matches(_ reported: String, _ gitPath: String) -> Bool {
+        reported == gitPath
+            || reported.hasSuffix("/" + gitPath)
+            || gitPath.hasSuffix("/" + reported)
     }
 
     /// Puts one file back and takes it out of the list.
@@ -91,6 +120,9 @@ struct ChangeReviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     let projectPath: String?
+    /// Which files this was opened about -- see ChangeReviewModel.reload.
+    /// Empty is the whole project.
+    var focus: [String] = []
     @StateObject private var model = ChangeReviewModel()
 
     var body: some View {
@@ -101,7 +133,7 @@ struct ChangeReviewView: View {
         }
         .frame(minWidth: 720, idealWidth: 940, minHeight: 460, idealHeight: 620)
         .background(palette.background)
-        .task(id: projectPath) { await model.reload(projectPath: projectPath) }
+        .task(id: projectPath) { await model.reload(projectPath: projectPath, focus: focus) }
     }
 
     private var header: some View {
@@ -119,7 +151,7 @@ struct ChangeReviewView: View {
             }
             Spacer(minLength: 0)
             Button(Strings.text(.reviewRefresh)) {
-                Task { await model.reload(projectPath: projectPath) }
+                Task { await model.reload(projectPath: projectPath, focus: focus) }
             }
             .disabled(model.isLoading)
             Button(Strings.text(.commonDone)) { dismiss() }

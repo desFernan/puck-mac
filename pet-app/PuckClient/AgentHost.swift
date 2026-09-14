@@ -401,6 +401,18 @@ final class AgentHost {
             projectPath: projectPath,
             task: task
         )
+        // What it changed, to the chat it was asked in -- the transcript
+        // turns this into the way into the review. Emitted even for a run
+        // that failed or was cancelled: a turn that stopped halfway has
+        // *still* edited files, and that is exactly when somebody wants to
+        // see which.
+        if !result.changedFiles.isEmpty {
+            emit(
+                .filesChanged(paths: result.changedFiles),
+                workspaceId: workspaceId,
+                sessionId: activeSessionId
+            )
+        }
         // "cancelled"/"timeout" are protocol codes of their own; everything
         // else the runner reports is vocabulary the model has no entry for.
         let passThroughCodes: Set<String> = ["cancelled", "timeout"]

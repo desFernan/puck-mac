@@ -84,6 +84,11 @@ enum BridgeEvent: Equatable {
     /// agent rewrites it, which it does as it learns what the work is, so the
     /// last one received is the plan rather than one entry in a log of them.
     case planUpdated(plan: AgentPlan)
+    /// What an editing run changed, once it is over. The transcript turns it
+    /// into a way into the review -- see ChangeReviewView -- so that "what
+    /// did that turn actually do to my project" is a click rather than a
+    /// trip to a terminal.
+    case filesChanged(paths: [String])
 }
 
 /// An image attached to a user_input (e.g. pet-app's F14 drag capture).
@@ -298,6 +303,7 @@ extension BridgeMessage: Codable {
         case agentDone = "agent_done"
         case petSays = "pet_says"
         case planUpdated = "plan"
+        case filesChanged = "files_changed"
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -315,6 +321,7 @@ extension BridgeMessage: Codable {
         case approvalId = "approval_id"
         case role
         case plan
+        case paths
     }
 
     init(from decoder: Decoder) throws {
@@ -386,6 +393,8 @@ extension BridgeMessage: Codable {
                 event = .petSays(text: try container.decode(String.self, forKey: .text))
             case .planUpdated:
                 event = .planUpdated(plan: try container.decode(AgentPlan.self, forKey: .plan))
+            case .filesChanged:
+                event = .filesChanged(paths: try container.decode([String].self, forKey: .paths))
             }
             self = .event(event, workspaceId: workspaceId, sessionId: sessionId)
 
@@ -510,6 +519,9 @@ extension BridgeMessage: Codable {
             case .planUpdated(let plan):
                 try container.encode(EventKey.planUpdated, forKey: .event)
                 try container.encode(plan, forKey: .plan)
+            case .filesChanged(let paths):
+                try container.encode(EventKey.filesChanged, forKey: .event)
+                try container.encode(paths, forKey: .paths)
             }
 
         case .userInput(let input):
